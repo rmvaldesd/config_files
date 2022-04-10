@@ -3,6 +3,7 @@ git clone https://git.suckless.org/dwm
 git clone https://git.suckless.org/dmenu
 git clone https://git.suckless.org/st
 
+/*************************************/
 sudo pacman -Sy xorg-xinit
 sudo pacman -Sy picom redshift
 sudo pacman -Sy feh
@@ -11,6 +12,14 @@ sudo pacman -Sy acpi brightnessctl
 sudo pacman -Sy xorg-xsetroot
 sudo pacman -Sy ttf-font-awesome
 sudo pacman -S xorgproto
+sudo pacman -S xorg-xfontsel
+sudo pacman -S geoclue
+/*************************************/
+
+sudo pacman -Sy xorg-xinit picom redshift feh xorg-xrandr acpi \
+brightnessctl xorg-xsetroot ttf-font-awesome xorgproto \
+xorg-xfontsel geoclue
+
 
 
 # create all these links after compile.
@@ -20,4 +29,3 @@ sudo ln -s $HOME/suckless/dmenu/dmenu_path /usr/bin/
 sudo ln -s $HOME/suckless/dmenu/dmenu_run /usr/bin/
 sudo ln -s $HOME/suckless/dmenu/stest /usr/bin/
 sudo ln -s $HOME/suckless/st/st /usr/bin/
-sudo pacman -S xorg-xfontsel
