@@ -1,0 +1,4 @@
+Archlinux:
+configure wifi from terminal:
+- nmtui
+
