@@ -1,0 +1,29 @@
+mod -> alt key
+
+resize focused panel horizontally.
+alt + h
+alt + l
+
+move focused window to another tag
+alt + shift + tag nbr
+
+close window
+alt + shift + c
+
+quit dwm
+alt + shift + q
+
+open terminal 
+alt + shift + enter
+
+open dmenu
+alt + p
+
+add / dim the number of master in layout
+alt + i (increment the number of masters)
+alt + d (dim the number of masters)
+
+convert window to master:
+alt + enter
+
+
