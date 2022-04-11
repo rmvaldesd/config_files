@@ -1,5 +1,7 @@
 Shortcuts
 
+https://codeyarns.com/tech/2014-08-22-vi-file-manager.html
+https://vifm.info/cheatsheets.shtml <------------ very good info.
 
 Open: 
 # vifm
@@ -37,9 +39,6 @@ we could have tabs in vifm
     :tabnew
     gt (move between tabs)
 
-
-
-
 marks:
     'H -> home
     set mark: go to folder: 
@@ -56,8 +55,10 @@ rename a file:
 the asterisk in a file its a current cursor position when we are not in the window.
 
 hidden files: 
-we could enable or disable with z (toggle)
-
+    we could enable or disable with za (toggle)
+    za: Toggle showing hidden files
+    zo: Show hidden files
+    zm: Hide hidden files
 
 
 
