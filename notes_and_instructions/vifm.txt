@@ -1,0 +1,64 @@
+Shortcuts
+
+
+Open: 
+# vifm
+
+It works with panels
+move between panels:
+ctrl + w + (h or l) 
+
+moving thow the filesystem:
+j k (up down)
+
+enter into folder
+enter
+
+move half page
+ctrl down or ctrl up
+
+go to top or down of the page.
+gg
+GG
+
+copy / paste file:
+yy: copy
+p: paste
+u: undo
+dd: delete file
+
+e: preview of file on current panel.
+w: preview in the other panel, could be file or file tree
+w: left preview.
+
+enter or -> key will open a file in vim.
+
+we could have tabs in vifm
+    :tabnew
+    gt (move between tabs)
+
+
+
+
+marks:
+    'H -> home
+    set mark: go to folder: 
+    mo (using key o)
+    go to previous mark: 
+    'o
+    :marks -> see current marks
+    marks are not persistents, will be lost when close vifm.
+    we could delete it using dd over the mark.
+
+rename a file: 
+    cw -> rename file (change word)
+
+the asterisk in a file its a current cursor position when we are not in the window.
+
+hidden files: 
+we could enable or disable with z (toggle)
+
+
+
+
+
