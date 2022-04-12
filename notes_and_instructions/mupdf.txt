@@ -1,0 +1,54 @@
+https://www.mupdf.com/docs/manual-mupdf-gl.html
+
+
+Set mupdf as default pdf viewer
+
+$ xdg-mime default mupdf.desktop application/pdf
+
+F1	            Display help.
+i	            Show document information.
+o	            Show document outline.
+L	            Highlight links.
+F	            Highlight form fields.
+a	            Show annotation editor.
+r	            Reload document.
+S	            Save document (only for PDF).
+q	            Quit viewer.
+ 
+<	            Decrease E-book font size.
+>	            Increase E-book font size.
+I	            Toggle inverted color mode.
+C	            Toggle tinted color mode.
+E	            Toggle ICC color management.
+e	            Toggle spot color emulation.
+A	            Toggle anti-aliasing.
+ 
+f	            Toggle fullscreen.
+w	            Shrinkwrap window to fit page.
+W	            Fit page width to window.
+H	            Fit page height to window.
+Z	            Fit page size to window.
+[number] z	    Set zoom resolution in DPI.
++	            Zoom in.
+-	            Zoom out.
+[	            Rotate counter-clockwise.
+]	            Rotate clockwise.
+[arrows] or h, j, k, l	Pan page in small increments.
+ 
+b	            Smart move one screenful backward.
+[space]	        Smart move one screenful forward.
+[comma] or [page up]	Go one page backward.
+[period] or [page down]	Go one page forward.
+[number] g	    Go to page number.
+G	            Go to last page.
+ 
+m	            Save current page to navigation history.
+t	            Go back in navigation history.
+T	            Go forward in navigation history.
+[number] m	    Save current page in numbered bookmark.
+[number] t	    Go to numbered bookmark.
+ 
+/	            Start searching forward.
+?	            Start searching backward.
+n	            Continue searching forward.
+N	            Continue searching backward.
