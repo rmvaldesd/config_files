@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>customSites</key>
+	<dict>
+		<key>0D483F84-314E-4D73-B378-84FDFB5D00D7</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>csbuk</string>
+			<key>text</key>
+			<string>Buk cornershop RRHH</string>
+			<key>url</key>
+			<string>https://cornershop.buk.cl/employees/9478#resumen</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>246D7DD5-58ED-45D9-A33C-4AFAE433691B</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>soq</string>
+			<key>text</key>
+			<string>Stack Overflow Search: {q}</string>
+			<key>url</key>
+			<string>https://stackoverflow.com/search?q={query}</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>30449177-CC06-430C-AFF0-1B09454B6351</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>ghprofile</string>
+			<key>text</key>
+			<string>Github Profile</string>
+			<key>url</key>
+			<string>https://github.com/rmvaldesd</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>3A510395-18C5-4FAC-8AC8-10ECEE47224C</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>trans enes</string>
+			<key>text</key>
+			<string>Translate English Spanish</string>
+			<key>url</key>
+			<string>https://translate.google.com/?sl=en&amp;tl=es&amp;text={query}&amp;op=translate</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>41E648A1-4A78-4453-89E5-AD1EDCC40A3A</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>csghpr</string>
+			<key>text</key>
+			<string>Github Cornershop assigned PRs</string>
+			<key>url</key>
+			<string>https://github.com/cornershop/cornershop-backend/pulls/assigned/rmvaldesd</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>4685867C-0957-4F86-A9F9-56FECB441109</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>csghrv</string>
+			<key>text</key>
+			<string>Github_cs_reviews</string>
+			<key>url</key>
+			<string>https://github.com/cornershop/cornershop-backend/pulls/review-requested/@me</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>4F3F725E-0968-4CB1-A955-F52509A28CAE</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>sot</string>
+			<key>text</key>
+			<string>Stack Overflow Tag {query}</string>
+			<key>url</key>
+			<string>https://stackoverflow.com/questions/tagged/{query}</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>5D265A21-D143-4DC4-8E2F-2B529E402C22</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>csghdesy</string>
+			<key>text</key>
+			<string>Github Cornershop devel delivery system</string>
+			<key>url</key>
+			<string>https://github.com/cornershop/cornershop-backend/tree/devel/apps/delivery_system</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>659CA708-582C-4932-A4B4-5EAEEF107D88</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>csccdevel</string>
+			<key>text</key>
+			<string>Circle CI Cornershop Dev</string>
+			<key>url</key>
+			<string>https://app.circleci.com/pipelines/github/cornershop/cornershop-backend?branch=devel&amp;filter=all</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>682F59B8-34E1-4790-902C-B1C02A28CBB9</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>csccmaster</string>
+			<key>text</key>
+			<string>Circle CI Cornershop Master pipelines</string>
+			<key>url</key>
+			<string>https://app.circleci.com/pipelines/github/cornershop/cornershop-backend?branch=master&amp;filter=all</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>7BC8FFFD-B3E1-445A-9267-7BCAEF0C541D</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>trans esen</string>
+			<key>text</key>
+			<string>Translate Spanish to English {query}</string>
+			<key>url</key>
+			<string>https://translate.google.com/?sl=es&amp;tl=en&amp;text={query}&amp;op=translate</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>91D1F802-F3A1-4858-9ABC-BAB374808765</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>csscprojects</string>
+			<key>text</key>
+			<string>Shortcut fulfillment projects</string>
+			<key>url</key>
+			<string>https://app.shortcut.com/shopperapps/epics?owner_ids=60be2a40-06a8-4f6f-b09e-0a84327dc8c1&amp;project_ids=4423</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+		<key>950727D0-61B0-405B-9B6D-8BBD89891886</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>csccmypp</string>
+			<key>text</key>
+			<string>Circle CI Cornershop my pipelines</string>
+			<key>url</key>
+			<string>https://app.circleci.com/pipelines/github/cornershop?filter=mine</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
+	</dict>
+</dict>
+</plist>
