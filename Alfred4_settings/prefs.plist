@@ -95,6 +95,19 @@
 			<key>utf8</key>
 			<true/>
 		</dict>
+		<key>59760E4A-033C-466C-95B7-48E876860A31</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>csghroot</string>
+			<key>text</key>
+			<string>Cornershop Github Root</string>
+			<key>url</key>
+			<string>https://github.com/cornershop/cornershop-backend</string>
+			<key>utf8</key>
+			<true/>
+		</dict>
 		<key>5D265A21-D143-4DC4-8E2F-2B529E402C22</key>
 		<dict>
 			<key>enabled</key>

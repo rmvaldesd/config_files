@@ -118,8 +118,11 @@ nnoremap <silent> <leader>w :w <cr>
 nnoremap <silent> <leader>q :q <cr>
 
 " Move throught open buffers
-nnoremap <silent> <leader>h :bp \| echo @% <cr>
-nnoremap <silent> <leader>l :bn \| echo @% <cr>
+" nnoremap <silent> <leader>h :bp \| echo @% <cr>
+" nnoremap <silent> <leader>l :bn \| echo @% <cr>
+" New Version of shortcut:
+nnoremap <C-H> :bprev<CR>
+nnoremap <C-L> :bnext<CR>
 
 " Show the name and path of current file.
 nnoremap <silent><leader>fn :echo @% <cr> 
