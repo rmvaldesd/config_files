@@ -108,6 +108,8 @@ nnoremap <silent> <leader>c :execute "set colorcolumn="
                   \ . (&colorcolumn == "" ? "88" : "")<CR>
 
 "FZF mappings
+let g:fzf_preview_window = ['up:50%', 'ctrl-/']
+let g:fzf_layout = { 'down': '~40%' }
 nnoremap <silent> <leader>f :Files <cr>
 nnoremap <silent> <leader>g :GFiles <cr>
 nnoremap <silent> <leader>rg :Rg <cr>
