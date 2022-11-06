@@ -1,0 +1,31 @@
+{
+  "python.jediEnabled": false,
+  "coc.preferences.formatOnSaveFiletypes": [
+    "css",
+    "markdown",
+    "graphql",
+    "html",
+    "yaml"
+  ],
+  "coc.preferences.formatOnType": true,
+  "python.linting.enabled": true,
+  "python.formatting.provider": "black",
+  "python.linting.pylintEnabled": false,
+  "python.linting.flake8Path": "/usr/local/bin/flake8",
+  "python.linting.flake8Enabled": true,
+  "python.linting.flake8Args": ["--max-line-length=88", "--extend-ignore=E203,E501"],
+  "python.formatting.blackPath": "/usr/local/bin/black",
+  "python.linting.pylintArgs": ["--load-plugins", "pylint-flask"],
+  "languageserver": {
+    "golang": {
+      "command": "gopls",
+      "rootPatterns": ["go.work", "go.mod", ".vim/", ".git/", ".hg/"],
+      "filetypes": ["go"],
+      "initializationOptions": {
+        "usePlaceholders": true
+      }
+    }
+  }
+}
+
+
