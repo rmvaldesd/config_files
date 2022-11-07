@@ -160,6 +160,17 @@
 			<key>utf8</key>
 			<true/>
 		</dict>
+		<key>830C0AE1-DD16-4602-8322-831C6F1B8007</key>
+		<dict>
+			<key>enabled</key>
+			<true/>
+			<key>keyword</key>
+			<string>wdrive</string>
+			<key>text</key>
+			<string>Google Drive Web: {q}</string>
+			<key>url</key>
+			<string>https://drive.google.com/drive/search?q={query}</string>
+		</dict>
 		<key>91D1F802-F3A1-4858-9ABC-BAB374808765</key>
 		<dict>
 			<key>enabled</key>
@@ -169,9 +180,7 @@
 			<key>text</key>
 			<string>Shortcut fulfillment projects</string>
 			<key>url</key>
-			<string>https://app.shortcut.com/shopperapps/epics?owner_ids=60be2a40-06a8-4f6f-b09e-0a84327dc8c1&amp;project_ids=4423</string>
-			<key>utf8</key>
-			<true/>
+			<string>https://app.shortcut.com/shopperapps/epics?owner_ids=v2%3Ap%3A5db33a53-cfcc-4a0e-923b-248329e5c8c5%3A60be2a40-06a8-4f6f-b09e-0a84327dc8c1&amp;owner_ids=v2%3Ap%3A5db33a53-cfcc-4a0e-923b-248329e5c8c5%3A61898687-ce53-4099-bc3f-df9ae6ea5428&amp;project_ids=v2%3Apr%3A5db33a53-cfcc-4a0e-923b-248329e5c8c5%3A4423</string>
 		</dict>
 		<key>950727D0-61B0-405B-9B6D-8BBD89891886</key>
 		<dict>
