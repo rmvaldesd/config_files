@@ -30,3 +30,7 @@ vim.keymap.set('n', '<leader>fh', builtin.help_tags, {})
 map("n","<leader>fd", "<cmd>Telescope file_browser<CR>", { noremap = true })
 map("n", "<leader>fm", "<cmd>Telescope marks<CR>")
 -- LSP mappings are in plugins/lsp-settings.lua
+
+-- Customs
+local utils = require('utils')
+vim.keymap.set('n', '<leader>fn', utils.get_current_file_name)

@@ -39,6 +39,7 @@ return require('packer').startup(function(use)
   }
   use {"nvim-telescope/telescope-file-browser.nvim"}
   use 'kyazdani42/nvim-web-devicons'
+  use { "lervag/wiki.vim" }
 
 
   -- Automatically set up your configuration after cloning packer.nvim
