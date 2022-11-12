@@ -31,6 +31,8 @@ return require('packer').startup(function(use)
   use 'hrsh7th/cmp-nvim-lsp'
   use 'hrsh7th/cmp-buffer'
   use {'numtostr/BufOnly.nvim', cmd='BufOnly'}
+
+  -- Telescope 
   use {
     'nvim-telescope/telescope.nvim',
     requires = { 
@@ -38,7 +40,10 @@ return require('packer').startup(function(use)
     }
   }
   use {"nvim-telescope/telescope-file-browser.nvim"}
+  use {'nvim-telescope/telescope-fzf-native.nvim', run = 'make' }
   use 'kyazdani42/nvim-web-devicons'
+
+  -- Notes - Wiki
   use { "lervag/wiki.vim" }
 
 
