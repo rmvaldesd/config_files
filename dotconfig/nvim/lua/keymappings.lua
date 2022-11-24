@@ -34,3 +34,16 @@ map("n", "<leader>fm", "<cmd>Telescope marks<CR>")
 -- Customs
 local utils = require('utils')
 vim.keymap.set('n', '<leader>fn', utils.get_current_file_name)
+
+-- relative path (src/foo.txt)
+map('n', '<leader>cf', '<cmd>let @+=expand("%")<CR>', {})
+
+-- absolute path (/something/src/foo.txt)
+map('n', '<leader>cF', '<cmd>let @+=expand("%:p")<CR>', {})
+
+-- filename (foo.txt)
+map('n', '<leader>ct', '<cmd>let @+=expand("%:t")<CR>', {})
+
+-- directory name (/something/src)
+map('n', '<leader>ch', '<cmd>let @+=expand("%:p:h")<CR>', {})
+
