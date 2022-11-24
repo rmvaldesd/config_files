@@ -1,5 +1,6 @@
 require('plugins/lsp-settings')
 require('plugins/telescope')
+require('plugins/nvim-colorizer')
 
 
 -- GruvBox settings
@@ -20,4 +21,5 @@ vim.g["mappings_use_defaults"] = 'local'
 vim.g["mappings_local"] = {
 	['<plug>(wiki-link-follow)'] = '<leader><CR>',
 }
+
 

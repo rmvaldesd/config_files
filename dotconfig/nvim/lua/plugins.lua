@@ -21,9 +21,12 @@ return require('packer').startup(function(use)
   use 'tpope/vim-commentary'
   use 'tpope/vim-fugitive'
   use 'tpope/vim-surround'
+
   use { "ellisonleao/gruvbox.nvim" }
   use 'vim-airline/vim-airline'
   use 'vim-airline/vim-airline-themes'
+  use { 'norcalli/nvim-colorizer.lua' }
+
   use 'rafcamlet/nvim-luapad'
   use 'L3MON4D3/LuaSnip'
   use 'saadparwaiz1/cmp_luasnip'
