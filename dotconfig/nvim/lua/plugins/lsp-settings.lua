@@ -53,9 +53,8 @@ end
 
 local lsp_flags = {
   -- This is the default in Nvim 0.7+
-  debounce_text_changes = 150,
+  debounce_text_changes = 300,
 }
-
 
 
 -- nvim-cmp supports additional completion capabilities
@@ -63,7 +62,7 @@ local capabilities = vim.lsp.protocol.make_client_capabilities()
 capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
 
 -- LSPs with default setup: bashls (Bash), cssls (CSS), html (HTML), clangd (C/C++), jsonls (JSON)
-for _, lsp in ipairs { 'pyright', 'gopls', 'tsserver', 'bashls', 'cssls', 'html', 'clangd', 'jsonls'} do
+for _, lsp in ipairs {'gopls', 'tsserver', 'bashls', 'cssls', 'html', 'clangd', 'jsonls'} do
       require('lspconfig')[lsp].setup {
         on_attach = on_attach,
         flags=lsp_flags,
@@ -72,6 +71,22 @@ for _, lsp in ipairs { 'pyright', 'gopls', 'tsserver', 'bashls', 'cssls', 'html'
 end
 
 -- LSPs with no default setup
+require('lspconfig')['pyright'].setup{
+    on_attach = on_attach,
+    flags = lsp_flags,
+    capabilities = capabilities,
+    settings = { 
+        python = { 
+            analysis = { 
+                autoSearchPaths = true, 
+                diagnosticMode = "openFilesOnly", 
+                useLibraryCodeForTypes = true, 
+                typeCheckingMode = "basic", 
+            }, 
+        }, 
+    }
+}
+
 require('lspconfig')['rust_analyzer'].setup{
     on_attach = on_attach,
     flags = lsp_flags,
