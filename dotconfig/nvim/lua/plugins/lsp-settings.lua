@@ -1,7 +1,7 @@
 -- ----------------------nvim-lsp-installer setup-----------------------
 require("nvim-lsp-installer").setup({
     -- List of servers to automatically install
-    ensure_installed = { 'pyright', 'gopls', 'tsserver', 'eslint', 'bashls', 'cssls', 'html', 'sumneko_lua', 'jsonls', 'clangd', 'lemminx' },
+    ensure_installed = { 'pyright', 'gopls', 'dartls', 'tsserver', 'eslint', 'bashls', 'cssls', 'html', 'sumneko_lua', 'jsonls', 'clangd', 'lemminx' },
     -- automatically detect which servers to install (based on which servers are set up via lspconfig)
     automatic_installation = true,
     ui = {
@@ -62,7 +62,7 @@ local capabilities = vim.lsp.protocol.make_client_capabilities()
 capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
 
 -- LSPs with default setup: bashls (Bash), cssls (CSS), html (HTML), clangd (C/C++), jsonls (JSON)
-for _, lsp in ipairs {'gopls', 'tsserver', 'bashls', 'cssls', 'html', 'clangd', 'jsonls'} do
+for _, lsp in ipairs { 'gopls', 'dartls', 'tsserver', 'bashls', 'cssls', 'html', 'clangd', 'jsonls'} do
       require('lspconfig')[lsp].setup {
         on_attach = on_attach,
         flags=lsp_flags,

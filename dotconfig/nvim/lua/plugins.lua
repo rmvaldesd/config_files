@@ -30,15 +30,19 @@ return require('packer').startup(function(use)
   use 'hrsh7th/nvim-cmp'
   use 'hrsh7th/cmp-nvim-lsp'
   use 'hrsh7th/cmp-buffer'
+  use 'mfussenegger/nvim-dap'
   use {'numtostr/BufOnly.nvim', cmd='BufOnly'}
+  use {
+      'akinsho/flutter-tools.nvim',
+      requires = 'nvim-lua/plenary.nvim', 
+      config = function() 
+          require("plugins/flutter-tools").setup()
+      end
+  }
+
 
   -- Telescope 
-  use {
-    'nvim-telescope/telescope.nvim',
-    requires = { 
-       {'nvim-lua/plenary.nvim'},
-    }
-  }
+  use { 'nvim-telescope/telescope.nvim', requires = 'nvim-lua/plenary.nvim' } 
   use {"nvim-telescope/telescope-file-browser.nvim"}
   use {'nvim-telescope/telescope-fzf-native.nvim', run = 'make' }
   use 'kyazdani42/nvim-web-devicons'
