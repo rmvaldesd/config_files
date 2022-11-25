@@ -1,9 +1,7 @@
 -- ----------------------nvim-lsp-installer setup-----------------------
-require("nvim-lsp-installer").setup({
+require("mason").setup({
     -- List of servers to automatically install
-    ensure_installed = { 'pyright', 'gopls', 'dartls', 'tsserver', 'eslint', 'bashls', 'cssls', 'html', 'sumneko_lua', 'jsonls', 'clangd', 'lemminx' },
     -- automatically detect which servers to install (based on which servers are set up via lspconfig)
-    automatic_installation = true,
     ui = {
         icons = {
             server_installed = "✓",
@@ -13,7 +11,9 @@ require("nvim-lsp-installer").setup({
     }
 })
 
-
+require("mason-lspconfig").setup{
+    ensure_installed = { 'pyright', 'gopls', 'eslint', 'tsserver', 'bashls', 'cssls', 'html', 'sumneko_lua', 'jsonls', 'clangd', 'lemminx' },
+}
 
 
 -- ------------------------- LSP Setup ---------------------------------

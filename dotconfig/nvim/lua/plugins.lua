@@ -16,7 +16,10 @@ return require('packer').startup(function(use)
   use {'nvim-telescope/telescope-symbols.nvim'}
   use 'wbthomason/packer.nvim'
   use 'ojroques/vim-oscyank'
-  use 'williamboman/nvim-lsp-installer'
+  --use 'williamboman/nvim-lsp-installer'
+  use { "williamboman/mason.nvim" }
+  use { "williamboman/mason-lspconfig.nvim" }
+
   use 'neovim/nvim-lspconfig'
   use 'tpope/vim-commentary'
   use 'tpope/vim-fugitive'
