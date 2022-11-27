@@ -17,7 +17,7 @@ function M.setup ()
     dev_log = { enabled = false, open_cmd = "tabedit" },
     lsp = {
       color = {
-        enabled = true,
+        enabled = false,
         background = true,
         virtual_text = false,
       },
