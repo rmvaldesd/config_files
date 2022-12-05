@@ -11,7 +11,7 @@ map('i', '<C-w>', '<C-g>u<C-w>')  -- Make <C-w> undo-friendly
 map('i', '<S-Tab>', 'pumvisible() ? "\\<C-p>" : "\\<Tab>"', {expr = true})
 map('i', '<Tab>', 'pumvisible() ? "\\<C-n>" : "\\<Tab>"', {expr = true})
 
-map('n', '<C-l>', '<cmd>noh<CR>')    -- Clear highlights
+-- map('n', '<C-l>', '<cmd>noh<CR>')    -- Clear highlights
 map('n', '<leader>o', 'm`o<Esc>``')  -- Insert a newline in normal
 
 -- quit / write with leader key shortcut.
@@ -48,3 +48,7 @@ map('n', '<leader>ct', '<cmd>let @+=expand("%:t")<CR>', {})
 -- directory name (/something/src)
 map('n', '<leader>ch', '<cmd>let @+=expand("%:p:h")<CR>', {})
 
+map('n', '<C-l>', '<C-w>l', {})
+map('n', '<C-h>', '<C-w>h', {})
+map('n', '<C-k>', '<C-w>k', {})
+map('n', '<C-j>', '<C-w>j', {})
