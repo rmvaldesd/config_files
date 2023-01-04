@@ -30,6 +30,7 @@ vim.keymap.set('n', '<leader>fh', builtin.help_tags, {})
 map("n","<leader>fd", "<cmd>Telescope file_browser<CR>", { noremap = true })
 map("n", "<leader>fm", "<cmd>Telescope marks<CR>")
 map("n", "<leader>fc", "<cmd>Telescope flutter commands<CR>")
+map("n", "gr", "<cmd>Telescope lsp_references<CR>")
 -- LSP mappings are in plugins/lsp-settings.lua
 
 -- Customs
