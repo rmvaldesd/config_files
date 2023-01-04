@@ -48,7 +48,13 @@ map('n', '<leader>ct', '<cmd>let @+=expand("%:t")<CR>', {})
 -- directory name (/something/src)
 map('n', '<leader>ch', '<cmd>let @+=expand("%:p:h")<CR>', {})
 
+--- moving throught the panes.
 map('n', '<C-l>', '<C-w>l', {})
 map('n', '<C-h>', '<C-w>h', {})
 map('n', '<C-k>', '<C-w>k', {})
 map('n', '<C-j>', '<C-w>j', {})
+
+--- moving throught the buffers
+map('n', '<leader>h', '<cmd>bprevious<CR>', {})
+map('n', '<leader>l', '<cmd>bnext<CR>', {})
+
