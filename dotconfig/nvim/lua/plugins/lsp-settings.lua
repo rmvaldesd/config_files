@@ -1,4 +1,5 @@
 -- ----------------------nvim-lsp-installer setup-----------------------
+local util = require 'lspconfig.util'
 require("mason").setup({
     -- List of servers to automatically install
     -- automatically detect which servers to install (based on which servers are set up via lspconfig)
@@ -51,51 +52,7 @@ local on_attach = function(client, bufnr)
   vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end, bufopts)
 end
 
-local lsp_flags = {
-  -- This is the default in Nvim 0.7+
-  debounce_text_changes = 300,
-}
 
-
--- nvim-cmp supports additional completion capabilities
-local capabilities = vim.lsp.protocol.make_client_capabilities()
-capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
-
--- LSPs with default setup: bashls (Bash), cssls (CSS), html (HTML), clangd (C/C++), jsonls (JSON)
-for _, lsp in ipairs { 'gopls', 'dartls', 'tsserver', 'bashls', 'cssls', 'html', 'clangd', 'jsonls'} do
-      require('lspconfig')[lsp].setup {
-        on_attach = on_attach,
-        flags=lsp_flags,
-        capabilities = capabilities,
-      }
-end
-
--- LSPs with no default setup
-require('lspconfig')['pyright'].setup{
-    on_attach = on_attach,
-    flags = lsp_flags,
-    capabilities = capabilities,
-    settings = { 
-        python = { 
-            analysis = { 
-                autoSearchPaths = true, 
-                diagnosticMode = "openFilesOnly", 
-                useLibraryCodeForTypes = true, 
-                typeCheckingMode = "basic", 
-            }, 
-        }, 
-    }
-}
-
-require('lspconfig')['rust_analyzer'].setup{
-    on_attach = on_attach,
-    flags = lsp_flags,
-    capabilities = capabilities,
-    -- Server-specific settings...
-    settings = {
-      ["rust-analyzer"] = {}
-    }
-}
 
 -- nvim-cmp setup
 local cmp = require 'cmp'
@@ -105,6 +62,10 @@ cmp.setup {
         expand = function(args)
             luasnip.lsp_expand(args.body)
         end,
+    },
+    window = {
+      -- completion = cmp.config.window.bordered(),
+      -- documentation = cmp.config.window.bordered(),
     },
     mapping = cmp.mapping.preset.insert({
         ['<C-d>'] = cmp.mapping.scroll_docs(-4),
@@ -134,9 +95,106 @@ cmp.setup {
         end, { 'i', 's' }),
     }),
     sources = {
-        { name = 'nvim_lsp', max_item_count = 6},
+        { name = 'nvim_lsp'},
         { name = 'luasnip' },
-        { name = 'buffer', max_item_count = 6 }
+        { name = 'buffer' },
+        { name = 'nvim_lsp_signature_help' }
     },
+}
+
+-- -----------------------end nvim-cmp configuration ---------------------
+
+local lsp_flags = {
+  -- This is the default in Nvim 0.7+
+  debounce_text_changes = 300,
+}
+
+
+-- nvim-cmp supports additional completion capabilities
+--local capabilities = vim.lsp.protocol.make_client_capabilities()
+--capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
+local capabilities = require('cmp_nvim_lsp').default_capabilities()
+
+
+-- LSPs with default setup: bashls (Bash), cssls (CSS), html (HTML), clangd (C/C++), jsonls (JSON)
+for _, lsp in ipairs { 'tsserver', 'bashls', 'cssls', 'html', 'clangd', 'jsonls'} do
+      require('lspconfig')[lsp].setup {
+        on_attach = on_attach,
+        flags=lsp_flags,
+        capabilities = capabilities,
+      }
+end
+
+-- LSPs with no default setup
+require('lspconfig')['gopls'].setup{
+    on_attach = on_attach,
+    flags = lsp_flags,
+    capabilities = capabilities,
+    filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
+    root_dir = function(fname)
+      return util.root_pattern 'go.work'(fname) or util.root_pattern('go.mod', '.git')(fname)
+    end,
+    single_file_support = true,
+}
+
+
+local python_root_files = {
+  'pyproject.toml',
+  'setup.py',
+  'setup.cfg',
+  'requirements.txt',
+  'Pipfile',
+  'pyrightconfig.json',
+}
+require('lspconfig')['pyright'].setup{
+    on_attach = on_attach,
+    flags = lsp_flags,
+    capabilities = capabilities,
+    filetypes = { 'python' },
+    root_dir = util.root_pattern(unpack(python_root_files)),
+    single_file_support = true,
+    settings = {
+      python = {
+        analysis = {
+          autoSearchPaths = true,
+          useLibraryCodeForTypes = true,
+          diagnosticMode = 'workspace',
+        },
+      },
+    },
+}
+
+
+require('lspconfig')['dartls'].setup{
+    on_attach = on_attach,
+    flags = lsp_flags,
+    capabilities = capabilities,
+    filetypes = { 'dart' },
+    root_dir = util.root_pattern 'pubspec.yaml',
+    single_file_support = true,
+    init_options = {
+      onlyAnalyzeProjectsWithOpenFiles = true,
+      suggestFromUnimportedLibraries = true,
+      closingLabels = true,
+      outline = true,
+      flutterOutline = true,
+    },
+    settings = {
+      dart = {
+        completeFunctionCalls = true,
+        showTodos = true,
+      },
+    },
+}
+
+
+require('lspconfig')['rust_analyzer'].setup{
+    on_attach = on_attach,
+    flags = lsp_flags,
+    capabilities = capabilities,
+    -- Server-specific settings...
+    settings = {
+      ["rust-analyzer"] = {}
+    }
 }
 
