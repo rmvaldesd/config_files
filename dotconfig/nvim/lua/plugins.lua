@@ -56,6 +56,10 @@ return require('packer').startup(function(use)
   -- Notes - Wiki
   use { "lervag/wiki.vim" }
 
+  -- browse things.
+  use { "preservim/tagbar" }
+  use { "preservim/nerdtree" }
+
 
   -- Automatically set up your configuration after cloning packer.nvim
   -- Put this at the end after all plugins

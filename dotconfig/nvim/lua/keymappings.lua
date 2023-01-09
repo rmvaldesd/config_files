@@ -59,3 +59,7 @@ map('n', '<C-j>', '<C-w>j', {})
 map('n', '<leader>h', '<cmd>bprevious<CR>', {})
 map('n', '<leader>l', '<cmd>bnext<CR>', {})
 
+--- Persevim (Nerdtree / TagBar)
+map('n', '<leader>m', '<cmd>NERDTreeToggle<CR>', {})
+map('n', '<leader>n', '<cmd>TagbarToggle<CR>', {})
+
