@@ -13,7 +13,7 @@ require("mason").setup({
 })
 
 require("mason-lspconfig").setup{
-    ensure_installed = { 'pyright', 'gopls', 'eslint', 'tsserver', 'bashls', 'cssls', 'html', 'sumneko_lua', 'jsonls', 'clangd', 'lemminx' },
+    ensure_installed = { 'pyright', 'gopls', 'eslint', 'tsserver', 'bashls', 'cssls', 'html', 'lua_ls', 'jsonls', 'clangd', 'lemminx' },
 }
 
 
