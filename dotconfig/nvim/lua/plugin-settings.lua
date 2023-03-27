@@ -1,6 +1,7 @@
 require('plugins/lsp-settings')
 require('plugins/telescope')
 require('plugins/nvim-colorizer')
+require('plugins/lsp-format')
 
 
 -- GruvBox settings
