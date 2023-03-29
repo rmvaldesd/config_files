@@ -33,19 +33,40 @@ require("dap").adapters.delve = {
   port = "${port}",
 }
 
+local substitutePath = {
+  {
+    from = "${env:GOPATH}/src",
+    to = "src"
+  },
+  {
+    from = "${env:GOPATH}/bazel-go-code/external/",
+    to = "external/"
+  },
+  {
+    from = "${env:GOPATH}/bazel-out/",
+    to = "bazel-out/"
+  },
+  {
+    from = "${env:GOPATH}/bazel-go-code/external/go_sdk",
+    to = "GOROOT/"
+  },
+}
+
 require("dap").configurations.go = {
   {
     type = "delve",
     name = "Debug",
     request = "attach",
     mode = "remote",
+    substitutePath = substitutePath
   },
   {
     type = "delve",
     name = "Debug test", -- configuration for debugging test files
     request = "attach",
     mode = "test",
-    program = "${file}"
+    program = "${file}",
+    substitutePath = substitutePath
   },
   -- works with go.mod packages and sub packages
   {
@@ -53,7 +74,8 @@ require("dap").configurations.go = {
     name = "Debug test (go.mod)",
     request = "launch",
     mode = "test",
-    program = "./${relativeFileDirname}"
+    program = "./${relativeFileDirname}",
+    substitutePath = substitutePath,
   }
 }
 
