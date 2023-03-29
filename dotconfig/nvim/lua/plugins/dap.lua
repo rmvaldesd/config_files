@@ -25,7 +25,18 @@ require('dap').configurations.rust = {
   lldb -- different debuggers or more configurations can be used here
 }
 
+
 -- https://github.com/go-delve/delve/blob/master/Documentation/usage/dlv_dap.md
+
+require("dap").adapters.go = {
+  type = "server",
+  port = "${port}",
+  executable = {
+    command = vim.fn.stdpath("data") .. '/mason/bin/dlv',
+    args = { "dap", "-l", "127.0.0.1:${port}" },
+  },
+}
+
 require("dap").configurations.go = {
   {
     type = "delve",
