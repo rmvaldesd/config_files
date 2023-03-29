@@ -30,7 +30,7 @@ require('dap').configurations.rust = {
 
 require("dap").adapters.delve = {
   type = "server",
-  port = "${port}",
+  port = "2345",
 }
 
 local substitutePath = {
