@@ -130,14 +130,15 @@ end
 
 -- LSPs with no default setup
 require('lspconfig')['gopls'].setup {
+  cmd = { 'gopls', '-remote=auto' },
   on_attach = on_attach,
   flags = lsp_flags,
   capabilities = capabilities,
   filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
-  root_dir = function(fname)
-    return util.root_pattern 'go.work' (fname) or util.root_pattern('go.mod', '.git')(fname)
-  end,
-  single_file_support = true,
+  --root_dir = function(fname)
+  --  return util.root_pattern 'go.work' (fname) or util.root_pattern('go.mod', '.git')(fname)
+  -- end,
+  -- single_file_support = true,
 }
 
 
