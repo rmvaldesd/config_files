@@ -28,26 +28,22 @@ require('dap').configurations.rust = {
 
 -- https://github.com/go-delve/delve/blob/master/Documentation/usage/dlv_dap.md
 
-require("dap").adapters.go = {
+require("dap").adapters.delve = {
   type = "server",
   port = "${port}",
-  executable = {
-    command = vim.fn.stdpath("data") .. '/mason/bin/dlv',
-    args = { "dap", "-l", "127.0.0.1:${port}" },
-  },
 }
 
 require("dap").configurations.go = {
   {
     type = "delve",
     name = "Debug",
-    request = "launch",
-    program = "${file}"
+    request = "attach",
+    mode = "remote",
   },
   {
     type = "delve",
     name = "Debug test", -- configuration for debugging test files
-    request = "launch",
+    request = "attach",
     mode = "test",
     program = "${file}"
   },
@@ -60,3 +56,13 @@ require("dap").configurations.go = {
     program = "./${relativeFileDirname}"
   }
 }
+
+require("dap").listeners.after.event_initialized["dapui_config"] = function()
+  require("dapui").open()
+end
+require("dap").listeners.before.event_terminated["dapui_config"] = function()
+  require("dapui").close()
+end
+require("dap").listeners.before.event_exited["dapui_config"] = function()
+  require("dapui").close()
+end
