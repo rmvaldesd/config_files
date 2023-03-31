@@ -5,7 +5,7 @@ require('plugins/lsp-format')
 require('plugins/notify')
 require('plugins/dap-ui')
 require('plugins/dap')
-
+require('plugins/treesitter')
 
 -- GruvBox settings
 vim.o.background = "dark" -- or "light" for light mode
