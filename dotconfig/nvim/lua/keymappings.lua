@@ -108,3 +108,8 @@ vim.keymap.set("n", "<leader>de", function()
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-w>=", false, true, true), "n", false)
   require("notify")("Debugger session ended", "warn")
 end)
+
+-- Harpoon keymappings
+
+vim.keymap.set("n", "<leader>sa", require("harpoon.mark").add_file)
+vim.keymap.set("n", "<leader>ss", require("harpoon.ui").toggle_quick_menu)
