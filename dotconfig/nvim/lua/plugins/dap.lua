@@ -27,7 +27,7 @@ require('dap').configurations.rust = {
 
 
 -- https://github.com/go-delve/delve/blob/master/Documentation/usage/dlv_dap.md
-
+--[[
 require("dap").adapters.delve = {
   type = "server",
   port = "2345",
@@ -78,7 +78,7 @@ require("dap").configurations.go = {
     substitutePath = substitutePath,
   }
 }
-
+--]]
 require("dap").adapters.dart = {
   type = "executable",
   -- As of this writing, this functionality is open for review in https://github.com/flutter/flutter/pull/91802
@@ -98,6 +98,8 @@ require("dap").configurations.dart = {
     toolArgs = { "-d", "iphone 14" }
   }
 }
+
+require("dap-go").setup()
 
 require("dap").listeners.after.event_initialized["dapui_config"] = function()
   require("dapui").open()
