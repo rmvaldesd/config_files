@@ -1,6 +1,6 @@
 vim.keymap.set('', '<leader>c', '"+y', { desc = 'copy to clipboard in normal, visual, select and operator modes' }) -- Copy to clipboard in normal, visual, select and operator modes
-vim.keymap.set('i', '<C-u>', '<C-g>u<C-u>') -- Make <C-u> undo-friendly
-vim.keymap.set('i', '<C-w>', '<C-g>u<C-w>') -- Make <C-w> undo-friendly
+vim.keymap.set('i', '<C-u>', '<C-g>u<C-u>')                                                                         -- Make <C-u> undo-friendly
+vim.keymap.set('i', '<C-w>', '<C-g>u<C-w>')                                                                         -- Make <C-w> undo-friendly
 
 -- <Tab> to navigate the completion menu
 vim.keymap.set('i', '<S-Tab>', 'pumvisible() ? "\\<C-p>" : "\\<Tab>"', { expr = true })
@@ -110,6 +110,5 @@ vim.keymap.set("n", "<leader>de", function()
 end, { desc = 'dap - close debugger and clear endpoints' })
 
 -- Harpoon keymappings
-
 vim.keymap.set("n", "<leader>sa", require("harpoon.mark").add_file, { desc = 'harpoon - add file' })
 vim.keymap.set("n", "<leader>ss", require("harpoon.ui").toggle_quick_menu, { desc = 'harpoon - toggle quick menu' })
