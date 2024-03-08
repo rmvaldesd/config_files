@@ -23,9 +23,7 @@ vim.opt.clipboard = "unnamedplus"
 vim.opt.splitbelow = true
 vim.opt.splitright = true
 vim.g.mapleader = " "
-vim.g.oscyank_term = 'default' -- needed for playing nicely with tmux
 vim.o.termguicolors = true
-
 require('lazy').setup('plugins')
 require("plugin-settings")
 require("keymappings")
