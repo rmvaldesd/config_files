@@ -20,7 +20,8 @@ vim.keymap.set('n', '<leader>x', '<cmd>BufOnly<CR>',
 -- Telescope Mappings
 local builtin = require('telescope.builtin')
 vim.keymap.set('n', '<leader>ff', builtin.find_files, { desc = 'files - find files' })
-vim.keymap.set('n', '<leader>fg', builtin.live_grep, { desc = 'files - find text live grep' })
+vim.keymap.set('n', '<leader>fG', builtin.live_grep, { desc = 'files - find text live grep' })
+vim.keymap.set("n", "<leader>fg", ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>")
 vim.keymap.set('n', '<leader>fb', builtin.buffers, { desc = 'buffers - show open buffers' })
 vim.keymap.set('n', '<leader>fh', builtin.help_tags, { desc = 'help tags' })
 vim.keymap.set('n', '<leader>fp', builtin.keymaps, { desc = 'keymaps' })

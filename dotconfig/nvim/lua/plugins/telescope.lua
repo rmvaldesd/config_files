@@ -4,6 +4,8 @@ return {
     'nvim-lua/plenary.nvim',
     "nvim-telescope/telescope-file-browser.nvim",
     'nvim-telescope/telescope-fzf-native.nvim',
+    "nvim-telescope/telescope-live-grep-args.nvim",
+
   },
 
   config = function()
@@ -25,5 +27,6 @@ return {
     require('telescope').load_extension("fzf")
     require("telescope").load_extension("file_browser")
     require("telescope").load_extension("flutter")
+    require("telescope").load_extension("live_grep_args")
   end
 }
