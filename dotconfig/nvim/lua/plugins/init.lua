@@ -111,7 +111,6 @@ return {
 
     -- Debugging
     'mfussenegger/nvim-dap-python',
-    'leoluz/nvim-dap-go',
 
 
   }
