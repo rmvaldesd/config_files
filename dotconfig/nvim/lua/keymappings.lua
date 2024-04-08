@@ -95,7 +95,7 @@ vim.keymap.set("n", "<leader>dn", dap.step_over, { desc = 'dap - debugging step 
 vim.keymap.set("n", "<leader>di", dap.step_into, { desc = 'dap - debugging step into' })
 vim.keymap.set("n", "<leader>do", dap.step_out, { desc = 'dap - debugging step out' })
 vim.keymap.set("n", "<leader>dt", dap.terminate, { desc = 'dap - terminate debugging' })
-vim.keymap.set("n", "<leader>dg", require("dap-go").debug_test, { desc = 'dap - debug go current test' })
+-- vim.keymap.set("n", "<leader>dg", require("dap-go").debug_test, { desc = 'dap - debug go current test' })
 vim.keymap.set("n", "<leader>dC", function()
   dap.clear_breakpoints()
   require("notify")("Breakpoints cleared", "warn")
