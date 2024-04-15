@@ -37,26 +37,33 @@ return {
     }
     require("dap").configurations.go = {
       {
+        name = 'Attach to Go',
         type = 'delve',
         request = 'attach',
-        name = 'Attach to Go',
         mode = 'remote',
+        stopOnEntry = true,
         substitutePath = {
           {
-            from = "${env:GOPATH}/src",
+            to =
+            "bazel-out/k8-dbg/bin/src/code.uber.internal/devexp/green-keeper/controller/dependency/cff_/repo_insights_cffgen.go",
+            from =
+            "${env:WORKSPACE_ROOT}/src/code.uber.internal/devexp/green-keeper/controller/dependency/repo_insights.go",
+          },
+          {
+            from = "${env:WORKSPACE_ROOT}/src",
             to = "src"
           },
           {
-            from = "${env:GOPATH}/bazel-go-code/external/",
-            to = "external/"
+            to = "external/",
+            from = "${env:WORKSPACE_ROOT}/bazel-go-code/external/"
           },
           {
-            from = "${env:GOPATH}/bazel-out/",
-            to = "bazel-out/"
+            to = "bazel-out/",
+            from = "${env:WORKSPACE_ROOT}/bazel-out/"
           },
           {
-            from = "${env:GOPATH}/bazel-go-code/external/go_sdk",
-            to = "GOROOT/"
+            to = "GOROOT/",
+            from = "${env:WORKSPACE_ROOT}/bazel-go-code/external/go_sdk"
           },
         },
       },
