@@ -113,3 +113,6 @@ end, { desc = 'dap - close debugger and clear endpoints' })
 -- Harpoon keymappings
 vim.keymap.set("n", "<leader>sa", require("harpoon.mark").add_file, { desc = 'harpoon - add file' })
 vim.keymap.set("n", "<leader>ss", require("harpoon.ui").toggle_quick_menu, { desc = 'harpoon - toggle quick menu' })
+
+-- show current line diagnostics
+vim.keymap.set("n", "<leader>sd", vim.diagnostic.open_float, { desc = 'show current line diagnostics' })
