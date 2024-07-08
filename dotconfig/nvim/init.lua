@@ -22,8 +22,14 @@ vim.opt.smartindent = true
 vim.opt.clipboard = "unnamedplus"
 vim.opt.splitbelow = true
 vim.opt.splitright = true
+vim.opt.wrap = false
 vim.g.mapleader = " "
 vim.o.termguicolors = true
+vim.g.netrw_banner = 0       -- gets rid of the annoying banner for netrw
+vim.g.netrw_browse_split = 4 -- open in prior window
+vim.g.netrw_altv = 1         -- change from left splitting to right splitting
+vim.g.netrw_liststyle = 3    -- tree style view in netrw
+
 require('lazy').setup('plugins')
 require("plugin-settings")
 require("keymappings")
@@ -57,3 +63,6 @@ vim.api.nvim_create_autocmd("BufWritePre", {
     goFormatAndImports(3000)
   end,
 })
+
+-- Open netrw in 25% split in tree view
+map("n", "<leader>e", ":25Lex<CR>") -- space+e toggles netrw tree view
