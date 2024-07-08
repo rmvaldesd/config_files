@@ -63,6 +63,3 @@ vim.api.nvim_create_autocmd("BufWritePre", {
     goFormatAndImports(3000)
   end,
 })
-
--- Open netrw in 25% split in tree view
-map("n", "<leader>e", ":25Lex<CR>") -- space+e toggles netrw tree view

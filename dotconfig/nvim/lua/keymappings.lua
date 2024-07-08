@@ -116,3 +116,6 @@ vim.keymap.set("n", "<leader>ss", require("harpoon.ui").toggle_quick_menu, { des
 
 -- show current line diagnostics
 vim.keymap.set("n", "<leader>sd", vim.diagnostic.open_float, { desc = 'show current line diagnostics' })
+
+-- Open netrw in 25% split in tree view
+vim.keymap.set("n", "<leader>e", ":25Lex<CR>") -- space+e toggles netrw tree view
