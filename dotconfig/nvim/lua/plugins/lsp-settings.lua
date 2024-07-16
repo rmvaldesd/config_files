@@ -66,7 +66,7 @@ return {
       init_options = {
         staticcheck = true,
         gofumpt = true,
-        memoryMode = "DegradeClosed",
+        -- memoryMode = "DegradeClosed",
       },
       filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
     }
