@@ -29,7 +29,7 @@ return {
       end
     },
 
-    'tpope/vim-commentary',
+    --'tpope/vim-commentary',
     'tpope/vim-fugitive',
     'tpope/vim-surround',
 

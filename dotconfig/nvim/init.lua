@@ -60,6 +60,6 @@ end
 vim.api.nvim_create_autocmd("BufWritePre", {
   pattern = "*.go",
   callback = function(args)
-    goFormatAndImports(3000)
+    goFormatAndImports(6000)
   end,
 })

@@ -1,6 +1,5 @@
 return {
   'mfussenegger/nvim-dap',
-  -- dependencies = { 'leoluz/nvim-dap-go' },
   config = function()
     require("dap").adapters.lldb = {
       type = "executable",
@@ -30,6 +29,7 @@ return {
     }
 
 
+    -- Go Uber Configuration
     -- https://github.com/go-delve/delve/blob/master/Documentation/usage/dlv_dap.md
     require("dap").adapters.delve = {
       type = 'server',
@@ -37,38 +37,40 @@ return {
     }
     require("dap").configurations.go = {
       {
-        name = 'Attach to Go',
+        name = 'Attach to Go (Uber)',
         type = 'delve',
         request = 'attach',
         mode = 'remote',
         stopOnEntry = true,
         substitutePath = {
           {
-            to =
-            "bazel-out/k8-dbg/bin/src/code.uber.internal/devexp/green-keeper/controller/dependency/cff_/repo_insights_cffgen.go",
             from =
             "${env:WORKSPACE_ROOT}/src/code.uber.internal/devexp/green-keeper/controller/dependency/repo_insights.go",
+            to =
+            "bazel-out/k8-dbg/bin/src/code.uber.internal/devexp/green-keeper/controller/dependency/cff_/repo_insights_cffgen.go",
           },
           {
             from = "${env:WORKSPACE_ROOT}/src",
-            to = "src"
+            to = "src",
           },
           {
+            from = "${env:WORKSPACE_ROOT}/bazel-go-code/external/",
             to = "external/",
-            from = "${env:WORKSPACE_ROOT}/bazel-go-code/external/"
           },
           {
+            from = "${env:WORKSPACE_ROOT}/bazel-out/",
             to = "bazel-out/",
-            from = "${env:WORKSPACE_ROOT}/bazel-out/"
           },
           {
+            from = "${env:WORKSPACE_ROOT}/bazel-go-code/external/go_sdk",
             to = "GOROOT/",
-            from = "${env:WORKSPACE_ROOT}/bazel-go-code/external/go_sdk"
           },
         },
       },
     }
+    -- Go Uber Configuration End
 
+    -- Flutter configuration
     require("dap").adapters.dart = {
       type = "executable",
       -- As of this writing, this functionality is open for review in https://github.com/flutter/flutter/pull/91802
@@ -88,6 +90,7 @@ return {
         toolArgs = { "-d", "iphone 14" }
       }
     }
+    -- Flutter configuration End
 
     require("dap").listeners.after.event_initialized["dapui_config"] = function()
       require("dapui").open()

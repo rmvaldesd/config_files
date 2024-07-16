@@ -6,15 +6,6 @@ return {
   },
   config = function()
     local util = require 'lspconfig.util'
-
-    -- Use an on_attach function to only map the following keys
-    -- after the language server attaches to the current buffer
-    local on_attach = function(client, bufnr)
-      -- Lsp-format setup --> https://github.com/lukas-reineke/lsp-format.nvim
-      require("lsp-format").on_attach(client)
-      -- Enable completion triggered by <c-x><c-o>
-      vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
-    end
     -- ------------------------- LSP Setup ---------------------------------
     -- Mappings.
     -- See `:help vim.diagnostic.*` for documentation on any of the below functions
@@ -24,8 +15,6 @@ return {
     vim.keymap.set('n', ']d', vim.diagnostic.goto_next, opts)
     vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
 
-    -- Use an on_attach function to only map the following keys
-    -- after the language server attaches to the current buffer
     local on_attach = function(client, bufnr)
       -- Lsp-format setup --> https://github.com/lukas-reineke/lsp-format.nvim
       require("lsp-format").on_attach(client)
@@ -57,12 +46,7 @@ return {
       debounce_text_changes = 300,
     }
 
-
-    -- nvim-cmp supports additional completion capabilities
-    --local capabilities = vim.lsp.protocol.make_client_capabilities()
-    --capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
     local capabilities = require('cmp_nvim_lsp').default_capabilities()
-
 
     -- LSPs with default setup: bashls (Bash), cssls (CSS), html (HTML), clangd (C/C++), jsonls (JSON)
     for _, lsp in ipairs { 'tsserver', 'bashls', 'cssls', 'html', 'clangd', 'jsonls', 'lua_ls' } do
@@ -79,11 +63,12 @@ return {
       on_attach = on_attach,
       flags = lsp_flags,
       capabilities = capabilities,
+      init_options = {
+        staticcheck = true,
+        gofumpt = true,
+        memoryMode = "DegradeClosed",
+      },
       filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
-      --root_dir = function(fname)
-      --  return util.root_pattern 'go.work' (fname) or util.root_pattern('go.mod', '.git')(fname)
-      -- end,
-      -- single_file_support = true,
     }
 
 
