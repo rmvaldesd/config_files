@@ -2,7 +2,7 @@ return {
   -- https://github.com/numToStr/Comment.nvim
   'numToStr/Comment.nvim',
   config = function()
-    require('comment').setup({
+    require('Comment').setup({
       ---Add a space b/w comment and the line
       padding = true,
       ---Whether the cursor should stay at its position
