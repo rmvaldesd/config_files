@@ -28,7 +28,10 @@ vim.keymap.set('n', '<leader>fp', builtin.keymaps, { desc = 'keymaps' })
 vim.keymap.set("n", "<leader>fd", "<cmd>Telescope file_browser<CR>", { noremap = true, desc = 'files - browse files' })
 vim.keymap.set("n", "<leader>fm", "<cmd>Telescope marks<CR>", { desc = 'looking for current set marks' })
 vim.keymap.set("n", "<leader>fc", "<cmd>Telescope flutter commands<CR>", { desc = 'flutter - commands' })
-vim.keymap.set("n", "gr", "<cmd>Telescope lsp_references<CR>", { desc = 'lsp references' })
+vim.keymap.set("n", "<leader>fr", "<cmd>Telescope lsp_references<CR>", { desc = 'lsp references' })
+vim.keymap.set("n", "<leader>fi", builtin.lsp_incoming_calls, { desc = 'lsp incoming calls' })
+vim.keymap.set("n", "<leader>fo", builtin.lsp_outgoing_calls, { desc = 'lsp outgoing calls' })
+vim.keymap.set("n", "<leader>fs", builtin.lsp_document_symbols, { desc = 'lsp document symbols' })
 -- LSP mappings are in plugins/lsp-settings.lua
 
 -- Customs
@@ -89,11 +92,18 @@ end, { desc = 'dap - start debugging session' })
 
 -- Set breakpoints, get variable values, step into/out of functions, etc.
 vim.keymap.set("n", "<leader>dl", require("dap.ui.widgets").hover, { desc = 'dap - hover information' })
-vim.keymap.set("n", "<leader>dc", dap.continue, { desc = 'dap - continue / start debugging' })
-vim.keymap.set("n", "<leader>db", dap.toggle_breakpoint, { desc = 'dap - toggle breakpoints' })
-vim.keymap.set("n", "<leader>dn", dap.step_over, { desc = 'dap - debugging step over' })
-vim.keymap.set("n", "<leader>di", dap.step_into, { desc = 'dap - debugging step into' })
-vim.keymap.set("n", "<leader>do", dap.step_out, { desc = 'dap - debugging step out' })
+vim.keymap.set("n", "<leader><F5>", dap.continue, { desc = 'dap - continue / start debugging' })
+vim.keymap.set("n", "<leader>b", dap.toggle_breakpoint, { desc = 'dap - toggle breakpoints' })
+vim.keymap.set("n", "<leader>B",
+  function()
+    dap.set_breakpoint(vim.fn.input 'Breakpoint condition: ')
+  end,
+  { desc = 'dap - condition breakpoint' }
+)
+vim.keymap.set("n", "<leader><F1>", dap.step_into, { desc = 'dap - debugging step into' })
+vim.keymap.set("n", "<leader><F2>", dap.step_over, { desc = 'dap - debugging step over' })
+vim.keymap.set("n", "<leader><F3>", dap.step_out, { desc = 'dap - debugging step out' })
+vim.keymap.set("n", "<leader><F7>", ui.toggle, { desc = 'dap - see last session result.' })
 vim.keymap.set("n", "<leader>dt", dap.terminate, { desc = 'dap - terminate debugging' })
 -- vim.keymap.set("n", "<leader>dg", require("dap-go").debug_test, { desc = 'dap - debug go current test' })
 vim.keymap.set("n", "<leader>dC", function()
