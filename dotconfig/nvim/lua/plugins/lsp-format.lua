@@ -3,7 +3,7 @@ return {
   'lukas-reineke/lsp-format.nvim',
   config = function()
     require("lsp-format").setup {
-      exclude = { "jsonls" },
+      exclude = { "jsonls", "gopls" },
     }
   end
 }
