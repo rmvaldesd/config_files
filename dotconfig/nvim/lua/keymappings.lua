@@ -31,7 +31,10 @@ vim.keymap.set("n", "<leader>fc", "<cmd>Telescope flutter commands<CR>", { desc 
 vim.keymap.set("n", "<leader>fr", "<cmd>Telescope lsp_references<CR>", { desc = 'lsp references' })
 vim.keymap.set("n", "<leader>fi", builtin.lsp_incoming_calls, { desc = 'lsp incoming calls' })
 vim.keymap.set("n", "<leader>fo", builtin.lsp_outgoing_calls, { desc = 'lsp outgoing calls' })
-vim.keymap.set("n", "<leader>fs", builtin.lsp_document_symbols, { desc = 'lsp document symbols' })
+-- vim.keymap.set("n", "<leader>fs", builtin.lsp_document_symbols, { desc = 'lsp document symbols' })
+vim.keymap.set("n", "<leader>fs", function() builtin.lsp_document_symbols({ symbol_width = 80 }) end,
+  { desc = 'lsp document symbols' })
+
 vim.keymap.set("n", "<leader>fa", builtin.diagnostics, { desc = 'document diagnostics' })
 vim.keymap.set("n", "<leader>fe", builtin.lsp_definitions, { desc = 'lsp word definition' })
 vim.keymap.set("n", "<leader>ft", builtin.lsp_type_definitions, { desc = 'lsp type definition' })
@@ -133,3 +136,5 @@ vim.keymap.set("n", "<leader>sd", vim.diagnostic.open_float, { desc = 'show curr
 
 -- Open netrw in 25% split in tree view
 vim.keymap.set("n", "<leader>e", ":25Lex<CR>") -- space+e toggles netrw tree view
+
+vim.keymap.set("n", "<leader>yb", "$<S-v>%y", { desc = 'Yank block Between ([{}]) ' })

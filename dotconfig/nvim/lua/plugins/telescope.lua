@@ -13,7 +13,7 @@ return {
     -- the loading is important
     require('telescope').setup {
       defaults = {
-        path_display = {"truncate"},
+        path_display = { "truncate" },
       },
       extensions = {
         fzf = {
