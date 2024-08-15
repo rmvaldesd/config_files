@@ -101,5 +101,38 @@ return {
     require("dap").listeners.before.event_exited["dapui_config"] = function()
       require("dapui").close()
     end
+
+
+    --- dap mappings
+    local dap_ok, dap = pcall(require, "dap")
+    local dap_ui_ok, ui = pcall(require, "dapui")
+
+    if not (dap_ok and dap_ui_ok) then
+      require("notify")("nvim-dap or dap-ui not installed!", "warning") -- nvim-notify is a separate plugin, I recommend it too!
+      return
+    end
+
+    vim.fn.sign_define('DapBreakpoint', { text = 'X' })
+
+    -- Set breakpoints, get variable values, step into/out of functions, etc.
+    vim.keymap.set("n", "<leader>i", require("dap.ui.widgets").hover, { desc = '[dap] - hover information' })
+    vim.keymap.set("n", "<leader>b", dap.toggle_breakpoint, { desc = '[dap] - toggle [b]reakpoints' })
+    vim.keymap.set("n", "<leader>B",
+      function()
+        dap.set_breakpoint(vim.fn.input 'Breakpoint condition: ')
+      end,
+      { desc = '[dap] - condition [B]reakpoint' }
+    )
+    vim.keymap.set("n", "<F5>", dap.continue, { desc = '[dap] - continue / start debugging' })
+    vim.keymap.set("n", "<F1>", dap.step_into, { desc = '[dap] - debugging step into' })
+    vim.keymap.set("n", "<F2>", dap.step_over, { desc = '[dap] - debugging step over' })
+    vim.keymap.set("n", "<F3>", dap.step_out, { desc = '[dap] - debugging step out' })
+    vim.keymap.set("n", "<F7>", ui.toggle, { desc = '[dap] - see last session result.' })
+    vim.keymap.set("n", "<leader>td", dap.terminate, { desc = '[dap] - terminate debugging' })
+    -- vim.keymap.set("n", "<leader>dg", require("dap-go").debug_test, { desc = '[dap] - debug go current test' })
+    vim.keymap.set("n", "<leader>cb", function()
+      dap.clear_breakpoints()
+      require("notify")("Breakpoints cleared", "warn")
+    end, { desc = '[dap] - [c]lear [b]reakpoints' })
   end
 }

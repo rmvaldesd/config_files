@@ -1,28 +1,49 @@
 return {
   "ThePrimeagen/harpoon",
   branch = "harpoon2",
-  dependencies = { "nvim-lua/plenary.nvim" },
+  dependencies = {
+    "nvim-lua/plenary.nvim",
+    "nvim-telescope/telescope.nvim",
+  },
   config = function()
-    require("harpoon").setup({
-      global_settings = {
-        -- sets the marks upon calling `toggle` on the ui, instead of require `:w`.
-        save_on_toggle = false,
+    local harpoon = require("harpoon")
 
-        -- saves the harpoon file upon every change. disabling is unrecommended.
-        save_on_change = true,
+    -- REQUIRED
+    harpoon:setup()
+    -- REQUIRED
 
-        -- sets harpoon to run the command immediately as it's passed to the terminal when calling `sendCommand`.
-        enter_on_sendcmd = false,
+    vim.keymap.set("n", "<leader>ha", function() harpoon:list():add() end)
 
-        -- closes any tmux windows harpoon that harpoon creates when you close Neovim.
-        tmux_autoclose_windows = false,
+    --[[ vim.keymap.set("n", "<C-1>", function() harpoon:list():select(1) end)
+    vim.keymap.set("n", "<C-2>", function() harpoon:list():select(2) end)
+    vim.keymap.set("n", "<C-3>", function() harpoon:list():select(3) end)
+    vim.keymap.set("n", "<C-4>", function() harpoon:list():select(4) end) ]]
 
-        -- filetypes that you want to prevent from adding to the harpoon list menu.
-        excluded_filetypes = { "harpoon" },
+    -- Toggle previous & next buffers stored within Harpoon list
+    vim.keymap.set("n", "<leader>hh", function() harpoon:list():prev() end, { desc = '[harpoon] previous buffer' })
+    vim.keymap.set("n", "<leader>hl", function() harpoon:list():next() end, { desc = '[harpoon] next buffer' })
 
-        -- set marks specific to each git branch inside git repository
-        mark_branch = false,
-      }
-    })
+    -- basic telescope configuration
+    local conf = require("telescope.config").values
+    local function toggle_telescope(harpoon_files)
+      local file_paths = {}
+      for _, item in ipairs(harpoon_files.items) do
+        table.insert(file_paths, item.value)
+      end
+
+      require("telescope.pickers").new({}, {
+        prompt_title = "Harpoon",
+        finder = require("telescope.finders").new_table({
+          results = file_paths,
+        }),
+        previewer = conf.file_previewer({}),
+        sorter = conf.generic_sorter({}),
+      }):find()
+    end
+
+    vim.keymap.set("n", "<leader>ho", function() toggle_telescope(harpoon:list()) end,
+      { desc = "[harpoon] - Open harpoon window" })
+    vim.keymap.set("n", "<leader>hu", function() harpoon.ui:toggle_quick_menu(harpoon:list()) end,
+      { desc = '[harpoon] - toggle quick menu' })
   end
 }

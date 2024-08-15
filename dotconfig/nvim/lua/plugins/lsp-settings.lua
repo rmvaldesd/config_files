@@ -9,11 +9,13 @@ return {
     -- ------------------------- LSP Setup ---------------------------------
     -- Mappings.
     -- See `:help vim.diagnostic.*` for documentation on any of the below functions
-    local opts = { noremap = true, silent = true }
-    vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, opts)
-    vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, opts)
-    vim.keymap.set('n', ']d', vim.diagnostic.goto_next, opts)
-    vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
+    local opts = function(desc)
+      return { noremap = true, silent = true, desc = desc }
+    end
+    vim.keymap.set('n', '<space>do', vim.diagnostic.open_float, opts('[Lsp] - diagnostics open float'))
+    vim.keymap.set('n', '<space>dh', vim.diagnostic.goto_prev, opts('[Lsp] - diagnostics go prev'))
+    vim.keymap.set('n', '<space>dn', vim.diagnostic.goto_next, opts('[Lsp] - diagnostics go next'))
+    vim.keymap.set('n', '<space>dsl', vim.diagnostic.setloclist, opts('[Lsp] - diagnostics open float'))
 
     local on_attach = function(client, bufnr)
       -- Lsp-format setup --> https://github.com/lukas-reineke/lsp-format.nvim
@@ -23,22 +25,27 @@ return {
 
       -- Mappings.
       -- See `:help vim.lsp.*` for documentation on any of the below functions
-      local bufopts = { noremap = true, silent = true, buffer = bufnr }
-      vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
-      vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
-      vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
-      vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
-      vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, bufopts)
-      vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder, bufopts)
-      vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder, bufopts)
+      local bufopts = function(bufnbr, desc)
+        return { noremap = true, silent = true, buffer = bufnr, desc = desc }
+      end
+      vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts(bufnr, '[Lsp] - [g]o to [D]eclaration'))
+      vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts(bufnr, '[Lsp] - [g]o to [d]efinition'))
+      vim.keymap.set('n', 'gh', vim.lsp.buf.hover, bufopts(bufnr, '[Lsp] - [go] to [h]over information'))
+      vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts(bufnr, '[Lsp] - [g]o to [i]mplementation'))
+      vim.keymap.set('n', 'gh', vim.lsp.buf.signature_help, bufopts(bufnr, '[Lsp] - [go] signature [h]elp'))
+      vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder,
+        bufopts(bufnr, '[Lsp] - [w]orkspace [a]dd folder'))
+      vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder,
+        bufopts(bufnr, '[Lsp] - [w]orkspace [r]emove folder'))
       vim.keymap.set('n', '<space>wl', function()
         print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
-      end, bufopts)
-      vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts)
-      vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
-      vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
+      end, bufopts(bufnr, '[Lsp] - [w]orkspace [l]ist folders'))
+      vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts(bufnr, '[Lsp] - Type Definition'))
+      vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts(bufnr, '[Lsp] - [r]e[n]ame symbol'))
+      vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts(bufnr, '[Lsp] - [c]ode [a]ction'))
       -- vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
-      vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end, bufopts)
+      vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end,
+        bufopts(bufnr, '[Lsp] - [f]ormat document'))
     end
 
     local lsp_flags = {
