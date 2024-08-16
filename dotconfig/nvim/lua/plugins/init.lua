@@ -123,5 +123,8 @@ return {
     }
 
 
-  }
+  },
+  -- mini icons used for oil.nvim
+  { 'echasnovski/mini.nvim', version = false },
+
 }

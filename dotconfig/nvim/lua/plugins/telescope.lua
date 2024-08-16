@@ -26,6 +26,12 @@ return {
       },
     }
 
+    local get_selection = function()
+      return vim.fn.getregion(
+        vim.fn.getpos ".", vim.fn.getpos "v", { mode = vim.fn.mode() }
+      )
+    end
+
     -- Telescope Mappings
     local builtin = require('telescope.builtin')
     vim.keymap.set('n', '<leader>fb', builtin.buffers, { desc = '[Telescope] buffers - show open buffers' })
@@ -35,6 +41,13 @@ return {
     vim.keymap.set("n", "<leader>fe", builtin.lsp_definitions, { desc = '[Telescope] lsp word definition' })
     vim.keymap.set('n', '<leader>ff', builtin.find_files, { desc = '[Telescope] files - find files' })
     vim.keymap.set('n', '<leader>fG', builtin.live_grep, { desc = '[Telescope] files - find text live grep' })
+    vim.keymap.set('v', '<leader>vg',
+      function()
+        require("telescope.builtin").live_grep {
+          default_text = table.concat(get_selection())
+        }
+      end
+    )
     vim.keymap.set("n", "<leader>fg", ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>",
       { desc = '[Telescope] Live Grep args' })
     vim.keymap.set('n', '<leader>ht', builtin.help_tags, { desc = '[Telescope] help tags' })
