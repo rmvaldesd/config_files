@@ -46,7 +46,8 @@ return {
         require("telescope.builtin").live_grep {
           default_text = table.concat(get_selection())
         }
-      end
+      end,
+      { desc = '[Telescope] files - find text live grep using visual mode selection' }
     )
     vim.keymap.set("n", "<leader>fg", ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>",
       { desc = '[Telescope] Live Grep args' })
