@@ -1,5 +1,8 @@
 return {
   'mfussenegger/nvim-dap',
+  dependencies = {
+    'leoluz/nvim-dap-go'
+  },
   config = function()
     require("dap").adapters.lldb = {
       type = "executable",
@@ -41,7 +44,7 @@ return {
         type = 'delve',
         request = 'attach',
         mode = 'remote',
-        stopOnEntry = true,
+        -- stopOnEntry = true,
         substitutePath = {
           {
             from =
@@ -67,6 +70,13 @@ return {
           },
         },
       },
+      {
+        name = 'Attach to Go (regular)',
+        type = 'delve',
+        request = 'attach',
+        mode = 'remote',
+        -- stopOnEntry = true,
+      }
     }
     -- Go Uber Configuration End
 
@@ -114,7 +124,38 @@ return {
 
     vim.fn.sign_define('DapBreakpoint', { text = 'X' })
 
-    -- Set breakpoints, get variable values, step into/out of functions, etc.
+
+    -- DAP-GO CONFIGURATION.
+    -- This is used mostly for the "debug this test" feature.
+    -- https://github.com/leoluz/nvim-dap-go
+    require('dap-go').setup {
+      dap_configurations = {
+        {
+          -- Must be "go" or it will be ignored by the plugin
+          type = "go",
+          name = "Attach remote - (dap-go)",
+          mode = "remote",
+          request = "attach",
+        },
+      },
+      -- delve configurations
+      delve = {
+        path = "dlv",
+        initialize_timeout_sec = 20,
+        port = "${port}",
+        -- additional args to pass to dlv
+        args = {},
+        build_flags = {},
+        detached = vim.fn.has("win32") == 0,
+        cwd = nil,
+      },
+      tests = {
+        -- enables verbosity when running the test.
+        verbose = false,
+      },
+    }
+
+    -- Set keymappings
     vim.keymap.set("n", "<leader>i", require("dap.ui.widgets").hover, { desc = '[dap] - hover information' })
     vim.keymap.set("n", "<leader>b", dap.toggle_breakpoint, { desc = '[dap] - toggle [b]reakpoints' })
     vim.keymap.set("n", "<leader>B",
@@ -123,7 +164,9 @@ return {
       end,
       { desc = '[dap] - condition [B]reakpoint' }
     )
+
     vim.keymap.set("n", "<F5>", dap.continue, { desc = '[dap] - continue / start debugging' })
+    vim.keymap.set("n", "<F6>", require('dap-go').debug_test, { desc = '[dap] - debug test' })
     vim.keymap.set("n", "<F1>", dap.step_into, { desc = '[dap] - debugging step into' })
     vim.keymap.set("n", "<F2>", dap.step_over, { desc = '[dap] - debugging step over' })
     vim.keymap.set("n", "<F3>", dap.step_out, { desc = '[dap] - debugging step out' })
