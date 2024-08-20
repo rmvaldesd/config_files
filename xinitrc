@@ -57,13 +57,15 @@ fi
 feh --bg-scale ~/config_files/wallpapers/arch-linux-wallpaper.png &
 #swap mouse buttons.
 # 14 or first number is the mouse id get by xinput list
-xinput set-button-map 14 3 2 1
+xinput set-button-map 14 3 2 1 &
+setxkbmap -layout latam
 
 #Compositor
 #picom -f &
 picom &
 redshift &
 #redshift -l -33.4:70.6 -t 5700:3600 -g 0.8 -m randr -v
+clipmenud &
 exec dwm
 #twm &
 #xclock -geometry 50x50-1+1 &

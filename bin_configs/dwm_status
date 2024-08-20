@@ -4,8 +4,8 @@
 
 print_wifi() {
 	ip=$(ip route get 8.8.8.8 2>/dev/null|grep -Eo 'src [0-9.]+'|grep -Eo '[0-9.]+')
-	#if=wlan0
-	if=wlp4s0
+	if=wlan0
+	#if=wlp4s0
 		while IFS=$': \t' read -r label value
 		do
 			case $label in SSID) SSID=$value
@@ -15,12 +15,12 @@ print_wifi() {
 		esac
 	done < <(iw "$if" link)
 	#echo -e "$SSID $SIGNAL $ip"
-	echo -e "$SSID $SIGNAL"
+	echo -e "$SSID $SIGNAL"
 }
 
 print_mem(){
 	#echo $(($(grep -m1 'MemAvailable:' /proc/meminfo | awk '{print $2}') / 1024))
-	echo $(free -h | awk '/^Mem/{ print ""$3"/"$2 }')
+	echo $(free -h | awk '/^Mem/{ print $3"/"$2 }')
 }
 
 print_vol(){
@@ -86,6 +86,6 @@ print_brightness(){
 while true
 do
 	#xsetroot -name "$(print_mem) $(print_network) $(print_temp) $(print_wifi) $(print_bat) $(print_record) $(print_date)"
-	xsetroot -name "$(print_wifi) $(print_ovpn) $(print_mem) $(print_brightness)% $(print_vol) $(print_bat)% $(print_date)"
+	xsetroot -name " $(print_wifi) $(print_ovpn)  $(print_mem)  $(print_brightness)%  $(print_vol)  $(print_bat)% $(print_date)"
 	sleep 1
 done
