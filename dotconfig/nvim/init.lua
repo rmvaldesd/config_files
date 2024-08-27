@@ -34,7 +34,7 @@ require('lazy').setup('plugins')
 require("plugin-settings")
 require("keymappings")
 
-local function goFormatAndImports(wait_ms)
+local function goFormat(wait_ms)
   -- Prefer `format` if available because `formatting_sync` has been deprecated as of nvim v0.8.0.
   if vim.lsp.buf.format == nil then
     vim.lsp.buf.formatting_sync(nil, wait_ms)
@@ -43,7 +43,8 @@ local function goFormatAndImports(wait_ms)
       timeout_ms = wait_ms,
     })
   end
-  local params = vim.lsp.util.make_range_params()
+  -- Too slow code... try to fix
+  --[[ local params = vim.lsp.util.make_range_params()
   params.context = { only = { "source.organizeImports" } }
   local result = vim.lsp.buf_request_sync(0, "textDocument/codeAction", params, wait_ms)
   for _, res in pairs(result or {}) do
@@ -54,12 +55,12 @@ local function goFormatAndImports(wait_ms)
         vim.lsp.buf.execute_command(r.command)
       end
     end
-  end
+  end ]]
 end
 
 vim.api.nvim_create_autocmd("BufWritePre", {
   pattern = "*.go",
   callback = function(args)
-    goFormatAndImports(6000)
+    goFormat(6000)
   end,
 })
