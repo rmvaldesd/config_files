@@ -19,7 +19,7 @@ return {
 
     local on_attach = function(client, bufnr)
       -- Lsp-format setup --> https://github.com/lukas-reineke/lsp-format.nvim
-      require("lsp-format").on_attach(client)
+      -- require("lua.plugins.format").on_attach(client)
       -- Enable completion triggered by <c-x><c-o>
       vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
 
@@ -72,7 +72,7 @@ return {
       capabilities = capabilities,
       init_options = {
         staticcheck = true,
-        gofumpt = true,
+        -- gofumpt = true,
         -- memoryMode = "DegradeClosed",
       },
       filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
@@ -105,7 +105,6 @@ return {
       },
     }
 
-
     require('lspconfig')['dartls'].setup {
       on_attach = on_attach,
       flags = lsp_flags,
@@ -127,7 +126,6 @@ return {
         },
       },
     }
-
 
     require('lspconfig')['rust_analyzer'].setup {
       on_attach = on_attach,

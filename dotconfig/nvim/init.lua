@@ -58,9 +58,9 @@ local function goFormat(wait_ms)
   end ]]
 end
 
-vim.api.nvim_create_autocmd("BufWritePre", {
+--[[ vim.api.nvim_create_autocmd("BufWritePre", {
   pattern = "*.go",
   callback = function(args)
     goFormat(6000)
   end,
-})
+}) ]]
