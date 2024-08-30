@@ -23,6 +23,7 @@ vim.opt.clipboard = "unnamedplus"
 vim.opt.splitbelow = true
 vim.opt.splitright = true
 vim.opt.wrap = false
+vim.opt.ignorecase = true
 vim.g.mapleader = " "
 vim.o.termguicolors = true
 vim.g.netrw_banner = 0       -- gets rid of the annoying banner for netrw
