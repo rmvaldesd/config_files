@@ -134,4 +134,13 @@ return {
 	},
 	-- mini icons used for oil.nvim
 	{ "echasnovski/mini.nvim", version = false },
+	{
+		"ojroques/nvim-bufdel",
+		config = function()
+			require("bufdel").setup({
+				next = "tabs",
+				quit = true, -- quit Neovim when last buffer is closed
+			})
+		end,
+	},
 }
