@@ -56,7 +56,7 @@ return {
     local capabilities = require('cmp_nvim_lsp').default_capabilities()
 
     -- LSPs with default setup: bashls (Bash), cssls (CSS), html (HTML), clangd (C/C++), jsonls (JSON)
-    for _, lsp in ipairs { 'tsserver', 'bashls', 'cssls', 'html', 'clangd', 'jsonls', 'lua_ls' } do
+    for _, lsp in ipairs { 'bashls', 'cssls', 'html', 'clangd', 'jsonls', 'lua_ls' } do
       require('lspconfig')[lsp].setup {
         on_attach = on_attach,
         flags = lsp_flags,
