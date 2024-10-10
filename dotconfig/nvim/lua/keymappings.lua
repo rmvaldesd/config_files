@@ -53,7 +53,7 @@ vim.keymap.set('n', '<leader>h', '<cmd>bprevious<CR>', { desc = 'move previous b
 vim.keymap.set('n', '<leader>l', '<cmd>bnext<CR>', { desc = 'move next buffer' })
 
 --- Persevim (Nerdtree / TagBar)
-vim.keymap.set('n', '<leader>m', '<cmd>NERDTreeToggle<CR>', { desc = 'Nerdtree - toggle files menu' })
+vim.keymap.set('n', '<leader>m', '<cmd>Neotree toggle<CR>', { desc = 'Neotree - toggle files menu' })
 vim.keymap.set('n', '<leader>n', '<cmd>TagbarToggle<CR>', { desc = 'TagBar - toggle tagbar menu' })
 
 
