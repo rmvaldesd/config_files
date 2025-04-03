@@ -1,7 +1,5 @@
 -- vim.keymap.set('', '<leader>c', '"+y', { desc = 'copy to clipboard in normal, visual, select and operator modes' }) -- Copy to clipboard in normal, visual, select and operator modes
 vim.keymap.set('i', '<C-u>', '<C-g>u<C-u>') -- Make <C-u> undo-friendly
--- vim.keymap.set('i', '<C-w>', '<C-g>u<C-w>') -- Make <C-w> undo-friendly
-
 -- <Tab> to navigate the completion menu
 vim.keymap.set('i', '<S-Tab>', 'pumvisible() ? "\\<C-p>" : "\\<Tab>"', { expr = true })
 vim.keymap.set('i', '<Tab>', 'pumvisible() ? "\\<C-n>" : "\\<Tab>"', { expr = true })
@@ -52,15 +50,8 @@ vim.keymap.set('n', '<S-Right>', ':vertical resize +2<CR>', {})
 vim.keymap.set('n', '<leader>h', '<cmd>bprevious<CR>', { desc = 'move previous buffer' })
 vim.keymap.set('n', '<leader>l', '<cmd>bnext<CR>', { desc = 'move next buffer' })
 
---- Persevim (Nerdtree / TagBar)
-vim.keymap.set('n', '<leader>m', '<cmd>Neotree toggle<CR>', { desc = 'Neotree - toggle files menu' })
-vim.keymap.set('n', '<leader>n', '<cmd>TagbarToggle<CR>', { desc = 'TagBar - toggle tagbar menu' })
-
 
 -- show current line diagnostics
 vim.keymap.set("n", "<leader>sd", vim.diagnostic.open_float, { desc = 'show current line diagnostics' })
-
--- Open netrw in 25% split in tree view
-vim.keymap.set("n", "<leader>e", ":25Lex<CR>") -- space+e toggles netrw tree view
 
 vim.keymap.set("n", "<leader>yb", "$<S-v>%y", { desc = 'Yank block Between ([{}]) ' })

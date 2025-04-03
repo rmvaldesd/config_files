@@ -58,8 +58,8 @@ return {
     vim.keymap.set("n", "<leader>fi", builtin.lsp_incoming_calls, { desc = '[Telescope] lsp incoming calls' })
     vim.keymap.set("n", "<leader>fo", builtin.lsp_outgoing_calls, { desc = '[Telescope] lsp outgoing calls' })
     -- vim.keymap.set("n", "<leader>fs", builtin.lsp_document_symbols, { desc = 'lsp document symbols' })
-    vim.keymap.set("n", "<leader>ds", function() builtin.lsp_document_symbols({ symbol_width = 80 }) end,
-      { desc = '[Telescope] lsp [d]ocument [s]ymbols' })
+    vim.keymap.set("n", "<leader>fs", function() builtin.lsp_document_symbols({ symbol_width = 80 }) end,
+      { desc = '[Telescope] lsp document symbols' })
 
     vim.keymap.set("n", "<leader>fa", builtin.diagnostics, { desc = '[Telescope] document diagnostics' })
     vim.keymap.set("n", "<leader>ft", builtin.lsp_type_definitions, { desc = '[Telescope] lsp type definition' })
