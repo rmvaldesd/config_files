@@ -19,9 +19,6 @@ return {
 		vim.keymap.set("n", "<space>dsl", vim.diagnostic.setloclist, opts("[Lsp] - diagnostics open float"))
 
 		local on_attach = function(client, bufnr)
-			-- Lsp-format setup --> https://github.com/lukas-reineke/lsp-format.nvim
-			-- require("lua.plugins.format").on_attach(client)
-			-- Enable completion triggered by <c-x><c-o>
 			vim.api.nvim_buf_set_option(bufnr, "omnifunc", "v:lua.vim.lsp.omnifunc")
 
 			-- Mappings.
@@ -63,7 +60,6 @@ return {
 			debounce_text_changes = 300,
 		}
 
-		-- local capabilities = require('cmp_nvim_lsp').default_capabilities()
 		local capabilities = {
 			textDocument = {
 				foldingRange = {
