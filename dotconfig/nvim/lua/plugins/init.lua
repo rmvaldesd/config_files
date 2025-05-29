@@ -2,7 +2,6 @@ return {
 	{
 		"nvim-lua/plenary.nvim",
 		"nvim-telescope/telescope-symbols.nvim",
-		"wbthomason/packer.nvim",
 		"ojroques/vim-oscyank",
 		--'williamboman/nvim-lsp-installer'
 		{
@@ -47,22 +46,12 @@ return {
 
 		"rafcamlet/nvim-luapad",
 		"L3MON4D3/LuaSnip",
-		"saadparwaiz1/cmp_luasnip",
-		"hrsh7th/cmp-nvim-lsp",
-		"hrsh7th/cmp-buffer",
 		{ "numtostr/BufOnly.nvim", cmd = "BufOnly" },
 
 		-- Telescope
 		"nvim-telescope/telescope-file-browser.nvim",
 		{ "nvim-telescope/telescope-fzf-native.nvim", build = "make" },
 		"kyazdani42/nvim-web-devicons",
-
-		-- Notes - Wiki
-		"lervag/wiki.vim",
-
-		-- browse things.
-		"preservim/tagbar",
-		--'preservim/nerdtree',
 
 		-- Debugging
 		"mfussenegger/nvim-dap-python",

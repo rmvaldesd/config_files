@@ -1,9 +1,7 @@
 -- ----------------------nvim-lsp-installer setup-----------------------
 return {
 	"neovim/nvim-lspconfig",
-	dependencies = {
-		"hrsh7th/cmp-nvim-lsp",
-	},
+	dependencies = {},
 	config = function()
 		local util = require("lspconfig.util")
 		local async = require("lspconfig.async")
