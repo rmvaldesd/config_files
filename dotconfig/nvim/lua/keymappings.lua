@@ -1,8 +1,5 @@
 -- vim.keymap.set('', '<leader>c', '"+y', { desc = 'copy to clipboard in normal, visual, select and operator modes' }) -- Copy to clipboard in normal, visual, select and operator modes
 vim.keymap.set("i", "<C-u>", "<C-g>u<C-u>") -- Make <C-u> undo-friendly
--- <Tab> to navigate the completion menu
-vim.keymap.set("i", "<S-Tab>", 'pumvisible() ? "\\<C-p>" : "\\<Tab>"', { expr = true })
-vim.keymap.set("i", "<Tab>", 'pumvisible() ? "\\<C-n>" : "\\<Tab>"', { expr = true })
 
 -- vim.keymap.set('n', '<C-l>', '<cmd>noh<CR>')    -- Clear highlights
 vim.keymap.set("n", "<leader>o", "m`o<Esc>``", { desc = "insert newline in normal" }) -- Insert a newline in normal
@@ -10,8 +7,6 @@ vim.keymap.set("n", "<leader>o", "m`o<Esc>``", { desc = "insert newline in norma
 -- quit / write with leader key shortcut.
 vim.keymap.set("n", "<leader>q", "<cmd>q<CR>", { desc = "quick quit" })
 vim.keymap.set("n", "<leader>w", "<cmd>w<CR>", { desc = "quick save file" })
-
--- LSP mappings are in plugins/lsp-settings.lua
 
 -- Customs
 local utils = require("utils")
