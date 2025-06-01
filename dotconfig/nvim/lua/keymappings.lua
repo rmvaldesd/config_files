@@ -8,10 +8,6 @@ vim.keymap.set("n", "<leader>o", "m`o<Esc>``", { desc = "insert newline in norma
 vim.keymap.set("n", "<leader>q", "<cmd>q<CR>", { desc = "quick quit" })
 vim.keymap.set("n", "<leader>w", "<cmd>w<CR>", { desc = "quick save file" })
 
--- Customs
-local utils = require("utils")
-vim.keymap.set("n", "<leader>fn", utils.get_current_file_name, { desc = "show current file name" })
-
 -- relative path (src/foo.txt)
 vim.keymap.set("n", "<leader>cp", '<cmd>let @+=expand("%")<CR>', { desc = "copy relative file path (src/foo.txt)" })
 
