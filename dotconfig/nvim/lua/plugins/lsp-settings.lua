@@ -1,7 +1,9 @@
 -- ----------------------nvim-lsp-installer setup-----------------------
 return {
 	"neovim/nvim-lspconfig",
-	dependencies = {},
+	dependencies = {
+		"saghen/blink.cmp",
+	},
 	config = function()
 		local util = require("lspconfig.util")
 		local async = require("lspconfig.async")
@@ -57,7 +59,7 @@ return {
 			-- This is the default in Nvim 0.7+
 			debounce_text_changes = 300,
 		}
-
+    
 		local capabilities = {
 			textDocument = {
 				foldingRange = {
@@ -89,7 +91,7 @@ return {
 			},
 			filetypes = { "go", "gomod", "gowork", "gotmpl" },
 		})
-
+    
 		local useLsp = os.getenv("NVIMULSP")
 		if useLsp == "true" then
 			require("lspconfig.configs").ulsp = {

@@ -52,10 +52,8 @@ return {
 		"nvim-telescope/telescope-file-browser.nvim",
 		{ "nvim-telescope/telescope-fzf-native.nvim", build = "make" },
 		"kyazdani42/nvim-web-devicons",
-
 		-- Debugging
 		"mfussenegger/nvim-dap-python",
-
 		{
 			"kylechui/nvim-surround",
 			version = "*", -- Use for stability; omit to use `main` branch for the latest features
