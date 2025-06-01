@@ -2,7 +2,6 @@ return {
 	{
 		"nvim-lua/plenary.nvim",
 		"nvim-telescope/telescope-symbols.nvim",
-		"wbthomason/packer.nvim",
 		"ojroques/vim-oscyank",
 		--'williamboman/nvim-lsp-installer'
 		{
@@ -53,17 +52,8 @@ return {
 		"nvim-telescope/telescope-file-browser.nvim",
 		{ "nvim-telescope/telescope-fzf-native.nvim", build = "make" },
 		"kyazdani42/nvim-web-devicons",
-
-		-- Notes - Wiki
-		"lervag/wiki.vim",
-
-		-- browse things.
-		"preservim/tagbar",
-		--'preservim/nerdtree',
-
 		-- Debugging
 		"mfussenegger/nvim-dap-python",
-
 		{
 			"kylechui/nvim-surround",
 			version = "*", -- Use for stability; omit to use `main` branch for the latest features
