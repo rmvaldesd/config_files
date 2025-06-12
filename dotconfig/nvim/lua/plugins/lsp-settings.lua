@@ -72,7 +72,7 @@ return {
     local capabilities = require('blink.cmp').get_lsp_capabilities()
 
     -- LSPs with default setup: bashls (Bash), cssls (CSS), html (HTML), clangd (C/C++), jsonls (JSON)
-    for _, lsp in ipairs({ "bashls", "cssls", "html", "clangd", "jsonls", "lua_ls", "ts_ls" }) do
+    for _, lsp in ipairs({ "bashls", "cssls", "html", "clangd", "jsonls", "ts_ls" }) do
       require("lspconfig")[lsp].setup({
         on_attach = on_attach,
         flags = lsp_flags,

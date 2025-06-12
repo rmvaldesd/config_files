@@ -27,8 +27,7 @@ vim.opt.wrap = false
 vim.opt.ignorecase = true
 vim.g.mapleader = " "
 vim.o.termguicolors = true
-vim.lsp.set_log_level("debug")
-
+-- vim.lsp.set_log_level("debug")
 
 require("lazy").setup("plugins")
 require("plugin-settings")
