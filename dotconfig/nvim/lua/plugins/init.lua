@@ -47,8 +47,6 @@ return {
     "tpope/vim-fugitive",
 
     "ellisonleao/gruvbox.nvim",
-    "vim-airline/vim-airline",
-    "vim-airline/vim-airline-themes",
 
     "rafcamlet/nvim-luapad",
     "L3MON4D3/LuaSnip",

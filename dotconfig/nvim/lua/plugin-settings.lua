@@ -2,9 +2,6 @@
 vim.o.background = "dark" -- or "light" for light mode
 vim.cmd([[colorscheme gruvbox]])
 
--- Airline settings
-vim.g.airline_theme = 'dark_minimal'
-
 -- Wiki.vim settings
 
 vim.g["wiki_root"] = '~/Wiki'
