@@ -181,6 +181,9 @@ return {
       settings = {
         ["rust-analyzer"] = {},
       },
+      cmd = {
+        "rustup", "run", "stable", "rust-analyzer",
+      }
     })
 
     require("lspconfig")["lua_ls"].setup({
