@@ -23,17 +23,17 @@ vim.keymap.set(
   { desc = "copy directory name - (/something/src)" }
 )
 
---- moving throught the panes.
--- vim.keymap.set("n", "<C-l>", "<C-w>l", { desc = "move to the right pane" })
--- vim.keymap.set("n", "<C-h>", "<C-w>h", { desc = "move to the left pane" })
--- vim.keymap.set("n", "<C-k>", "<C-w>k", { desc = "move to the below pane" })
--- vim.keymap.set("n", "<C-j>", "<C-w>j", { desc = "move to the above pane" })
+-- Paso PEQUEÑO (1 unidad)
+vim.keymap.set('n', '<M-h>', ':vertical resize -1<CR>', { silent = true, desc = 'Narrow left (small)' })
+vim.keymap.set('n', '<M-l>', ':vertical resize +1<CR>', { silent = true, desc = 'Widen right (small)' })
+vim.keymap.set('n', '<M-j>', ':resize +1<CR>', { silent = true, desc = 'Increase height (small)' })
+vim.keymap.set('n', '<M-k>', ':resize -1<CR>', { silent = true, desc = 'Decrease height (small)' })
 
---- resizing panes horizontally and vertically.
-vim.keymap.set("n", "<M-Up>", ":resize -2<CR>", {})
-vim.keymap.set("n", "<M-Down>", ":resize +2<CR>", {})
-vim.keymap.set("n", "<M-Left>", ":vertical resize -2<CR>", {})
-vim.keymap.set("n", "<M-Right>", ":vertical resize +3<CR>", {})
+-- Paso NORMAL (5 unidades)
+vim.keymap.set('n', '<M-H>', ':vertical resize -5<CR>', { silent = true, desc = 'Narrow left (normal)' })
+vim.keymap.set('n', '<M-L>', ':vertical resize +5<CR>', { silent = true, desc = 'Widen right (normal)' })
+vim.keymap.set('n', '<M-J>', ':resize +5<CR>', { silent = true, desc = 'Increase height (normal)' })
+vim.keymap.set('n', '<M-K>', ':resize -5<CR>', { silent = true, desc = 'Decrease height (normal)' })
 
 --- moving throught the buffers
 vim.keymap.set("n", "<leader>h", "<cmd>bprevious<CR>", { desc = "move previous buffer" })
