@@ -24,10 +24,10 @@ vim.keymap.set(
 )
 
 --- moving throught the panes.
-vim.keymap.set("n", "<C-l>", "<C-w>l", { desc = "move to the right pane" })
-vim.keymap.set("n", "<C-h>", "<C-w>h", { desc = "move to the left pane" })
-vim.keymap.set("n", "<C-k>", "<C-w>k", { desc = "move to the below pane" })
-vim.keymap.set("n", "<C-j>", "<C-w>j", { desc = "move to the above pane" })
+-- vim.keymap.set("n", "<C-l>", "<C-w>l", { desc = "move to the right pane" })
+-- vim.keymap.set("n", "<C-h>", "<C-w>h", { desc = "move to the left pane" })
+-- vim.keymap.set("n", "<C-k>", "<C-w>k", { desc = "move to the below pane" })
+-- vim.keymap.set("n", "<C-j>", "<C-w>j", { desc = "move to the above pane" })
 
 --- resizing panes horizontally and vertically.
 vim.keymap.set("n", "<M-Up>", ":resize -2<CR>", {})
