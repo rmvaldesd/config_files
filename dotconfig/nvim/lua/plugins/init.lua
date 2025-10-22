@@ -33,8 +33,6 @@ return {
             "clangd",
             "lemminx",
             "ts_ls",
-            "rust-analizer",
-            "codelldb",
           },
           automatic_installation = false,
           handlers = {
