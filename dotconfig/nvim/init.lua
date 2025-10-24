@@ -28,6 +28,12 @@ vim.opt.ignorecase = true
 vim.g.mapleader = " "
 vim.o.termguicolors = true
 -- vim.lsp.set_log_level("debug")
+vim.opt.guicursor = {
+  "n-v-c:block",   -- normal/visual/command-line: block
+  "i-ci-ve:hor20", -- insert, insert-command, visual-ex mode: underline (20%)
+  "r-cr:hor20",    -- replace modes: underline (20%)
+  "o:hor50",       -- operator-pending mode: underline (50%)
+}
 
 require("lazy").setup("plugins")
 require("plugin-settings")

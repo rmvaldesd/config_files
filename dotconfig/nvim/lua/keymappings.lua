@@ -40,6 +40,10 @@ vim.keymap.set("n", "<leader>h", "<cmd>bprevious<CR>", { desc = "move previous b
 vim.keymap.set("n", "<leader>l", "<cmd>bnext<CR>", { desc = "move next buffer" })
 
 -- show current line diagnostics
-vim.keymap.set("n", "<leader>sd", vim.diagnostic.open_float, { desc = "show current line diagnostics" })
+vim.keymap.set("n", "<leader>ld", vim.diagnostic.open_float, { desc = "show current line diagnostics" })
 
 vim.keymap.set("n", "<leader>yb", "$<S-v>%y", { desc = "Yank block Between ([{}]) " })
+
+-- copilot
+-- toggle suggestions
+vim.keymap.set("n", "<leader>scp", ":Copilot suggestion toggle_auto_trigger<CR>", { desc = "Copilot toggle suggestions" })
