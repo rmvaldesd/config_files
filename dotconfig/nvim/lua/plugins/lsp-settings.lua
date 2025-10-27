@@ -119,6 +119,7 @@ return {
             ]],
           },
       })
+    end
     --LSPs with no default setup
 
     local python_root_files = {
