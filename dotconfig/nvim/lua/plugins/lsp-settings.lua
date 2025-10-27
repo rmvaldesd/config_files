@@ -95,7 +95,8 @@ return {
 
     local useLsp = os.getenv("NVIMULSP")
     if useLsp == "true" then
-      vim.lsp.config("ulsp", {
+      require("lspconfig.configs").ulsp = {
+        default_config = {
           cmd = { "socat", "-", "tcp:localhost:27883,ignoreeof" },
           flags = {
             debounce_text_changes = 1000,
@@ -118,9 +119,10 @@ return {
             Use at your own risk, and may the code gods have mercy on your soul
             ]],
           },
-      })
-    end
-    --LSPs with no default setup
+        },
+      }
+      require("lspconfig.configs").ulsp.setup({})
+    end --LSPs with no default setup
 
     local python_root_files = {
       "pyproject.toml",
