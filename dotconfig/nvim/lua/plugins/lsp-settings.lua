@@ -73,14 +73,14 @@ return {
 
     -- LSPs with default setup: bashls (Bash), cssls (CSS), html (HTML), clangd (C/C++), jsonls (JSON)
     for _, lsp in ipairs({ "bashls", "cssls", "html", "clangd", "jsonls", "ts_ls" }) do
-      require("lspconfig")[lsp].setup({
+      vim.lsp.config(lsp, {
         on_attach = on_attach,
         flags = lsp_flags,
         capabilities = capabilities,
       })
     end
 
-    require("lspconfig")["gopls"].setup({
+    vim.lsp.config("gopls", {
       cmd = { "gopls", "-remote=auto" },
       on_attach = on_attach,
       flags = lsp_flags,
@@ -95,8 +95,7 @@ return {
 
     local useLsp = os.getenv("NVIMULSP")
     if useLsp == "true" then
-      require("lspconfig.configs").ulsp = {
-        default_config = {
+      vim.lsp.config("ulsp", {
           cmd = { "socat", "-", "tcp:localhost:27883,ignoreeof" },
           flags = {
             debounce_text_changes = 1000,
@@ -119,10 +118,7 @@ return {
             Use at your own risk, and may the code gods have mercy on your soul
             ]],
           },
-        },
-      }
-      require("lspconfig.configs").ulsp.setup({})
-    end
+      })
     --LSPs with no default setup
 
     local python_root_files = {
@@ -133,7 +129,7 @@ return {
       "Pipfile",
       "pyrightconfig.json",
     }
-    require("lspconfig")["pyright"].setup({
+    vim.lsp.config("pyright", {
       on_attach = on_attach,
       flags = lsp_flags,
       capabilities = capabilities,
@@ -151,7 +147,7 @@ return {
       },
     })
 
-    require("lspconfig")["dartls"].setup({
+    vim.lsp.config("dartls", {
       on_attach = on_attach,
       flags = lsp_flags,
       capabilities = capabilities,
@@ -173,7 +169,7 @@ return {
       },
     })
 
-    require("lspconfig")["rust_analyzer"].setup({
+    vim.lsp.config("rust_analyzer", {
       on_attach = on_attach,
       flags = lsp_flags,
       capabilities = capabilities,
@@ -186,7 +182,7 @@ return {
       }
     })
 
-    require("lspconfig")["lua_ls"].setup({
+    vim.lsp.config("lua_ls", {
       on_attach = on_attach,
       flags = lsp_flags,
       capabilities = capabilities,
