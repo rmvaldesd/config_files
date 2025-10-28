@@ -1,6 +1,6 @@
 -- GruvBox settings
 vim.o.background = "dark" -- or "light" for light mode
-vim.cmd([[colorscheme gruvbox]])
+vim.cmd([[colorscheme tokyonight]])
 
 -- Wiki.vim settings
 

@@ -23,17 +23,6 @@ vim.keymap.set(
   { desc = "copy directory name - (/something/src)" }
 )
 
--- Paso PEQUEÑO (1 unidad)
-vim.keymap.set('n', '<M-h>', ':vertical resize -1<CR>', { silent = true, desc = 'Narrow left (small)' })
-vim.keymap.set('n', '<M-l>', ':vertical resize +1<CR>', { silent = true, desc = 'Widen right (small)' })
-vim.keymap.set('n', '<M-j>', ':resize +1<CR>', { silent = true, desc = 'Increase height (small)' })
-vim.keymap.set('n', '<M-k>', ':resize -1<CR>', { silent = true, desc = 'Decrease height (small)' })
-
--- Paso NORMAL (5 unidades)
-vim.keymap.set('n', '<M-H>', ':vertical resize -5<CR>', { silent = true, desc = 'Narrow left (normal)' })
-vim.keymap.set('n', '<M-L>', ':vertical resize +5<CR>', { silent = true, desc = 'Widen right (normal)' })
-vim.keymap.set('n', '<M-J>', ':resize +5<CR>', { silent = true, desc = 'Increase height (normal)' })
-vim.keymap.set('n', '<M-K>', ':resize -5<CR>', { silent = true, desc = 'Decrease height (normal)' })
 
 --- moving throught the buffers
 vim.keymap.set("n", "<leader>h", "<cmd>bprevious<CR>", { desc = "move previous buffer" })
