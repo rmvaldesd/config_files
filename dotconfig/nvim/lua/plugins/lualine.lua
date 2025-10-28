@@ -4,7 +4,7 @@ return {
   config = function()
     require('lualine').setup({
       options = {
-        theme = 'gruvbox',
+        theme = 'tokyonight',
         component_separators = { left = '', right = '' },
         section_separators = { left = '', right = '' },
         globalstatus = true,
