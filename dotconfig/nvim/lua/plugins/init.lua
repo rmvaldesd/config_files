@@ -47,12 +47,14 @@ return {
     "tpope/vim-fugitive",
 
     -- "ellisonleao/gruvbox.nvim",
-    {
-      "folke/tokyonight.nvim",
-      lazy = false,
-      priority = 1000,
-      opts = {},
-    },
+    -- {
+    --   "folke/tokyonight.nvim",
+    --   lazy = false,
+    --   priority = 1000,
+    --   opts = {},
+    -- },
+    "rebelot/kanagawa.nvim",
+
 
     "rafcamlet/nvim-luapad",
     "L3MON4D3/LuaSnip",
