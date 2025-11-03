@@ -23,10 +23,11 @@ vim.keymap.set(
   { desc = "copy directory name - (/something/src)" }
 )
 
-
---- moving throught the buffers
-vim.keymap.set("n", "<leader>h", "<cmd>bprevious<CR>", { desc = "move previous buffer" })
-vim.keymap.set("n", "<leader>l", "<cmd>bnext<CR>", { desc = "move next buffer" })
+-- easy move mapping to move between panes
+vim.keymap.set('n', '<C-h>', '<C-w>h', { desc = 'Move to left pane' })
+vim.keymap.set('n', '<C-j>', '<C-w>j', { desc = 'Move to below pane' })
+vim.keymap.set('n', '<C-k>', '<C-w>k', { desc = 'Move to above pane' })
+vim.keymap.set('n', '<C-l>', '<C-w>l', { desc = 'Move to right pane' })
 
 -- show current line diagnostics
 vim.keymap.set("n", "<leader>ld", vim.diagnostic.open_float, { desc = "show current line diagnostics" })
