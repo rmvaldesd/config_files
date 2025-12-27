@@ -57,7 +57,6 @@ return {
 
 
     "rafcamlet/nvim-luapad",
-    "L3MON4D3/LuaSnip",
     { "numtostr/BufOnly.nvim",                    cmd = "BufOnly" },
 
     -- Telescope
