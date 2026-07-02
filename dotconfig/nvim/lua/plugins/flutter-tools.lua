@@ -17,11 +17,6 @@ return
       widget_guides = { enabled = true, debug = true },
       dev_log = { enabled = false, open_cmd = "tabedit" },
       lsp = {
-        color = {
-          enabled = false,
-          background = true,
-          virtual_text = false,
-        },
         settings = {
           showTodos = true,
           renameFilesWithClasses = "prompt",

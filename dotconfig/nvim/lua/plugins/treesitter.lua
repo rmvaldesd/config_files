@@ -1,58 +1,67 @@
--- Treesitter
 return {
-	"nvim-treesitter/nvim-treesitter",
-	build = function()
-		local ts_update = require("nvim-treesitter.install").update({ with_sync = true })
-		ts_update()
-	end,
-	config = function()
-		require("nvim-treesitter.configs").setup({
-			-- A list of parser names, or "all" (the five listed parsers should always be installed)
-			ensure_installed = {
-				"c",
-				"lua",
-				"vim",
-				"help",
-				"query",
-				"go",
-				"dart",
-				"python",
-				"tsx",
-				"toml",
-				"yaml",
-				"json",
-				"html",
-			},
+  "nvim-treesitter/nvim-treesitter",
+  -- Force lazy to use the new branch just in case
+  branch = "main",
+  build = ":TSUpdate",
+  config = function()
+    -- The new top-level module is just 'nvim-treesitter'
+    local ts = require("nvim-treesitter")
 
-			-- Install parsers synchronously (only applied to `ensure_installed`)
-			sync_install = false,
-			ignore_install = { "help" },
+    -- Define the languages you want to automatically track
+    local ensure_installed = {
+      "c",
+      "lua",
+      "vim",
+      "vimdoc",
+      "query",
+      "markdown",
+      "python",
+      "go",
+      "dart",
+      "rust",
+      "json",
+      "tsx",
+      "html",
+      "toml",
+    }
 
-			-- Automatically install missing parsers when entering buffer
-			-- Recommendation: set to false if you don't have `tree-sitter` CLI installed locally
-			auto_install = true,
+    -- In the new API, we fetch what's installed and pass the remainder to .install()
+    local installed = require("nvim-treesitter.config").get_installed()
+    local to_install = {}
+    for _, lang in ipairs(ensure_installed) do
+      if not vim.tbl_contains(installed, lang) then
+        table.insert(to_install, lang)
+      end
+    end
 
-			-- List of parsers to ignore installing (for "all")
-			-- ignore_install = { "javascript" },
-
-			---- If you need to change the installation directory of the parsers (see -> Advanced Setup)
-			-- parser_install_dir = "/some/path/to/store/parsers", -- Remember to run vim.opt.runtimepath:append("/some/path/to/store/parsers")!
-
-			highlight = {
-				enable = true,
-				-- list of language that will be disabled
-				--disable = { "c", "rust" },
-				additional_vim_regex_highlighting = true,
-			},
-			incremental_selection = {
-				enable = true,
-				keymaps = {
-					init_selection = "gnn",
-					node_incremental = "grn",
-					scope_incremental = "grc",
-					node_decremental = "grm",
-				},
-			},
-		})
-	end,
+    if #to_install > 0 then
+      ts.install(to_install)
+    end
+  end,
+  init = function()
+    -- The new rewrite handles parser management, but leaves activation to Neovim core.
+    -- This autocmd handles lightning-fast native syntax highlighting and indentation.
+    vim.api.nvim_create_autocmd("FileType", {
+      callback = function()
+        pcall(vim.treesitter.start)
+        vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+      end,
+    })
+  end,
 }
+
+--      ensure_installed = {
+--        "c",
+--        "lua",
+--        "vim",
+--        "help",
+--        "query",
+--        "go",
+--        "dart",
+--        "python",
+--        "tsx",
+--        "toml",
+--        "yaml",
+--        "json",
+--        "html",
+--      },
