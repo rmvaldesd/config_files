@@ -129,7 +129,7 @@ return {
       flags = lsp_flags,
       capabilities = capabilities,
       filetypes = { "python" },
-      root_dir = util.root_pattern(unpack(python_root_files)),
+      root_markers = python_root_files,
       single_file_support = true,
       settings = {
         python = {
@@ -147,7 +147,7 @@ return {
       flags = lsp_flags,
       capabilities = capabilities,
       filetypes = { "dart" },
-      root_dir = util.root_pattern("pubspec.yaml"),
+      root_markers = { "pubspec.yaml" },
       single_file_support = true,
       init_options = {
         onlyAnalyzeProjectsWithOpenFiles = true,
@@ -186,6 +186,23 @@ return {
           diagnostics = { globals = { "vim" } },
         },
       },
+    })
+
+    -- vim.lsp.config() only STORES config; vim.lsp.enable() actually starts the
+    -- server (registers the FileType autocmd). Without this, on_attach never
+    -- runs and none of the LSP keymaps (gd, gD, gh, gi, ...) get set.
+    vim.lsp.enable({
+      "bashls",
+      "cssls",
+      "html",
+      "clangd",
+      "jsonls",
+      "ts_ls",
+      "gopls",
+      "pyright",
+      "dartls",
+      "rust_analyzer",
+      "lua_ls",
     })
   end,
 }
