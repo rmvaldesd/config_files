@@ -7,7 +7,7 @@ return {
 
         conform.setup({
             formatters_by_ft = {
-                go = { "gofmt" },
+                go = { "goimports", "gofumpt" },
                 lua = { "stylua" },
                 typescript = { "prettier" },
                 javascript = { "prettier" },

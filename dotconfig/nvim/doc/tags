@@ -1,0 +1,14 @@
+lsp-nav	lsp-navigation.txt	/*lsp-nav*
+lsp-nav-back	lsp-navigation.txt	/*lsp-nav-back*
+lsp-nav-calls	lsp-navigation.txt	/*lsp-nav-calls*
+lsp-nav-contents	lsp-navigation.txt	/*lsp-nav-contents*
+lsp-nav-diagnostics	lsp-navigation.txt	/*lsp-nav-diagnostics*
+lsp-nav-discover	lsp-navigation.txt	/*lsp-nav-discover*
+lsp-nav-edit	lsp-navigation.txt	/*lsp-nav-edit*
+lsp-nav-info	lsp-navigation.txt	/*lsp-nav-info*
+lsp-nav-jump	lsp-navigation.txt	/*lsp-nav-jump*
+lsp-nav-outline	lsp-navigation.txt	/*lsp-nav-outline*
+lsp-nav-refs	lsp-navigation.txt	/*lsp-nav-refs*
+lsp-nav-symbols	lsp-navigation.txt	/*lsp-nav-symbols*
+lsp-nav-workflow	lsp-navigation.txt	/*lsp-nav-workflow*
+lsp-navigation.txt	lsp-navigation.txt	/*lsp-navigation.txt*

@@ -30,7 +30,11 @@ return {
       vim.keymap.set("n", "gd", vim.lsp.buf.definition, bufopts(bufnr, "[Lsp] - [g]o to [d]efinition"))
       vim.keymap.set("n", "gh", vim.lsp.buf.hover, bufopts(bufnr, "[Lsp] - [go] to [h]over information"))
       vim.keymap.set("n", "gi", vim.lsp.buf.implementation, bufopts(bufnr, "[Lsp] - [g]o to [i]mplementation"))
-      vim.keymap.set("n", "gh", vim.lsp.buf.signature_help, bufopts(bufnr, "[Lsp] - [go] signature [h]elp"))
+      vim.keymap.set("n", "gs", vim.lsp.buf.signature_help, bufopts(bufnr, "[Lsp] - [g]o [s]ignature help"))
+      vim.keymap.set("n", "gr", vim.lsp.buf.references, bufopts(bufnr, "[Lsp] - [g]o to [r]eferences"))
+      vim.keymap.set("n", "<space>th", function()
+        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = bufnr }), { bufnr = bufnr })
+      end, bufopts(bufnr, "[Lsp] - [t]oggle inlay [h]ints"))
       vim.keymap.set(
         "n",
         "<space>wa",
@@ -53,6 +57,11 @@ return {
       vim.keymap.set("n", "<space>f", function()
         vim.lsp.buf.format({ async = true })
       end, bufopts(bufnr, "[Lsp] - [f]ormat document"))
+
+      -- Turn inlay hints on by default when the server provides them.
+      if client:supports_method("textDocument/inlayHint") then
+        vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
+      end
     end
 
     local lsp_flags = {
@@ -85,12 +94,48 @@ return {
       on_attach = on_attach,
       flags = lsp_flags,
       capabilities = capabilities,
-      init_options = {
-        staticcheck = true,
-        -- gofumpt = true,
-        -- memoryMode = "DegradeClosed",
-      },
       filetypes = { "go", "gomod", "gowork", "gotmpl" },
+      settings = {
+        gopls = {
+          -- Static analysis
+          staticcheck = true,
+          gofumpt = true,
+          analyses = {
+            unusedparams = true,
+            unusedwrite = true,
+            shadow = true,
+            nilness = true,
+            useany = true,
+            fieldalignment = false,
+          },
+          -- Completion quality
+          usePlaceholders = true,
+          completeUnimported = true,
+          -- Inlay hints
+          hints = {
+            assignVariableTypes = true,
+            compositeLiteralFields = true,
+            compositeLiteralTypes = true,
+            constantValues = true,
+            functionTypeParameters = true,
+            parameterNames = true,
+            rangeVariableTypes = true,
+          },
+          -- Code lenses (run test / tidy / generate above the code)
+          codelenses = {
+            gc_details = true,
+            generate = true,
+            regenerate_cgo = true,
+            test = true,
+            tidy = true,
+            upgrade_dependency = true,
+            vendor = true,
+          },
+          semanticTokens = true,
+          -- Skip noisy/heavy dirs for faster indexing
+          directoryFilters = { "-.git", "-node_modules", "-bazel-out", "-bazel-bin" },
+        },
+      },
     })
 
     local useLsp = os.getenv("NVIMULSP")

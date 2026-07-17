@@ -70,6 +70,8 @@ return {
         type = "delve",
         request = "attach",
         mode = "remote",
+        host = "127.0.0.1", -- ADD THIS
+        port = 2345,        -- ADD THIS
         -- stopOnEntry = true,
       },
     }
@@ -116,7 +118,14 @@ return {
       return
     end
 
-    vim.fn.sign_define("DapBreakpoint", { text = "X" })
+    -- Breakpoint / stopped-line signs. Highlight the whole stopped line so the
+    -- current execution point is obvious at a glance.
+    vim.api.nvim_set_hl(0, "DapStoppedLine", { default = true, link = "Visual" })
+    vim.fn.sign_define("DapBreakpoint", { text = "", texthl = "DiagnosticError", linehl = "", numhl = "" })
+    vim.fn.sign_define("DapBreakpointCondition", { text = "", texthl = "DiagnosticWarn", linehl = "", numhl = "" })
+    vim.fn.sign_define("DapLogPoint", { text = "", texthl = "DiagnosticInfo", linehl = "", numhl = "" })
+    vim.fn.sign_define("DapBreakpointRejected", { text = "", texthl = "DiagnosticError", linehl = "", numhl = "" })
+    vim.fn.sign_define("DapStopped", { text = "", texthl = "DiagnosticWarn", linehl = "DapStoppedLine", numhl = "DiagnosticWarn" })
 
     -- DAP-GO CONFIGURATION.
     -- This is used mostly for the "debug this test" feature.
@@ -148,6 +157,57 @@ return {
       },
     })
 
+    -- Python debugging. nvim-dap-python was already installed but never wired up.
+    -- debugpy must live in the SAME interpreter that runs your app: activate the
+    -- project's venv, then `python -m pip install debugpy`.
+    --
+    -- Resolve the interpreter: prefer an active/project virtualenv, fall back to
+    -- system python3. dap-python also re-resolves the venv per-launch for the
+    -- debugged program, so opening nvim at the project root is enough.
+    local function python_path()
+      local venv = os.getenv("VIRTUAL_ENV")
+      if venv and vim.fn.executable(venv .. "/bin/python") == 1 then
+        return venv .. "/bin/python"
+      end
+      local cwd = vim.fn.getcwd()
+      for _, p in ipairs({ cwd .. "/.venv/bin/python", cwd .. "/venv/bin/python" }) do
+        if vim.fn.executable(p) == 1 then
+          return p
+        end
+      end
+      return "python3"
+    end
+
+    local ok_dap_python, dap_python = pcall(require, "dap-python")
+    if ok_dap_python then
+      dap_python.setup(python_path())
+      dap_python.test_runner = "pytest"
+
+      -- Django-specific launch configs. `--noreload` is REQUIRED: Django's
+      -- autoreloader runs the server in a child process the debugger never
+      -- attaches to, so without it breakpoints silently never fire.
+      table.insert(dap.configurations.python, 1, {
+        type = "python",
+        request = "launch",
+        name = "Django: runserver",
+        program = "${workspaceFolder}/manage.py",
+        args = { "runserver", "--noreload" },
+        django = true,          -- enables Django template breakpoints
+        justMyCode = false,     -- allow stepping into Django/3rd-party code
+        console = "integratedTerminal",
+      })
+      table.insert(dap.configurations.python, 2, {
+        type = "python",
+        request = "launch",
+        name = "Django: test",
+        program = "${workspaceFolder}/manage.py",
+        args = { "test" },
+        django = true,
+        justMyCode = false,
+        console = "integratedTerminal",
+      })
+    end
+
     -- Set keymappings
     vim.keymap.set("n", "<leader>i", require("dap.ui.widgets").hover, { desc = "[dap] - hover information" })
     vim.keymap.set("n", "<leader>b", dap.toggle_breakpoint, { desc = "[dap] - toggle [b]reakpoints" })
@@ -176,5 +236,15 @@ return {
       dap.clear_breakpoints()
       require("notify")("Breakpoints cleared", "warn")
     end, { desc = "[dap] - [c]lear [b]reakpoints" })
+
+    -- Evaluate the expression under the cursor (normal) or the visual selection.
+    vim.keymap.set({ "n", "v" }, "<leader>de", function()
+      ui.eval(nil, { enter = true })
+    end, { desc = "[dap] - [e]valuate expression" })
+    vim.keymap.set("n", "<leader>dr", dap.repl.toggle, { desc = "[dap] - toggle [r]epl" })
+    vim.keymap.set("n", "<leader>dl", dap.run_last, { desc = "[dap] - run [l]ast config" })
+    vim.keymap.set("n", "<leader>df", function()
+      ui.float_element("scopes", { enter = true })
+    end, { desc = "[dap] - [f]loat scopes" })
   end,
 }

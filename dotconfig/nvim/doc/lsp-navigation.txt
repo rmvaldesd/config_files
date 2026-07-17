@@ -1,0 +1,137 @@
+*lsp-navigation.txt*    Code navigation cheatsheet for this Neovim config
+
+                        LSP & CODE NAVIGATION GUIDE                    *lsp-nav*
+
+Everything you need to move around a large codebase: jump to/from definitions,
+walk the call hierarchy, list symbols, and search project-wide. Leader is
+<space>.  Type `:help <tag>` to jump to any section below, or press `<leader>?`
+in a code buffer to see the live which-key menu of LSP keys.
+
+==============================================================================
+CONTENTS                                                     *lsp-nav-contents*
+
+    1. Discovering keys .................... |lsp-nav-discover|
+    2. Jump to / from definitions .......... |lsp-nav-jump|
+    3. Call hierarchy (callers/callees) .... |lsp-nav-calls|
+    4. Symbols: file & project ............. |lsp-nav-symbols|
+    5. References & implementations ........ |lsp-nav-refs|
+    6. Info: hover, signature, hints ....... |lsp-nav-info|
+    7. Edit: rename, code action, format ... |lsp-nav-edit|
+    8. Diagnostics ......................... |lsp-nav-diagnostics|
+    9. Recommended workflow ................ |lsp-nav-workflow|
+
+==============================================================================
+1. DISCOVERING KEYS                                          *lsp-nav-discover*
+
+You never have to memorize these. Three ways to find a key on demand:
+
+    <leader>?     which-key popup of buffer-local mappings (the LSP keys).
+    <leader> ...  press space and wait; which-key lists what follows it.
+    <leader>km    Telescope: fuzzy-search EVERY mapping by description.
+    :WhichKey     browse all mappings in the which-key popup.
+    :help lsp-nav open this document.
+
+Tip: every mapping here has a `desc`, so `<leader>km` is searchable by intent,
+e.g. type "callers" or "workspace" or "rename".
+
+==============================================================================
+2. JUMP TO / FROM DEFINITIONS                                    *lsp-nav-jump*
+
+    gd            Go to Definition (jumps straight there).
+    gD            Go to Declaration.
+    gi            Go to Implementation (interfaces -> concrete impls).
+    <space>D      Go to Type Definition.
+    <leader>fe    Definitions in a Telescope picker (when there are several).
+    <leader>ft    Type definition in a Telescope picker.
+
+Jumping BACK and FORTH (built-in, works after any jump):        *lsp-nav-back*
+
+    <C-o>         Jump back (older position in the jumplist).
+    <C-i>         Jump forward (newer position). Same as <Tab>.
+    ``            Jump to position before the latest jump.
+    :jumps        Show the whole jumplist.
+
+So the core loop is: `gd` to dive in, `<C-o>` to come back. Chain them to
+tunnel through several files and pop all the way back out.
+
+==============================================================================
+3. CALL HIERARCHY (CALLERS / CALLEES)                           *lsp-nav-calls*
+
+    <leader>fi    Incoming calls: WHO CALLS this function (the callers).
+    <leader>fo    Outgoing calls: what this function CALLS (the callees).
+
+Both open a Telescope picker showing one level of the hierarchy. To walk the
+tree deeper, select an entry (jumps you there) and invoke the same key again
+from the new location. That lets you climb up the callers chain or descend the
+callees chain one hop at a time.
+
+Mnemonic: `i` = calls coming IN, `o` = calls going OUT.
+
+==============================================================================
+4. SYMBOLS: FILE & PROJECT                                    *lsp-nav-symbols*
+
+    <leader>fs    Document symbols: every function/type/method in THIS file.
+                  Great as a live "outline" to jump within a big file.
+    <leader>fw    Workspace symbols: search ANY symbol across the whole
+                  project by name. Type and it queries the LSP dynamically.
+                  This is the fastest way to find a function you know the
+                  name of but not the file.
+
+Also built-in:                                                *lsp-nav-outline*
+
+    gO            Native document-symbol outline (Neovim 0.11+).
+
+==============================================================================
+5. REFERENCES & IMPLEMENTATIONS                                  *lsp-nav-refs*
+
+    gr            References: every usage of the symbol under the cursor.
+    <leader>fr    Same, in a Telescope picker.
+    gi            Implementations of an interface/abstract symbol.
+
+Use `gr` to answer "where is this used?" before renaming or deleting.
+
+==============================================================================
+6. INFO: HOVER, SIGNATURE, HINTS                                *lsp-nav-info*
+
+    gh            Hover: type + doc of the symbol under the cursor.
+    gs            Signature help: parameters of the call you're inside.
+    <space>th     Toggle inlay hints (inline parameter names & types).
+
+==============================================================================
+7. EDIT: RENAME, CODE ACTION, FORMAT                            *lsp-nav-edit*
+
+    <space>rn     Rename symbol across the whole project.
+    <space>ca     Code action (quick-fixes, imports, refactors).
+    <space>f      Format the current buffer via the LSP.
+    <leader>l     Format via conform.nvim (goimports+gofumpt for Go, etc).
+
+==============================================================================
+8. DIAGNOSTICS                                            *lsp-nav-diagnostics*
+
+    <space>do     Open the diagnostic float under the cursor.
+    <space>dn     Go to next diagnostic.
+    <space>dh     Go to previous diagnostic.
+    <space>dsl    Send buffer diagnostics to the location list.
+    <leader>fa    Telescope: all diagnostics in the project.
+
+==============================================================================
+9. RECOMMENDED WORKFLOW                                      *lsp-nav-workflow*
+
+Exploring an unfamiliar function `Foo`:
+
+    1. <leader>fw   find "Foo" project-wide, <CR> to jump to it.
+    2. gh           read its signature/doc.
+    3. <leader>fi   see who calls it (callers) to learn how it's used.
+    4. <leader>fo   see what it calls (callees) to learn what it does.
+    5. gd on a call inside it   dive into a callee.
+    6. <C-o>        pop back out, repeat.
+
+Working inside one big file:
+
+    <leader>fs      outline of the file; jump to any function instantly.
+
+Before a refactor:
+
+    gr              confirm every reference, then <space>rn to rename all.
+
+ vim:tw=78:ts=8:noet:ft=help:norl:
