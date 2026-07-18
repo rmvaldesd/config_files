@@ -63,8 +63,12 @@ return {
             { desc = '[LSP] incoming calls — callers of this function' })
         vim.keymap.set("n", "<leader>fo", builtin.lsp_outgoing_calls,
             { desc = '[LSP] outgoing calls — functions this one calls' })
-        vim.keymap.set("n", "<leader>fs", function() builtin.lsp_document_symbols({ symbol_width = 80 }) end,
+        vim.keymap.set("n", "<leader>fs",
+            function() builtin.lsp_document_symbols({ symbol_width = 45 }) end,
             { desc = '[LSP] document symbols — functions/types in THIS file' })
+        vim.keymap.set("n", "<leader>fF",
+            function() builtin.lsp_document_symbols({ symbol_width = 45, symbols = { "function", "method" } }) end,
+            { desc = '[LSP] document functions — only functions/methods in THIS file' })
         vim.keymap.set("n", "<leader>fw", builtin.lsp_dynamic_workspace_symbols,
             { desc = '[LSP] workspace symbols — search any symbol project-wide' })
 
