@@ -60,6 +60,7 @@ hl.on("hyprland.start", function()
   hl.exec_cmd(terminal)
   hl.exec_cmd("hyprpaper")
   hl.exec_cmd("waybar")
+  hl.exec_cmd("~/.config/waybar/auto-reload.sh")
   hl.exec_cmd("hypridle")
 end)
 
@@ -235,11 +236,11 @@ hl.config({
 
 hl.config({
   input = {
-    kb_layout    = "latam",
+    kb_layout    = "latam,es",
     --kb_layout    = "es",
     kb_variant   = "",
     kb_model     = "",
-    kb_options   = "",
+    kb_options   = "grp:alt_shift_toggle",
     kb_rules     = "",
 
     left_handed  = false,

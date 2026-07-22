@@ -8,6 +8,7 @@
   ],
   "modules-right": [
     "hyprland/submap",
+    "custom/language",
     "group/volume",
     "battery",
     "bluetooth",
@@ -21,7 +22,6 @@
   "battery": {
     "interval": 60,
     "format": "{icon}{capacity}%",
-    "format": "{icon} {capacity}%",
     "format-charging": "󰂄 {capacity}%",
     "format-plugged": " {capacity}%",
     "format-alt": "{time} {icon}",
@@ -74,7 +74,7 @@
     "on-click": "exec nmrs"
   },
   "clock": {
-    "format": " {:%a, %d. %b %I:%M %p}",
+    "format": "{:%a, %d. %b %I:%M %p}",
     "tooltip-format": "<tt><small>{calendar}</small></tt>",
     "calendar": {
       "format": {
@@ -85,7 +85,7 @@
   },
   "pulseaudio": {
     "format": "{volume}% {icon}",
-    "format-muted": "",
+    "format-muted": "X",
     "format-icons": {
       "default": [
         "",
@@ -106,8 +106,14 @@
   "group/volume": {
     "orientation": "horizontal",
     "modules": [
-      "pulseaudio",
-      "pulseaudio/slider"
+      "pulseaudio"
+      //"pulseaudio/slider"
     ]
+  },
+  "custom/language": {
+    "exec": "~/.config/waybar/scripts/kb_layout.sh",
+    "interval": 1,
+    "format": "{}",
+    "on-click": "hyprctl switchxkblayout at-translated-set-2-keyboard next"
   }
 }
