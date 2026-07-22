@@ -275,9 +275,9 @@ local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 local secondMod = "SUPER + SHIFT"
 
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
-local closeWindowBind = hl.bind(mainMod .. " + Q", hl.dsp.window.close())
+local closeWindowBind = hl.bind(secondMod .. " + C", hl.dsp.window.close())
 -- closeWindowBind:set_enabled(false)
-hl.bind(mainMod .. " + M",
+hl.bind(secondMod .. " + M",
   hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'"))
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
@@ -305,6 +305,22 @@ hl.bind(secondMod .. " + T", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(secondMod .. " + F", hl.dsp.window.fullscreen({ mode = "maximized" }))
 
 hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("hyprlock"))
+
+
+-- Activar el submapa al pulsar Mod + R
+hl.bind("SUPER + R", hl.dsp.submap("resize"))
+-- Definición del submapa "resize"
+hl.define_submap("resize", function()
+  -- Ajustar tamaño de ventana activa (manteniendo presionado con repeating = true)
+  hl.bind("L", hl.dsp.window.resize({ x = 10, y = 0, relative = true }), { repeating = true })
+  hl.bind("H", hl.dsp.window.resize({ x = -10, y = 0, relative = true }), { repeating = true })
+  hl.bind("I", hl.dsp.window.resize({ x = 0, y = -10, relative = true }), { repeating = true })
+  hl.bind("J", hl.dsp.window.resize({ x = 0, y = 10, relative = true }), { repeating = true })
+
+  -- Salir del submapa al presionar Enter o Escape
+  hl.bind("Return", hl.dsp.submap("reset"))
+  hl.bind("escape", hl.dsp.submap("reset"))
+end)
 
 -- Switch workspaces with mainMod + [0-9]
 -- Move active window to a workspace with mainMod + SHIFT + [0-9]
