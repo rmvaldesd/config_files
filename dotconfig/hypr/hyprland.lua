@@ -62,6 +62,9 @@ hl.on("hyprland.start", function()
   hl.exec_cmd("waybar")
   hl.exec_cmd("~/.config/waybar/auto-reload.sh")
   hl.exec_cmd("hypridle")
+  hl.exec_cmd("mako")
+  hl.exec_cmd("/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1")
+  hl.exec_cmd("wl-paste --watch cliphist store")
 end)
 
 
@@ -129,7 +132,7 @@ hl.config({
 
     -- Change transparency of focused and unfocused windows
     active_opacity   = 1.0,
-    inactive_opacity = 20.0,
+    inactive_opacity = 0.9, -- rango válido 0.0-1.0 (el 20.0 anterior se truncaba a 1.0 y no tenía efecto)
 
     shadow           = {
       enabled      = true,
@@ -307,6 +310,9 @@ hl.bind(secondMod .. " + F", hl.dsp.window.fullscreen({ mode = "maximized" }))
 
 hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("hyprlock"))
 
+-- Historial del portapapeles (cliphist): elegir una entrada con rofi y copiarla
+hl.bind(secondMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu -p 'Portapapeles' | cliphist decode | wl-copy"))
+
 
 -- Activar el submapa al pulsar Mod + R
 hl.bind("SUPER + R", hl.dsp.submap("resize"))
@@ -343,7 +349,8 @@ hl.bind(mainMod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
-hl.bind(mainMod .. " + S", hl.dsp.exec_cmd("hyprshot -m region --raw | satty --filename -"))
+-- Captura de región con anotación. Va en la tecla Print porque SUPER+S ya está tomado por el scratchpad "magic".
+hl.bind("Print", hl.dsp.exec_cmd("hyprshot -m region --raw | satty --filename -"))
 
 -- Tu nueva combinación base: SUPER + CONTROL
 local thirdMod = mainMod .. " + CONTROL"
