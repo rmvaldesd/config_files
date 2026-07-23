@@ -84,7 +84,7 @@
     "on-click": "exec chromium --app=https://calendar.google.com"
   },
   "pulseaudio": {
-    "format": "{volume}% {icon}",
+    "format": "{icon} {volume}%",
     "format-muted": "X",
     "format-icons": {
       "default": [
@@ -114,6 +114,6 @@
     "exec": "~/.config/waybar/scripts/kb_layout.sh",
     "interval": 1,
     "format": "{}",
-    "on-click": "hyprctl switchxkblayout at-translated-set-2-keyboard next"
+    "on-click": "hyprctl switchxkblayout all next"
   }
 }

@@ -345,6 +345,24 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 hl.bind(mainMod .. " + S", hl.dsp.exec_cmd("hyprshot -m region --raw | satty --filename -"))
 
+-- Tu nueva combinación base: SUPER + CONTROL
+local thirdMod = mainMod .. " + CONTROL"
+
+-- ==========================================
+-- 1. CAMBIAR DE WORKSPACE (Navegación)
+-- ==========================================
+
+-- Moverse al espacio de trabajo ANTERIOR con 'H' (Izquierda)
+hl.bind(thirdMod .. " + H", hl.dsp.focus({ workspace = "e-1" }))
+
+-- Moverse al espacio de trabajo SIGUIENTE con 'L' (Derecha)
+hl.bind(thirdMod .. " + L", hl.dsp.focus({ workspace = "e+1" }))
+
+-- Opcionales (Vertical)
+hl.bind(thirdMod .. " + K", hl.dsp.focus({ workspace = "e-1" })) -- Arriba / Anterior
+hl.bind(thirdMod .. " + J", hl.dsp.focus({ workspace = "e+1" })) -- Abajo / Siguiente
+
+
 
 -- Laptop multimedia keys for volume and LCD brightness
 hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"),
