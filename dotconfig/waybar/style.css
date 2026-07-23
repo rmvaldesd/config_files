@@ -6,9 +6,11 @@
 @define-color dark-5 rgba(113, 113, 122, 1);
 
 * {
-  /* `otf-font-awesome` is required to be installed for icons.
-     Se listan las familias v7 (Arch) y v6 (Fedora): CSS usa la primera que exista en el sistema. */
-  font-family: "JetBrains Mono", "Font Awesome 7 Free", "Font Awesome 7 Brands", "Font Awesome 6 Free", "Font Awesome 6 Brands", sans-serif;
+  /* Iconos: "Symbols Nerd Font" viene versionada en config_files/fonts (instalada por
+     scripts/install-fonts.sh) y cubre TODOS los glifos usados (Font Awesome + Material Design),
+     así se ve idéntico en Arch y Fedora sin depender de los paquetes de cada distro.
+     Las familias Font Awesome quedan solo como fallback (v7 en Arch, v6 en Fedora). */
+  font-family: "JetBrains Mono", "Symbols Nerd Font", "Symbols Nerd Font Mono", "Font Awesome 7 Free", "Font Awesome 7 Brands", "Font Awesome 6 Free", "Font Awesome 6 Brands", sans-serif;
   font-size: 13px;
 }
 
