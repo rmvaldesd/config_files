@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Menú de apagado para Hyprland usando rofi.
+# Invocado por el bind SUPER+SHIFT+M en hyprland.lua (con fallback a hyprctl si no está instalado).
+
+opciones=" Bloquear\n󰍃 Cerrar sesión\n󰤄 Suspender\n Reiniciar\n Apagar"
+
+seleccion=$(echo -e "$opciones" | rofi -dmenu -i -p "Salir" -theme-str 'window {width: 250px;}')
+
+case "$seleccion" in
+    *Bloquear)       hyprlock ;;
+    *"Cerrar sesión") hyprctl dispatch exit ;;
+    *Suspender)      systemctl suspend ;;
+    *Reiniciar)      systemctl reboot ;;
+    *Apagar)         systemctl poweroff ;;
+esac
