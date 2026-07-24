@@ -156,7 +156,7 @@ sudo pacman -S --needed "${paquetes_apariencia[@]}"
 echo "-> Habilitando servicios del sistema..."
 sudo systemctl enable NetworkManager.service         # Gestor de red al arrancar. Sin '--now' a propósito: si la conexión actual la maneja otro servicio (iwd, dhcpcd), arrancar NM aquí podría cortar la red a mitad del script.
 sudo systemctl enable --now bluetooth.service        # Necesario para que bluez funcione y bluetui pueda gestionar dispositivos.
-sudo systemctl enable ly.service                     # Pantalla de login TUI al arrancar. Sin '--now' a propósito: arrancarlo ahora tomaría la TTY en plena instalación.
+sudo systemctl enable ly@tty1.service                     # Pantalla de login TUI al arrancar. Sin '--now' a propósito: arrancarlo ahora tomaría la TTY en plena instalación.
 sudo systemctl enable --now fstrim.timer             # TRIM semanal del SSD; mantiene el rendimiento del disco a largo plazo.
 sudo systemctl enable --now ufw.service              # Arranca el firewall en cada boot.
 sudo ufw --force enable                              # Activa ufw con la política por defecto: bloquear entrante, permitir saliente.
