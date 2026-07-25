@@ -8,6 +8,7 @@ fast later.
 
 | Topic | Location | What's there |
 |-------|----------|--------------|
+| **Escritorio** | [`hyprland/`](./hyprland/) | Todos los atajos (ventanas, workspaces, capturas, fzf, `imgs`) y el comportamiento automático: inactividad, perfiles de energía, wallpaper, asociaciones de archivos. |
 | **Neovim** | [`vim/`](./vim/) | Full setup guide: debugging (Go/Python/Django), LSP navigation, keymaps. |
 | **tmux** | [`tmux/`](./tmux/) | Keybindings and options for the current `tmux.conf`. |
 | **Linux** | [`linux/`](./linux/) | OS/desktop notes, commands, troubleshooting. |
