@@ -239,6 +239,19 @@ for dir in nvim hypr waybar rofi mako ghostty; do
     echo "-> Enlazado: $destino -> ~/config_files/dotconfig/$dir"
 done
 
+# Enlaza las asociaciones de archivos (qué app abre cada tipo de archivo).
+# Va aparte del loop de arriba porque ese enlaza directorios y esto es un archivo suelto
+# dentro de ~/.config. Verificado que 'xdg-mime default' y Thunar escriben A TRAVÉS del
+# symlink en vez de reemplazarlo, así que los cambios que hagas desde la GUI quedan
+# versionados solos.
+if [ -e "$HOME/.config/mimeapps.list" ] && [ ! -L "$HOME/.config/mimeapps.list" ]; then
+    respaldo="$HOME/.config/mimeapps.list.bak.$(date +%Y%m%d%H%M%S)"
+    mv "$HOME/.config/mimeapps.list" "$respaldo"
+    echo "-> ~/.config/mimeapps.list ya existía; respaldado como $respaldo"
+fi
+ln -sfn "$HOME/config_files/mimeapps.list" "$HOME/.config/mimeapps.list"
+echo "-> Enlazado: ~/.config/mimeapps.list -> ~/config_files/mimeapps.list"
+
 # Enlaza la configuración de tmux directamente en el home
 if [ -e "$HOME/.tmux.conf" ] && [ ! -L "$HOME/.tmux.conf" ]; then
     respaldo="$HOME/.tmux.conf.bak.$(date +%Y%m%d%H%M%S)"
