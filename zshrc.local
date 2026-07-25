@@ -11,6 +11,18 @@
 export PATH="$HOME/.local/bin:$PATH"
 
 # ---------------------------------------------------------------------------
+# claude
+# ---------------------------------------------------------------------------
+# Arranca Claude Code con el modo 'bypassPermissions' habilitado pero NO
+# activo: la sesion empieza preguntando como siempre, y desde adentro se puede
+# saltar a saltarse todos los permisos con Shift+Tab (ciclo de modos) o con
+# /permissions. Sin este flag ese modo ni siquiera aparece como opcion.
+#
+# La variante --dangerously-skip-permissions (sin 'allow-') arranca directo en
+# ese modo, sin preguntar nada desde el primer comando.
+alias yolo='claude --allow-dangerously-skip-permissions'
+
+# ---------------------------------------------------------------------------
 # fzf
 # ---------------------------------------------------------------------------
 # 'fzf --zsh' emite el autocompletado y los atajos de teclado juntos. Es el
