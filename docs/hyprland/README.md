@@ -242,10 +242,19 @@ no expiran solas.
 | Tipo | Abre con |
 |---|---|
 | Imágenes (17 formatos) | imv |
+| `.xcf` (formato nativo de GIMP) | GIMP |
 | PDF | zathura |
 | Video y audio (122 formatos) | mpv |
 | Texto y código (24 tipos) | Sublime Text |
 | HTML | chromium |
+
+GIMP está instalado pero **solo** se asocia a `.xcf`: para el resto de las
+imágenes queda en el menú *Abrir con* de Thunar, porque es un editor y no tiene
+sentido levantarlo para mirar un PNG.
+
+Las asociaciones viven en `mimeapps.list`, versionado. Si cambiás una desde
+Thunar (*Abrir con → Establecer como predeterminada*), el cambio se guarda ahí
+solo: `xdg-mime` escribe a través del symlink.
 
 ## Dónde vive cada configuración
 
