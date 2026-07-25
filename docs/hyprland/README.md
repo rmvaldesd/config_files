@@ -82,11 +82,15 @@ con `Return` o `Escape`.
 | `SUPER + SHIFT + V` | Historial del portapapeles (cliphist en rofi) |
 | `SUPER + SHIFT + Q` | Bloquear la pantalla (hyprlock) |
 | `SUPER + SHIFT + M` | Menú de apagado (hyprshutdown) |
-| `CONTROL + SHIFT + /` (o sea `CONTROL + ?`) | **Esta ayuda**, en una terminal flotante |
+| `SUPER + A` | **Esta ayuda**, en una terminal flotante |
 
 > Abre este documento con `glow` si está instalado, y cae a `less` si no. Se
-> cierra con `q`. Es el único atajo del entorno que no usa `SUPER`: se declara
-> por la tecla física (`slash` con shift), no por el símbolo `?`.
+> cierra con `q`.
+>
+> **Por qué una letra y no `?`:** el layout de este equipo es `latam`, donde la
+> barra `/` no tiene tecla propia (se escribe con `Shift + 7`). Un bind sobre el
+> keysym `slash` no se dispara con la combinación que uno esperaría. Las letras
+> están en la misma posición física en cualquier layout.
 
 ## Capturas de pantalla
 
