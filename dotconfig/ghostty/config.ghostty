@@ -20,16 +20,22 @@ window-padding-y = 8
 background-opacity = 0.96
 
 # --- Colores base ---
-background = #18181b
+# #27272a es el @dark-8 de waybar, el fondo de sus modulos. Un escalon mas
+# claro que el #18181b de la barra, que resultaba demasiado oscuro.
+background = #27272a
 foreground = #fafafa
 cursor-color = #75f1fa
 cursor-style = block
-selection-background = #3f3f46
+# Un escalon mas que el fondo para que la seleccion se distinga: contra
+# #27272a, el #3f3f46 quedaba casi invisible.
+selection-background = #52525b
 selection-foreground = #fafafa
 
 # --- Paleta ANSI ---
 # 0-7: colores normales
-palette = 0=#27272a
+# El negro es #18181b (el @dark-9 de la barra): tiene que ser MAS oscuro que
+# el fondo, si no el texto en color 0 quedaria invisible.
+palette = 0=#18181b
 palette = 1=#e35149
 palette = 2=#7ee787
 palette = 3=#e3b341
