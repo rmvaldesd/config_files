@@ -82,10 +82,11 @@ con `Return` o `Escape`.
 | `SUPER + SHIFT + V` | Historial del portapapeles (cliphist en rofi) |
 | `SUPER + SHIFT + Q` | Bloquear la pantalla (hyprlock) |
 | `SUPER + SHIFT + M` | Menú de apagado (hyprshutdown) |
-| `SUPER + /` | **Esta ayuda**, en una terminal flotante |
+| `CONTROL + SHIFT + /` (o sea `CONTROL + ?`) | **Esta ayuda**, en una terminal flotante |
 
-> `SUPER + /` abre este documento con `glow` si está instalado, y cae a `less`
-> si no. Se cierra con `q`.
+> Abre este documento con `glow` si está instalado, y cae a `less` si no. Se
+> cierra con `q`. Es el único atajo del entorno que no usa `SUPER`: se declara
+> por la tecla física (`slash` con shift), no por el símbolo `?`.
 
 ## Capturas de pantalla
 

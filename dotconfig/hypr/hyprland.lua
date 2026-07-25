@@ -73,7 +73,7 @@ local screenshotWindow  = "hyprshot -m window -m active --clipboard-only"
 -- SUPER + Print: el monitor activo entero.
 local screenshotMonitor = "hyprshot -m output -m active --clipboard-only"
 
--- SUPER + / : abre la referencia de atajos en una terminal flotante.
+-- CONTROL + SHIFT + / : abre la referencia de atajos en una terminal flotante.
 -- El titulo 'ayuda-atajos' es lo que matchea la window_rule del final del archivo
 -- para que salga flotante y no como una ventana mas en el mosaico.
 -- Usa glow si esta instalado (renderiza las tablas) y cae a less si no, asi el
@@ -399,8 +399,11 @@ hl.bind("CONTROL + Print", hl.dsp.exec_cmd(screenshotSave))              -- regi
 hl.bind("ALT + Print", hl.dsp.exec_cmd(screenshotWindow))                -- ventana activa -> portapapeles
 hl.bind(mainMod .. " + Print", hl.dsp.exec_cmd(screenshotMonitor))       -- monitor completo -> portapapeles
 
--- Ayuda: referencia de atajos. La tecla '/' va por el '?' de "ayuda".
-hl.bind(mainMod .. " + slash", hl.dsp.exec_cmd(ayuda))
+-- Ayuda: referencia de atajos. Es CONTROL + SHIFT + slash porque '?' se escribe
+-- con shift; el bind se declara por la tecla fisica, no por el simbolo.
+-- No usar CONTROL + slash a secas: Sublime Text lo usa para comentar/descomentar,
+-- y un bind global de Hyprland se lo quitaria a todas las aplicaciones.
+hl.bind("CONTROL + SHIFT + slash", hl.dsp.exec_cmd(ayuda))
 
 -- Tu nueva combinación base: SUPER + CONTROL
 local thirdMod = mainMod .. " + CONTROL"
@@ -490,7 +493,7 @@ hl.window_rule({
   float = true,
 })
 
--- La ventana de ayuda (SUPER + /) sale flotante en vez de sumarse al mosaico.
+-- La ventana de ayuda (CONTROL + SHIFT + /) sale flotante en vez de sumarse al mosaico.
 hl.window_rule({
   name  = "ayuda-flotante",
   match = { title = "^ayuda-atajos$" },
