@@ -246,7 +246,17 @@ no expiran solas.
 | PDF | zathura |
 | Video y audio (122 formatos) | mpv |
 | Texto y código (24 tipos) | Sublime Text |
+| Documentos de oficina (140 tipos) | LibreOffice (writer, calc, impress, draw, base, math) |
 | HTML y enlaces `http` / `https` | Firefox |
+
+Tres tipos quedaron **deliberadamente fuera** de LibreOffice aunque los declara:
+`application/pdf` sigue en zathura, y `text/plain` y `text/csv` en Sublime Text.
+Abrir un `.txt` en Writer o un log en Calc no es lo que uno espera de un doble
+clic. Si preferís los CSV en Calc:
+
+```sh
+xdg-mime default libreoffice-calc.desktop text/csv
+```
 
 GIMP está instalado pero **solo** se asocia a `.xcf`: para el resto de las
 imágenes queda en el menú *Abrir con* de Thunar, porque es un editor y no tiene
