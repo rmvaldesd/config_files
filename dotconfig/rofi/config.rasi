@@ -166,3 +166,6 @@ configuration {
       sorting-method:    "name";
   }
 }
+
+/* Tema dark propio, en el mismo directorio. Ver dark.rasi. */
+@theme "~/.config/rofi/dark.rasi"

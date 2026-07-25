@@ -1,0 +1,115 @@
+/* Tema dark de rofi.
+ * Vive en ~/config_files/dotconfig/rofi y se enlaza como ~/.config/rofi desde
+ * archdesktopinstall.sh (seccion 9). Lo carga config.rasi con @theme.
+ *
+ * Misma paleta que waybar (style.css), mako y ghostty: escala zinc
+ * (#18181b / #27272a / #3f3f46 / #52525b), acento cyan #75f1fa y rojo #e35149.
+ *
+ * Sirve para los tres modos en uso: 'drun' con iconos, 'run' y el 'dmenu' del
+ * historial de portapapeles.
+ */
+
+* {
+    bg:       #27272a;
+    bg-alt:   #18181b;
+    fg:       #fafafa;
+    fg-dim:   #a1a1aa;
+    accent:   #75f1fa;
+    urgent:   #e35149;
+    borde:    #3f3f46;
+
+    background-color: transparent;
+    text-color:       @fg;
+    font:             "JetBrainsMono Nerd Font 11";
+}
+
+window {
+    background-color: @bg;
+    border:           2px;
+    border-color:     @borde;
+    border-radius:    10px;
+    width:            45%;
+    padding:          0;
+}
+
+mainbox {
+    padding: 12px;
+    spacing: 10px;
+}
+
+/* Caja de busqueda: un escalon mas oscura que la ventana, igual que el
+ * contraste entre la barra de waybar y sus modulos. */
+inputbar {
+    background-color: @bg-alt;
+    border-radius:    8px;
+    padding:          10px 12px;
+    spacing:          8px;
+    children:         [ prompt, entry ];
+}
+
+prompt {
+    text-color: @accent;
+}
+
+entry {
+    placeholder:       "Buscar...";
+    placeholder-color: @fg-dim;
+}
+
+listview {
+    lines:     8;
+    columns:   1;
+    scrollbar: false;
+    spacing:   4px;
+}
+
+element {
+    padding:       8px 10px;
+    border-radius: 8px;
+    spacing:       10px;
+}
+
+element normal.normal,
+element alternate.normal {
+    text-color: @fg;
+}
+
+element normal.urgent,
+element alternate.urgent {
+    text-color: @urgent;
+}
+
+/* Seleccionado: fondo cyan con texto oscuro, igual que el workspace activo
+ * de waybar (background @highlight, color black). */
+element selected.normal {
+    background-color: @accent;
+    text-color:       @bg-alt;
+}
+
+element selected.urgent {
+    background-color: @urgent;
+    text-color:       @bg-alt;
+}
+
+element-icon {
+    size:           22px;
+    vertical-align: 0.5;
+}
+
+element-text {
+    vertical-align: 0.5;
+    /* Sin color propio a proposito: hereda el del elemento, asi el resaltado
+     * de coincidencias se lee tanto sobre el fondo oscuro como sobre el cyan
+     * del elemento seleccionado. */
+    highlight:      bold underline;
+}
+
+message {
+    padding:          10px;
+    border-radius:    8px;
+    background-color: @bg-alt;
+}
+
+textbox {
+    text-color: @fg;
+}
