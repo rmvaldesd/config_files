@@ -110,6 +110,7 @@ paquetes_utilidades=(
     polkit-gnome      # Agente de autenticación gráfica; levanta la ventana flotante para pedir tu clave sudo.
     thunar            # Gestor de archivos gráfico y ligero del entorno XFCE.
     tumbler           # Extensión para Thunar que permite generar miniaturas (thumbnails) de imágenes y videos.
+    imv               # Visor de imágenes nativo de Wayland, controlado por teclado (hjkl para navegar, +/- zoom). Es el habitual en setups de Hyprland/sway por ser mínimo; para verlo con doble clic desde Thunar hay que fijarlo como handler por defecto en ~/.config/mimeapps.list.
     brightnessctl     # Utilidad para controlar el brillo de la pantalla (ideal para laptops con teclas multimedia).
     power-profiles-daemon # Expone los perfiles performance/balanced/power-saver y los aplica al platform_profile ACPI y al EPP del intel_pstate. Waybar lo muestra con el módulo 'power-profiles-daemon'. NO instalar junto con tlp: se pisan entre sí.
     python-gobject    # Dependencia OPCIONAL de power-profiles-daemon pero obligatoria acá: sin ella 'powerprofilesctl' no arranca (ModuleNotFoundError: gi.repository) y power-profile-sync no puede cambiar el perfil.
