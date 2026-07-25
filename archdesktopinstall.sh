@@ -133,6 +133,7 @@ paquetes_utilidades=(
     tmux              # Multiplexor de terminal; su configuración se enlaza desde config_files/tmux.conf en la sección 9.
     lazygit           # Interfaz TUI para git; simplifica staging, commits, ramas y rebases desde la terminal.
     fzf               # Buscador difuso (fuzzy finder) para la terminal; también lo usa el plugin fzf de nvim.
+    ueberzugpp        # Dibuja imágenes dentro de la terminal. Lo usa la función 'imgs' de zshrc.local para previsualizar imágenes en fzf.
     ripgrep           # Grep ultrarrápido; Telescope de nvim lo necesita para live_grep.
     fd                # Alternativa moderna a find; Telescope de nvim lo usa para find_files.
     unzip             # Descompresor ZIP; Mason (nvim) lo necesita para extraer los LSPs que descarga.

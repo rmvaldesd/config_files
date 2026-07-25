@@ -48,3 +48,65 @@ if command -v fzf > /dev/null 2>&1; then
         --color=marker:#75f1fa,spinner:#75f1fa,header:#71717a
         --color=border:#3f3f46"
 fi
+
+# ---------------------------------------------------------------------------
+# imgs: buscar imagenes con vista previa dentro de la terminal
+# ---------------------------------------------------------------------------
+# Uso:  imgs [directorio]     (por defecto, el actual)
+#       Enter abre la elegida con el visor predeterminado; Esc cancela.
+#
+# Como funciona: ueberzugpp corre como demonio escuchando en un socket UNIX, y
+# el comando de preview de fzf le manda por ahi la ruta de la imagen junto con
+# las coordenadas donde dibujarla. Esas coordenadas las expone el propio fzf en
+# FZF_PREVIEW_TOP/LEFT/LINES/COLUMNS.
+imgs() {
+    emulate -L zsh
+
+    local bin
+    for bin in fzf ueberzugpp; do
+        (( $+commands[$bin] )) || { print -u2 "imgs: falta '$bin'"; return 1 }
+    done
+
+    local dir=${1:-.}
+    [[ -d $dir ]] || { print -u2 "imgs: '$dir' no es un directorio"; return 1 }
+
+    # --use-escape-codes hace que ueberzugpp consulte las capacidades de la
+    # terminal; en ghostty eso negocia el protocolo de graficos de Kitty, que es
+    # el que funciona bien. El backend de Wayland usa layer-shell y posiciona mal
+    # sobre una ventana de terminal.
+    # --no-stdin exige --pid-file: el demonio queda escuchando solo en el socket.
+    local pidfile=$(mktemp) pid socket sel
+    ueberzugpp layer --silent --no-stdin --use-escape-codes --pid-file $pidfile
+    pid=$(<$pidfile)
+    socket=/tmp/ueberzugpp-${pid}.socket
+
+    local -a buscar
+    if (( $+commands[fd] )); then
+        buscar=(fd --type f -e png -e jpg -e jpeg -e gif -e webp -e bmp . $dir)
+    else
+        buscar=(find $dir -type f \( -iname '*.png' -o -iname '*.jpg' \
+                -o -iname '*.jpeg' -o -iname '*.gif' -o -iname '*.webp' \
+                -o -iname '*.bmp' \))
+    fi
+
+    # El bloque 'always' garantiza que el demonio se cierre pase lo que pase:
+    # seleccion normal, Esc, Ctrl+C o error. Si no, queda un proceso huerfano
+    # dibujando sobre la terminal.
+    {
+        sel=$("${buscar[@]}" 2>/dev/null | fzf \
+            --prompt 'imagen> ' \
+            --preview-window 'right:60%' \
+            --preview "ueberzugpp cmd -s $socket -i imgs-preview -a add \
+                       -x \$FZF_PREVIEW_LEFT -y \$FZF_PREVIEW_TOP \
+                       --max-width \$FZF_PREVIEW_COLUMNS \
+                       --max-height \$FZF_PREVIEW_LINES -f {}")
+    } always {
+        ueberzugpp cmd -s $socket -a exit 2>/dev/null
+        rm -f $pidfile
+    }
+
+    [[ -n $sel ]] || return 0
+    print -r -- $sel
+    # &! lo desacopla de la shell: cerrar la terminal no cierra el visor.
+    xdg-open $sel >/dev/null 2>&1 &!
+}
