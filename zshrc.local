@@ -1,0 +1,11 @@
+# Definiciones propias de zsh. Vive en ~/config_files/zshrc.local y se enlaza
+# como ~/.zshrc.local desde archdesktopinstall.sh (sección 9).
+#
+# ~/.zshrc ya NO se versiona: lo genera oh-my-zsh desde su template y queda como
+# archivo real, así sus actualizaciones y su instalador pueden tocarlo sin
+# pelearse con el repo. Lo único que el script le agrega es un source de este
+# archivo al final. Todo lo propio va acá.
+
+# Binarios de usuario instalados fuera de pacman (entre ellos 'claude', que el
+# instalador oficial deja en ~/.local/bin).
+export PATH="$HOME/.local/bin:$PATH"

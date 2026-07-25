@@ -247,14 +247,16 @@ fi
 ln -sfn "$HOME/config_files/tmux.conf" "$HOME/.tmux.conf"
 echo "-> Enlazado: ~/.tmux.conf -> ~/config_files/tmux.conf"
 
-# Enlaza la configuración de zsh en el home
-if [ -e "$HOME/.zshrc" ] && [ ! -L "$HOME/.zshrc" ]; then
-    respaldo="$HOME/.zshrc.bak.$(date +%Y%m%d%H%M%S)"
-    mv "$HOME/.zshrc" "$respaldo"
-    echo "-> ~/.zshrc ya existía; respaldado como $respaldo"
+# Enlaza SÓLO las definiciones propias de zsh. ~/.zshrc no se versiona: lo genera
+# oh-my-zsh desde su template en la sección 11, y ahí se le agrega el source de
+# este archivo. Así las actualizaciones de oh-my-zsh no chocan con el repo.
+if [ -e "$HOME/.zshrc.local" ] && [ ! -L "$HOME/.zshrc.local" ]; then
+    respaldo="$HOME/.zshrc.local.bak.$(date +%Y%m%d%H%M%S)"
+    mv "$HOME/.zshrc.local" "$respaldo"
+    echo "-> ~/.zshrc.local ya existía; respaldado como $respaldo"
 fi
-ln -sfn "$HOME/config_files/zshrc" "$HOME/.zshrc"
-echo "-> Enlazado: ~/.zshrc -> ~/config_files/zshrc"
+ln -sfn "$HOME/config_files/zshrc.local" "$HOME/.zshrc.local"
+echo "-> Enlazado: ~/.zshrc.local -> ~/config_files/zshrc.local"
 
 # Instala las fuentes versionadas en el repo (Symbols Nerd Font para los iconos de Waybar).
 # Es el mismo script que se usa en Fedora, así ambas máquinas ven exactamente los mismos glifos.
@@ -318,10 +320,32 @@ sudo systemctl start power-profile-sync.service || \
 echo "-> Aplicando ajustes finales..."
 xdg-user-dirs-update                                 # Crea ~/Descargas, ~/Documentos, ~/Imágenes, etc. según el idioma del sistema.
 
-# Instala oh-my-zsh (solo el framework; el ~/.zshrc versionado ya quedó enlazado en la sección 9)
+# Instala oh-my-zsh (sólo el framework: se clona el repo, no se corre su instalador)
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
     echo "-> Instalando oh-my-zsh..."
     git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "$HOME/.oh-my-zsh"
+fi
+
+# ~/.zshrc queda como archivo REAL, no como symlink al repo: así oh-my-zsh (o su
+# instalador oficial, si algún día lo corrés) puede actualizarlo sin pelearse con
+# los dotfiles. Lo propio vive en ~/.zshrc.local, enlazado en la sección 9.
+if [ -L "$HOME/.zshrc" ]; then
+    # Viene del esquema anterior de este script, donde ~/.zshrc era symlink al repo.
+    # No se pierde nada: lo propio ya está en zshrc.local.
+    rm "$HOME/.zshrc"
+    echo "-> ~/.zshrc era un symlink al repo (esquema viejo); se reemplaza por un archivo real."
+fi
+if [ ! -f "$HOME/.zshrc" ]; then
+    cp "$HOME/.oh-my-zsh/templates/zshrc.zsh-template" "$HOME/.zshrc"
+    echo "-> ~/.zshrc creado desde el template de oh-my-zsh."
+fi
+
+# Agrega el include una sola vez. Las comillas simples son a propósito: $HOME tiene
+# que quedar literal en el archivo, no expandirse al escribirlo.
+linea_include='[ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"'
+if ! grep -qF "$linea_include" "$HOME/.zshrc"; then
+    printf '\n# Definiciones propias versionadas en ~/config_files/zshrc.local\n%s\n' "$linea_include" >> "$HOME/.zshrc"
+    echo "-> Agregado a ~/.zshrc el source de ~/.zshrc.local."
 fi
 if [ "$(getent passwd "$USER" | cut -d: -f7)" != "/usr/bin/zsh" ]; then
     sudo chsh -s /usr/bin/zsh "$USER"                # Deja zsh como shell por defecto del usuario.
