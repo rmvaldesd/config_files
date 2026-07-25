@@ -1,0 +1,37 @@
+#!/bin/sh
+# Elige un wallpaper al azar de ~/config_files/wallpapers y lanza hyprpaper con el.
+# Lo invoca el autostart de hyprland.lua en lugar de llamar a 'hyprpaper' pelado.
+#
+# Por que genera un config en vez de editar dotconfig/hypr/hyprpaper.conf:
+# ese archivo es un symlink al repo, y reescribirlo en cada login dejaria el
+# working tree de git sucio para siempre. hyprpaper acepta -c para leer un
+# config alternativo, asi que el generado vive en el directorio de runtime y
+# desaparece al cerrar sesion.
+#
+# Para sumar fondos alcanza con copiar imagenes a wallpapers/: entran solas en
+# la rotacion, sin tocar ninguna configuracion.
+
+set -eu
+
+DIR="$HOME/config_files/wallpapers"
+CONF="${XDG_RUNTIME_DIR:-/tmp}/hyprpaper-generado.conf"
+
+# -maxdepth 1 para no recursar, y el filtro por extension evita tomar por
+# ejemplo un README o un .gitkeep que haya en el directorio.
+WALL=$(find "$DIR" -maxdepth 1 -type f \
+    \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) \
+    2>/dev/null | shuf -n 1)
+
+if [ -z "$WALL" ]; then
+    echo "hyprpaper-random: no hay imagenes en $DIR" >&2
+    exit 1
+fi
+
+cat > "$CONF" <<EOF
+preload = $WALL
+wallpaper = , $WALL
+# No mantener wallpapers no usados en memoria
+ipc = off
+EOF
+
+exec hyprpaper -c "$CONF"

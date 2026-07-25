@@ -90,7 +90,8 @@ hl.on("hyprland.start", function()
   hl.exec_cmd('gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"')
 
   hl.exec_cmd(terminal)
-  hl.exec_cmd("hyprpaper")
+  -- Elige un wallpaper al azar de config_files/wallpapers en cada login.
+  hl.exec_cmd("~/config_files/bin_configs/hyprpaper-random")
   hl.exec_cmd("waybar")
   hl.exec_cmd("~/.config/waybar/auto-reload.sh")
   hl.exec_cmd("hypridle")
