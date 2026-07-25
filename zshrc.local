@@ -70,13 +70,20 @@ imgs() {
     local dir=${1:-.}
     [[ -d $dir ]] || { print -u2 "imgs: '$dir' no es un directorio"; return 1 }
 
-    # --use-escape-codes hace que ueberzugpp consulte las capacidades de la
-    # terminal; en ghostty eso negocia el protocolo de graficos de Kitty, que es
-    # el que funciona bien. El backend de Wayland usa layer-shell y posiciona mal
-    # sobre una ventana de terminal.
+    # -o kitty fija el backend en vez de dejar que ueberzugpp lo detecte:
+    #
+    #   NO usar --use-escape-codes aca. Ese flag hace que ueberzugpp le mande
+    #   consultas a la terminal (47 bytes: ESC[?1;1;0S, ESC_Gi=31... y ESC[c) y
+    #   las RESPUESTAS quedan en el buffer de entrada. Como nadie las lee, se las
+    #   come fzf como si fueran teclas, y entre esos bytes va uno que dispara el
+    #   accept: la imagen se abre sola sin haber tocado Enter.
+    #
+    # ghostty implementa el protocolo de graficos de Kitty, asi que indicarselo
+    # directamente evita la consulta. El backend de Wayland no sirve: usa
+    # layer-shell y posiciona mal sobre una ventana de terminal.
     # --no-stdin exige --pid-file: el demonio queda escuchando solo en el socket.
     local pidfile=$(mktemp) pid socket sel
-    ueberzugpp layer --silent --no-stdin --use-escape-codes --pid-file $pidfile
+    ueberzugpp layer --silent --no-stdin -o kitty --pid-file $pidfile
     pid=$(<$pidfile)
     socket=/tmp/ueberzugpp-${pid}.socket
 
