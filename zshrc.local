@@ -93,9 +93,16 @@ imgs() {
     # seleccion normal, Esc, Ctrl+C o error. Si no, queda un proceso huerfano
     # dibujando sobre la terminal.
     {
+        # Ctrl-Y copia la imagen al portapapeles y cierra. El tipo MIME se saca
+        # del archivo con 'file' en vez de asumir image/png: si se copia con un
+        # tipo que no corresponde, el pegado falla en la app de destino.
+        # Las comillas simples son a proposito, para que el $(...) lo evalue la
+        # shell de fzf al presionar la tecla y no zsh al definir la funcion.
         sel=$("${buscar[@]}" 2>/dev/null | fzf \
             --prompt 'imagen> ' \
+            --header 'Enter: abrir   Ctrl-Y: copiar al portapapeles   Esc: salir' \
             --preview-window 'right:60%' \
+            --bind 'ctrl-y:execute-silent(wl-copy --type "$(file -b --mime-type {})" < {} > /dev/null 2>&1; notify-send -t 3000 "Copiada al portapapeles" "$(basename {})")+abort' \
             --preview "ueberzugpp cmd -s $socket -i imgs-preview -a add \
                        -x \$FZF_PREVIEW_LEFT -y \$FZF_PREVIEW_TOP \
                        --max-width \$FZF_PREVIEW_COLUMNS \
