@@ -221,8 +221,8 @@ echo "-> Creando enlaces simbólicos de los dotfiles..."
 mkdir -p "$HOME/.config"
 
 # Enlaza cada directorio de config_files/dotconfig dentro de ~/.config.
-# ghostty aún no está versionado: el guard de existencia permite agregarlo al repo
-# más adelante sin tocar este script.
+# El guard de existencia permite sumar o quitar directorios del repo sin tocar este
+# script: los que no estén en dotconfig/ simplemente se saltean.
 for dir in nvim hypr waybar rofi mako ghostty; do
     origen="$HOME/config_files/dotconfig/$dir"
     [ -d "$origen" ] || continue
