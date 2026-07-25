@@ -64,6 +64,11 @@ paquetes_sistema=(
     pipewire-pulse     # Reemplazo de PulseAudio; permite que las apps que buscan PulseAudio funcionen con PipeWire.
     pipewire-jack      # Soporte para audio profesional/baja latencia (JACK) a través de PipeWire.
     wireplumber        # El gestor de sesiones para PipeWire; decide cómo se enrutan las entradas y salidas de audio.
+    sof-firmware       # Firmware Sound Open Firmware; imprescindible para el audio de los portátiles Intel modernos.
+    alsa-firmware      # Firmware adicional para tarjetas de sonido antiguas o específicas que lo requieren.
+    alsa-ucm-conf      # Perfiles de configuración (Use Case Manager) que definen el enrutado correcto de altavoces y micrófonos.
+    alsa-utils         # Herramientas de línea de comandos de ALSA (alsamixer, aplay, speaker-test) para diagnosticar el audio.
+    linux-firmware     # Blobs de firmware para el kernel (Wi-Fi, gráficos, bluetooth y otros dispositivos).
     mesa               # Controladores de código abierto para aceleración gráfica 3D (Intel/AMD).
     networkmanager     # Demonio encargado de gestionar las conexiones a internet (Ethernet y Wi-Fi).
     bluez              # Pila oficial del protocolo Bluetooth en Linux.
@@ -106,6 +111,8 @@ paquetes_utilidades=(
     thunar            # Gestor de archivos gráfico y ligero del entorno XFCE.
     tumbler           # Extensión para Thunar que permite generar miniaturas (thumbnails) de imágenes y videos.
     brightnessctl     # Utilidad para controlar el brillo de la pantalla (ideal para laptops con teclas multimedia).
+    power-profiles-daemon # Expone los perfiles performance/balanced/power-saver y los aplica al platform_profile ACPI y al EPP del intel_pstate. Waybar lo muestra con el módulo 'power-profiles-daemon'. NO instalar junto con tlp: se pisan entre sí.
+    python-gobject    # Dependencia OPCIONAL de power-profiles-daemon pero obligatoria acá: sin ella 'powerprofilesctl' no arranca (ModuleNotFoundError: gi.repository) y power-profile-sync no puede cambiar el perfil.
     pamixer           # Controlador de volumen por línea de comandos, excelente para enlazarlo a los atajos de teclado.
     satty             # Herramienta moderna de anotación de capturas de pantalla (se usa con hyprshot en hyprland.lua).
     hyprshot          # Wrapper de grim+slurp para capturas de pantalla; usado en el bind de screenshot de hyprland.lua.
@@ -117,8 +124,8 @@ paquetes_utilidades=(
     jq                # Procesador de JSON en la terminal; kb_layout.sh lo usa para leer la salida de 'hyprctl -j'.
     inotify-tools     # Provee 'inotifywait'; auto-reload.sh lo usa para recargar Waybar al guardar cambios en su config.
     psmisc            # Provee 'killall'; auto-reload.sh lo usa para enviar la señal SIGUSR2 de recarga a Waybar.
-    neovim            # Editor de texto; su configuración se enlaza desde config_files/dotconfig/nvim en la sección 10.
-    tmux              # Multiplexor de terminal; su configuración se enlaza desde config_files/tmux.conf en la sección 10.
+    neovim            # Editor de texto; su configuración se enlaza desde config_files/dotconfig/nvim en la sección 9.
+    tmux              # Multiplexor de terminal; su configuración se enlaza desde config_files/tmux.conf en la sección 9.
     lazygit           # Interfaz TUI para git; simplifica staging, commits, ramas y rebases desde la terminal.
     fzf               # Buscador difuso (fuzzy finder) para la terminal; también lo usa el plugin fzf de nvim.
     ripgrep           # Grep ultrarrápido; Telescope de nvim lo necesita para live_grep.
@@ -126,12 +133,14 @@ paquetes_utilidades=(
     unzip             # Descompresor ZIP; Mason (nvim) lo necesita para extraer los LSPs que descarga.
     nodejs            # Runtime de JavaScript; requerido por varios LSPs que instala Mason (ts_ls, pyright, etc.).
     npm               # Gestor de paquetes de Node; Mason lo usa para instalar LSPs basados en Node.
+    tree-sitter-cli   # Compilador de parsers de Tree-sitter; nvim-treesitter lo necesita para instalar gramáticas.
     zsh               # Shell principal del usuario (se configura como shell por defecto en la sección 11).
     gvfs              # Capa de montaje virtual; permite a Thunar montar USBs, ver la papelera y unidades de red.
     gvfs-mtp          # Soporte MTP para gvfs; permite a Thunar acceder a celulares Android.
     xdg-user-dirs     # Crea los directorios estándar del usuario (~/Descargas, ~/Documentos, etc.).
     cliphist          # Historial del portapapeles para Wayland; sin él, lo copiado muere al cerrar la app de origen.
     ufw               # Firewall sencillo; se activa en la sección 7 con política deny-incoming/allow-outgoing.
+    spotify-launcher  # Descarga y mantiene actualizado el cliente oficial de Spotify desde los repos de Snap de Spotify.
 )
 sudo pacman -S --needed "${paquetes_utilidades[@]}"
 
@@ -159,8 +168,22 @@ sudo systemctl enable --now bluetooth.service        # Necesario para que bluez 
 sudo systemctl enable ly@tty1.service                     # Pantalla de login TUI al arrancar. Sin '--now' a propósito: arrancarlo ahora tomaría la TTY en plena instalación.
 sudo systemctl enable --now fstrim.timer             # TRIM semanal del SSD; mantiene el rendimiento del disco a largo plazo.
 sudo systemctl enable --now ufw.service              # Arranca el firewall en cada boot.
+sudo systemctl enable --now power-profiles-daemon.service  # Demonio de perfiles de energía. Sin 'enable' explícito sólo se activaría por D-Bus bajo demanda y no estaría listo al bootear.
 sudo ufw --force enable                              # Activa ufw con la política por defecto: bloquear entrante, permitir saliente.
 sudo timedatectl set-ntp true                        # Sincronización de hora por NTP; un reloj desviado rompe TLS y las firmas de git/pacman.
+
+# Servicios de audio: son de USUARIO (no del sistema), por eso van con 'systemctl --user' y sin sudo.
+# PipeWire debe correr dentro de la sesión del usuario para tener acceso a su dispositivo de audio y a su dbus.
+echo "-> Habilitando los servicios de audio de PipeWire para el usuario..."
+if systemctl --user is-system-running &>/dev/null || [ -S "/run/user/$UID/bus" ]; then
+    systemctl --user enable --now pipewire.service       # Servidor de audio/video principal.
+    systemctl --user enable --now pipewire-pulse.service # Capa de compatibilidad con PulseAudio (pavucontrol, navegadores, Discord).
+    systemctl --user enable --now wireplumber.service    # Gestor de sesiones; sin él PipeWire arranca pero no enruta ningún dispositivo.
+else
+    # Puede pasar si el script se ejecuta desde un chroot o una TTY sin gestor de sesión systemd --user activo.
+    echo "-> AVISO: no hay sesión de usuario systemd activa; no se pudieron habilitar los servicios de PipeWire."
+    echo "   Ejecuta esto tras iniciar sesión: systemctl --user enable --now pipewire.service pipewire-pulse.service wireplumber.service"
+fi
 
 # ==========================================
 # 8. CLONADO DE DOTFILES (config_files)
@@ -198,7 +221,7 @@ echo "-> Creando enlaces simbólicos de los dotfiles..."
 mkdir -p "$HOME/.config"
 
 # Enlaza cada directorio de config_files/dotconfig dentro de ~/.config.
-# mako y ghostty aún no están versionados: el guard de existencia permite agregarlos al repo
+# ghostty aún no está versionado: el guard de existencia permite agregarlo al repo
 # más adelante sin tocar este script.
 for dir in nvim hypr waybar rofi mako ghostty; do
     origen="$HOME/config_files/dotconfig/$dir"
@@ -242,12 +265,60 @@ sudo ln -sfn "$HOME/config_files/bin_configs/hyprshutdown" /usr/local/bin/hyprsh
 echo "-> Enlazado: /usr/local/bin/hyprshutdown -> ~/config_files/bin_configs/hyprshutdown"
 
 # ==========================================
-# 10. AJUSTES FINALES DE USUARIO
+# 10. CAMBIO AUTOMÁTICO DE PERFIL DE ENERGÍA
+# ==========================================
+# Va después de la sección 9 porque los archivos vienen del repo clonado en la 8.
+#
+# A diferencia de dotconfig/, estos archivos se COPIAN en vez de enlazarse:
+#   - udev lee sus reglas antes de que se monte /home (que acá es el subvolumen
+#     btrfs @home), así que un symlink a ~/config_files estaría roto justo en ese
+#     momento y la regla no se cargaría nunca;
+#   - la regla polkit y el script los consume root, y no deben vivir en una ruta
+#     escribible por el usuario.
+# Consecuencia: si editás estos archivos en el repo, hay que volver a correr esta
+# sección para que el sistema los tome. Los 'install' son idempotentes.
+echo "-> Configurando el cambio automático de perfil de energía..."
+
+# Script que lee la fuente de alimentación y aplica el perfil que corresponde.
+sudo install -Dm755 "$HOME/config_files/bin_configs/power-profile-sync" \
+    /usr/local/bin/power-profile-sync
+
+# Unit que ejecuta el script. Se dispara en tres momentos: al bootear
+# (graphical.target), al despertar de la suspensión (suspend.target) y al
+# conectar/desconectar el cargador (la regla udev de abajo).
+sudo install -Dm644 "$HOME/config_files/etc/systemd/system/power-profile-sync.service" \
+    /etc/systemd/system/power-profile-sync.service
+
+# Regla udev: cualquier evento del cargador arranca la unit.
+sudo install -Dm644 "$HOME/config_files/etc/udev/rules.d/99-power-profile-switch.rules" \
+    /etc/udev/rules.d/99-power-profile-switch.rules
+
+# Regla polkit: sin esto la unit recibe "denied". Corre como root pero sin sesión
+# activa, y la política por defecto de switch-profile sólo permite allow_active.
+sudo install -Dm644 "$HOME/config_files/etc/polkit-1/rules.d/49-power-profiles-root.rules" \
+    /etc/polkit-1/rules.d/49-power-profiles-root.rules
+
+sudo systemctl daemon-reload
+sudo udevadm control --reload-rules
+
+# 'enable' sólo crea los symlinks en graphical.target.wants y suspend.target.wants:
+# es una operación de archivos que no falla. Va sin tolerancia a errores.
+sudo systemctl enable power-profile-sync.service
+
+# 'start' sí puede fallar (polkit todavía no releyó sus reglas, hardware sin perfiles,
+# etc.) y con set -e eso abortaría la instalación entera dejando afuera oh-my-zsh, AUR
+# y Claude Code. El perfil no es crítico y se corrige solo en el próximo boot o al
+# mover el cargador, así que acá el error se tolera igual que en las secciones 12 y 13.
+sudo systemctl start power-profile-sync.service || \
+    echo "AVISO: no se pudo aplicar el perfil de energía ahora (se aplicará al reiniciar). Revisá con: systemctl status power-profile-sync.service"
+
+# ==========================================
+# 11. AJUSTES FINALES DE USUARIO
 # ==========================================
 echo "-> Aplicando ajustes finales..."
 xdg-user-dirs-update                                 # Crea ~/Descargas, ~/Documentos, ~/Imágenes, etc. según el idioma del sistema.
 
-# Instala oh-my-zsh (solo el framework; el ~/.zshrc versionado ya quedó enlazado en la sección 10)
+# Instala oh-my-zsh (solo el framework; el ~/.zshrc versionado ya quedó enlazado en la sección 9)
 if [ ! -d "$HOME/.oh-my-zsh" ]; then
     echo "-> Instalando oh-my-zsh..."
     git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git "$HOME/.oh-my-zsh"
@@ -258,7 +329,7 @@ if [ "$(getent passwd "$USER" | cut -d: -f7)" != "/usr/bin/zsh" ]; then
 fi
 
 # ==========================================
-# 11. PAQUETES DESDE AUR (VIA YAY)
+# 12. PAQUETES DESDE AUR (VIA YAY)
 # ==========================================
 # Va al final a propósito: los builds de AUR se rompen con frecuencia y un fallo aquí no debe
 # abortar el resto de la instalación (por eso además el error se tolera en vez de cortar con set -e).
@@ -271,6 +342,21 @@ paquetes_aur=(
 )
 yay -S --needed --noconfirm "${paquetes_aur[@]}" || \
     echo "AVISO: falló la instalación desde AUR; el resto del entorno quedó completo. Reintenta luego con: yay -S ${paquetes_aur[*]}"
+
+# ==========================================
+# 13. CLAUDE CODE
+# ==========================================
+# Instalador oficial de Anthropic; deja el binario en ~/.local/bin/claude (ya incluido en el PATH del zshrc).
+# No viene de pacman ni de AUR, por eso va aparte y al final. curl ya se instaló en la sección 1.
+# El error se tolera (igual que con AUR) para que un fallo de red aquí no aborte la instalación completa.
+echo "-> Instalando Claude Code..."
+if command -v claude &>/dev/null; then
+    echo "-> Claude Code ya está instalado; se omite."
+elif curl -fsSL https://claude.ai/install.sh | bash; then
+    echo "-> Claude Code instalado. Ejecuta 'claude' tras reiniciar la shell para iniciar sesión."
+else
+    echo "AVISO: falló la instalación de Claude Code. Reintenta luego con: curl -fsSL https://claude.ai/install.sh | bash"
+fi
 
 echo "---"
 echo "=== ¡Instalación completada con éxito! ==="
@@ -350,4 +436,20 @@ exit 0
 # o rofi. Te permitirá seleccionar de forma global el tema oscuro, cursores y paquetes
 # de iconos (como Papirus) para que aplicaciones como Firefox y Thunar no se vean blancas
 # o con estilos viejos.
+#
+# ------------------------------------------------------------------------------
+# 8. PERFILES DE ENERGÍA (ya configurados en la sección 10)
+# ------------------------------------------------------------------------------
+# El perfil cambia solo: 'performance' enchufado, 'balanced' en batería. Lo decide
+# /usr/local/bin/power-profile-sync leyendo /sys/class/power_supply/A*/online.
+#
+# Para ver el estado y cambiarlo a mano:
+#   powerprofilesctl get / list / set balanced
+#   systemctl start power-profile-sync.service   # vuelve a sincronizar con el cargador
+#
+# Un cambio manual (por ejemplo con el click en el módulo de Waybar) dura hasta el
+# próximo evento de cargador, boot o resume; ahí se resincroniza.
+#
+# Para cambiar qué perfil corresponde a cada estado, editá el if de
+# bin_configs/power-profile-sync y volvé a correr la sección 10.
 #

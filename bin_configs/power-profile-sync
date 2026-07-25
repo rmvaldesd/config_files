@@ -1,0 +1,22 @@
+#!/bin/sh
+# Sincroniza el perfil de power-profiles-daemon con la fuente de alimentacion.
+#   AC conectado    -> performance
+#   AC desconectado -> balanced
+#
+# Lo ejecuta power-profile-sync.service, disparado por tres eventos:
+#   - regla udev 99-power-profile-switch.rules (enchufar/desenchufar)
+#   - graphical.target (al bootear)
+#   - suspend.target   (al despertar de la suspension)
+#
+# El glob A*/online cubre los distintos nombres segun hardware (AC, AC0, ACAD,
+# ADP1); la bateria es BAT*, asi que no matchea. Si hay varias fuentes, alcanza
+# con que una este en 1 para considerarlo enchufado.
+#
+# En un equipo de escritorio sin bateria el glob no matchea nada y cae en el
+# else, dejando 'balanced': inofensivo.
+
+if grep -q '^1$' /sys/class/power_supply/A*/online 2>/dev/null; then
+    exec /usr/bin/powerprofilesctl set performance
+else
+    exec /usr/bin/powerprofilesctl set balanced
+fi

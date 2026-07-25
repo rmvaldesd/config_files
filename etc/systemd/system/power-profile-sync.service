@@ -1,0 +1,14 @@
+[Unit]
+Description=Sincroniza el perfil de energia con la fuente de alimentacion
+Requires=power-profiles-daemon.service
+After=power-profiles-daemon.service suspend.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/power-profile-sync
+
+[Install]
+# graphical.target -> corre al bootear
+# suspend.target   -> combinado con el After= de arriba, corre al SALIR de la
+#                     suspension (idiom de systemd para "ejecutar al resume")
+WantedBy=graphical.target suspend.target

@@ -1,0 +1,10 @@
+# Al conectar o desconectar el cargador, arranca la unit que sincroniza el
+# perfil de energia. La unit lee el estado y decide el perfil, asi que aca no
+# hace falta filtrar por ATTR{online}.
+# KERNEL=="A*" cubre AC, AC0, ACAD, ADP1 (la bateria es BAT*, no matchea).
+#
+# IMPORTANTE: este archivo se COPIA a /etc/udev/rules.d/, no se enlaza.
+# systemd-udevd arranca antes de que se monte /home, asi que un symlink a
+# ~/config_files estaria roto justo cuando udev lee las reglas (y udev no
+# vuelve a escanearlas despues).
+SUBSYSTEM=="power_supply", KERNEL=="A*", RUN+="/usr/bin/systemctl --no-block start power-profile-sync.service"

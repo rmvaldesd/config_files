@@ -1,0 +1,16 @@
+// Permite que procesos de root sin sesion activa (el servicio systemd que
+// dispara la regla udev al conectar/desconectar el cargador) cambien el perfil
+// de energia. Sin esto polkit los rechaza: la politica por defecto de
+// org.freedesktop.UPower.PowerProfiles.switch-profile es allow_active=yes,
+// allow_inactive=no, allow_any=no, y un servicio systemd no tiene sesion.
+//
+// IMPORTANTE: este archivo se COPIA a /etc/polkit-1/rules.d/, no se enlaza.
+// Es la regla que autoriza a root; si fuera un symlink a ~/config_files,
+// cualquier proceso corriendo como el usuario podria reescribirla. Por eso ese
+// directorio es modo 0700 de root de fabrica.
+polkit.addRule(function (action, subject) {
+    if (action.id.indexOf("org.freedesktop.UPower.PowerProfiles.") === 0 &&
+        subject.user === "root") {
+        return polkit.Result.YES;
+    }
+});

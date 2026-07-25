@@ -11,6 +11,7 @@
     "custom/language",
     "group/volume",
     "battery",
+    "power-profiles-daemon",
     "bluetooth",
     "network",
     "cpu",
@@ -39,6 +40,17 @@
       "󰂂",
       "󰁹"
     ]
+  },
+  "power-profiles-daemon": {
+    "format": "{icon}",
+    "tooltip": true,
+    "tooltip-format": "Perfil: {profile}\nDriver: {driver}",
+    "format-icons": {
+      "default": "󰾅",
+      "performance": "󰓅",
+      "balanced": "󰾅",
+      "power-saver": "󰌪"
+    }
   },
   "bluetooth": {
     "format": "",

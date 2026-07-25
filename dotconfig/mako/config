@@ -1,0 +1,45 @@
+# mako — tema dark alineado con la paleta de waybar
+# (zinc #18181b/#27272a/#3f3f46 + highlight cyan #75f1fa)
+
+# --- Comportamiento ---
+default-timeout=5000
+anchor=top-right
+layer=top
+max-visible=5
+sort=-time
+icons=1
+max-icon-size=48
+markup=1
+actions=1
+format=<b>%s</b>\n%b
+
+# --- Geometría ---
+width=380
+height=160
+margin=10
+padding=14
+border-size=2
+border-radius=10
+
+# --- Colores / tipografía ---
+font=JetBrains Mono 10
+background-color=#18181bf2
+text-color=#fafafa
+border-color=#3f3f46
+progress-color=over #75f1fa33
+
+# Notificaciones de baja prioridad: más apagadas
+[urgency=low]
+text-color=#a1a1aa
+border-color=#27272a
+
+# Prioridad normal: acento cyan en el borde
+[urgency=normal]
+border-color=#3f3f46
+
+# Críticas: rojo y sin expirar (batería baja, etc.)
+[urgency=critical]
+background-color=#1f1315f2
+text-color=#fafafa
+border-color=#e35149
+default-timeout=0
