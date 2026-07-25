@@ -73,6 +73,15 @@ local screenshotWindow  = "hyprshot -m window -m active --clipboard-only"
 -- SUPER + Print: el monitor activo entero.
 local screenshotMonitor = "hyprshot -m output -m active --clipboard-only"
 
+-- SUPER + / : abre la referencia de atajos en una terminal flotante.
+-- El titulo 'ayuda-atajos' es lo que matchea la window_rule del final del archivo
+-- para que salga flotante y no como una ventana mas en el mosaico.
+-- Usa glow si esta instalado (renderiza las tablas) y cae a less si no, asi el
+-- atajo nunca queda roto.
+local ayuda = "ghostty --title=ayuda-atajos -e sh -c "
+           .. "'D=$HOME/config_files/docs/hyprland/README.md; "
+           .. "if command -v glow >/dev/null 2>&1; then glow -p \"$D\"; else less \"$D\"; fi'"
+
 
 -------------------
 ---- AUTOSTART ----
@@ -390,6 +399,9 @@ hl.bind("CONTROL + Print", hl.dsp.exec_cmd(screenshotSave))              -- regi
 hl.bind("ALT + Print", hl.dsp.exec_cmd(screenshotWindow))                -- ventana activa -> portapapeles
 hl.bind(mainMod .. " + Print", hl.dsp.exec_cmd(screenshotMonitor))       -- monitor completo -> portapapeles
 
+-- Ayuda: referencia de atajos. La tecla '/' va por el '?' de "ayuda".
+hl.bind(mainMod .. " + slash", hl.dsp.exec_cmd(ayuda))
+
 -- Tu nueva combinación base: SUPER + CONTROL
 local thirdMod = mainMod .. " + CONTROL"
 
@@ -475,5 +487,13 @@ hl.window_rule({
   match = { class = "hyprland-run" },
 
   move  = "20 monitor_h-120",
+  float = true,
+})
+
+-- La ventana de ayuda (SUPER + /) sale flotante en vez de sumarse al mosaico.
+hl.window_rule({
+  name  = "ayuda-flotante",
+  match = { title = "^ayuda-atajos$" },
+
   float = true,
 })

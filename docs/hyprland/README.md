@@ -82,6 +82,10 @@ con `Return` o `Escape`.
 | `SUPER + SHIFT + V` | Historial del portapapeles (cliphist en rofi) |
 | `SUPER + SHIFT + Q` | Bloquear la pantalla (hyprlock) |
 | `SUPER + SHIFT + M` | Menú de apagado (hyprshutdown) |
+| `SUPER + /` | **Esta ayuda**, en una terminal flotante |
+
+> `SUPER + /` abre este documento con `glow` si está instalado, y cae a `less`
+> si no. Se cierra con `q`.
 
 ## Capturas de pantalla
 
