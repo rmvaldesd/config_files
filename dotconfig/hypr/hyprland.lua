@@ -41,13 +41,36 @@ local runner      = "rofi -show run"
 local bar         = "waybar"
 local browser     = "firefox"
 
--- Captura de región, anotación en satty y copia al portapapeles.
---   --copy-command wl-copy       satty NO sabe copiar en Wayland por su cuenta; sin
---                                esta opción el botón de copiar no hace absolutamente nada.
---   --actions-on-enter ...       Enter copia, sin tener que buscar el botón.
---   --early-exit copy            cierra satty apenas copió, en vez de quedar abierto.
-local screenshot  = "hyprshot -m region --raw | satty --filename - "
-                 .. "--copy-command wl-copy --actions-on-enter save-to-clipboard --early-exit copy"
+-- Capturas de pantalla (los binds están más abajo, junto a la tecla Print).
+--
+-- Notas comunes a todos:
+--   -z / --freeze     congela la imagen al iniciar la selección. Sin esto no se
+--                     pueden capturar menús desplegados ni tooltips: desaparecen
+--                     apenas movés el mouse para seleccionar.
+--   --clipboard-only  hyprshot por defecto guarda en disco Y copia; esta opción
+--                     evita llenar ~/Pictures con capturas descartables.
+--   -m active         requiere repetir --mode con la selección buscada
+--                     (window o output), es la sintaxis que pide hyprshot.
+
+-- Print: región, anotar en satty, y al portapapeles.
+--   --copy-command wl-copy   satty NO sabe copiar en Wayland por su cuenta; sin
+--                            esta opción el botón de copiar no hace nada.
+--   --actions-on-enter ...   Enter copia, sin tener que buscar el botón.
+--   --early-exit copy        cierra satty apenas copió, en vez de quedar abierto.
+local screenshot        = "hyprshot -m region -z --raw | satty --filename - "
+                       .. "--copy-command wl-copy --actions-on-enter save-to-clipboard --early-exit copy"
+
+-- SHIFT + Print: región directo al portapapeles, sin pasar por satty.
+local screenshotCopy    = "hyprshot -m region -z --clipboard-only"
+
+-- CONTROL + Print: región a ~/Pictures y además al portapapeles.
+local screenshotSave    = "hyprshot -m region -z"
+
+-- ALT + Print: la ventana enfocada completa, sin seleccionar con el mouse.
+local screenshotWindow  = "hyprshot -m window -m active --clipboard-only"
+
+-- SUPER + Print: el monitor activo entero.
+local screenshotMonitor = "hyprshot -m output -m active --clipboard-only"
 
 
 -------------------
@@ -357,8 +380,13 @@ hl.bind(mainMod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
--- Captura de región con anotación. Va en la tecla Print porque SUPER+S ya está tomado por el scratchpad "magic".
-hl.bind("Print", hl.dsp.exec_cmd(screenshot))
+-- Capturas de pantalla. Van en la tecla Print porque SUPER+S ya está tomado por el scratchpad "magic".
+-- Los comandos están definidos arriba, en el bloque MY PROGRAMS.
+hl.bind("Print", hl.dsp.exec_cmd(screenshot))                            -- región + anotar + portapapeles
+hl.bind("SHIFT + Print", hl.dsp.exec_cmd(screenshotCopy))                -- región -> portapapeles
+hl.bind("CONTROL + Print", hl.dsp.exec_cmd(screenshotSave))              -- región -> ~/Pictures + portapapeles
+hl.bind("ALT + Print", hl.dsp.exec_cmd(screenshotWindow))                -- ventana activa -> portapapeles
+hl.bind(mainMod .. " + Print", hl.dsp.exec_cmd(screenshotMonitor))       -- monitor completo -> portapapeles
 
 -- Tu nueva combinación base: SUPER + CONTROL
 local thirdMod = mainMod .. " + CONTROL"
