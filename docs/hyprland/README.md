@@ -245,8 +245,8 @@ no expiran solas.
 | `.xcf` (formato nativo de GIMP) | GIMP |
 | PDF | zathura |
 | Video y audio (122 formatos) | mpv |
-| Texto y código (24 tipos) | Sublime Text |
-| Documentos de oficina (140 tipos) | LibreOffice (writer, calc, impress, draw, base, math) |
+| Texto y código (23 tipos) | Sublime Text |
+| Documentos de oficina (134 tipos) | LibreOffice (writer, calc, impress, draw, base, math) |
 | HTML y enlaces `http` / `https` | Firefox |
 
 Dos tipos quedaron **deliberadamente fuera** de LibreOffice aunque los declara:
