@@ -1,0 +1,51 @@
+# Configuracion de ghostty.
+# Vive en ~/config_files/dotconfig/ghostty y se enlaza como ~/.config/ghostty
+# desde archdesktopinstall.sh (seccion 9).
+#
+# La paleta es la misma que usan waybar (style.css) y mako: escala zinc
+# (#18181b / #27272a / #3f3f46 / #52525b) con acento cyan #75f1fa y el rojo
+# #e35149 de los estados urgentes.
+
+# --- Tipografia ---
+# La variante Nerd Font es la que trae los glifos (iconos de powerline, git,
+# devicons). El paquete ttf-jetbrains-mono-nerd la registra con este nombre
+# exacto; "JetBrains Mono" a secas es la familia sin glifos.
+font-family = JetBrainsMono Nerd Font
+font-size = 12
+
+# --- Ventana ---
+window-padding-x = 10
+window-padding-y = 8
+# Transparencia sutil, igual que las notificaciones de mako.
+background-opacity = 0.96
+
+# --- Colores base ---
+background = #18181b
+foreground = #fafafa
+cursor-color = #75f1fa
+cursor-style = block
+selection-background = #3f3f46
+selection-foreground = #fafafa
+
+# --- Paleta ANSI ---
+# 0-7: colores normales
+palette = 0=#27272a
+palette = 1=#e35149
+palette = 2=#7ee787
+palette = 3=#e3b341
+palette = 4=#79c0ff
+palette = 5=#d2a8ff
+palette = 6=#75f1fa
+palette = 7=#d4d4d8
+# 8-15: variantes brillantes
+palette = 8=#52525b
+palette = 9=#ff7b72
+palette = 10=#8ef0a0
+palette = 11=#f0c674
+palette = 12=#a5d6ff
+palette = 13=#e2c5ff
+palette = 14=#a5f6fc
+palette = 15=#fafafa
+
+# --- Comportamiento ---
+mouse-hide-while-typing = true
