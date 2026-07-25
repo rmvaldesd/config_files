@@ -114,6 +114,7 @@ paquetes_utilidades=(
     zathura           # Visor de documentos minimalista con teclas tipo vim (j/k para desplazar, / para buscar, q para salir). Queda asociado a PDF vía mimeapps.list.
     zathura-pdf-poppler # OBLIGATORIO: zathura por sí solo NO abre ningún archivo, necesita un plugin de backend. Se elige poppler sobre mupdf porque este último arrastra tesseract con sus datos de OCR, innecesario para leer PDFs.
     mpv               # Reproductor de video y audio, nativo de Wayland y controlado por teclado (espacio pausa, flechas saltan, f pantalla completa, q sale). Queda asociado a los formatos de video vía mimeapps.list. Si alguna vez querés una interfaz gráfica, celluloid y haruna son frontends sobre este mismo motor.
+    libreoffice-fresh # Suite ofimática. La variante 'fresh' trae las versiones nuevas; 'libreoffice-still' es la conservadora, si preferís estabilidad sobre funciones. No se instala el paquete de idioma (libreoffice-fresh-es) porque el locale de este equipo es en_US.
     gimp              # Editor de imágenes. NO se asocia a los tipos de imagen a propósito: esos abren con imv, que es el visor; solo .xcf (image/x-xcf) abre directo en GIMP, porque ningún visor lo lee. Para el resto, GIMP queda en el menú "Abrir con" de Thunar.
     obsidian          # Base de conocimiento sobre archivos Markdown locales.
     brightnessctl     # Utilidad para controlar el brillo de la pantalla (ideal para laptops con teclas multimedia).

@@ -246,7 +246,7 @@ no expiran solas.
 | PDF | zathura |
 | Video y audio (122 formatos) | mpv |
 | Texto y código (24 tipos) | Sublime Text |
-| HTML | chromium |
+| HTML y enlaces `http` / `https` | Firefox |
 
 GIMP está instalado pero **solo** se asocia a `.xcf`: para el resto de las
 imágenes queda en el menú *Abrir con* de Thunar, porque es un editor y no tiene
