@@ -92,16 +92,21 @@ element selected.urgent {
 }
 
 element-icon {
-    size:           22px;
-    vertical-align: 0.5;
+    size:             22px;
+    vertical-align:   0.5;
+    background-color: transparent;
 }
 
 element-text {
-    vertical-align: 0.5;
-    /* Sin color propio a proposito: hereda el del elemento, asi el resaltado
-     * de coincidencias se lee tanto sobre el fondo oscuro como sobre el cyan
-     * del elemento seleccionado. */
-    highlight:      bold underline;
+    vertical-align:   0.5;
+    background-color: transparent;
+    /* 'inherit' es OBLIGATORIO: sin esto element-text se queda con el
+     * text-color global del bloque *, ignora el estado del elemento, y el
+     * texto del seleccionado sale blanco sobre el fondo cyan. */
+    text-color:       inherit;
+    /* Solo negrita y subrayado, sin color propio: asi el resaltado de
+     * coincidencias se lee tanto sobre el fondo oscuro como sobre el cyan. */
+    highlight:        bold underline;
 }
 
 message {
