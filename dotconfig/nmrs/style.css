@@ -13,9 +13,11 @@ window.light-theme {
   --warning-color: #d97706;
   --error-color: #dc2626;
 }
+/* Paleta propia, la misma de waybar (style.css), mako, rofi y ghostty: escala
+   zinc con acento cyan #75f1fa. El bloque del tema claro queda como venía.
+   El selector incluye 'window' a secas, como en el original, para que sea
+   tambien el tema por defecto cuando la ventana no lleva clase. */
 window,
-/* Paleta propia, la misma de waybar (style.css), mako, rofi y ghostty:
-   escala zinc con acento cyan #75f1fa. El tema claro queda como venía. */
 window.dark-theme {
   --bg-primary: #27272a;          /* @dark-8: fondo de los modulos de waybar */
   --bg-secondary: #18181b;        /* @dark-9: fondo de la barra */
@@ -139,6 +141,18 @@ list > row:selected {
   font-style: italic;
   margin-left: 8px;
   opacity: 0.9;
+}
+
+/* Fila seleccionada: el fondo pasa a ser el cyan del acento, asi que el texto
+   tiene que ser oscuro. Hace falta decirlo explicitamente porque las reglas de
+   arriba (.network-selection label y .connected-label) fijan su propio color y
+   ganan por especificidad sobre el 'color' de list > row:selected: sin esto el
+   texto queda blanco sobre celeste, ilegible.
+   El selector cubre cualquier label anidado dentro de una fila seleccionada,
+   no solo estos dos, para que no reaparezca al agregar elementos nuevos. */
+row:selected label,
+row:selected .connected-label {
+  color: var(--bg-primary);
 }
 
 /* Network quality labels */
