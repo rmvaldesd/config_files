@@ -41,6 +41,14 @@ local runner      = "rofi -show run"
 local bar         = "waybar"
 local browser     = "firefox"
 
+-- Captura de región, anotación en satty y copia al portapapeles.
+--   --copy-command wl-copy       satty NO sabe copiar en Wayland por su cuenta; sin
+--                                esta opción el botón de copiar no hace absolutamente nada.
+--   --actions-on-enter ...       Enter copia, sin tener que buscar el botón.
+--   --early-exit copy            cierra satty apenas copió, en vez de quedar abierto.
+local screenshot  = "hyprshot -m region --raw | satty --filename - "
+                 .. "--copy-command wl-copy --actions-on-enter save-to-clipboard --early-exit copy"
+
 
 -------------------
 ---- AUTOSTART ----
@@ -350,7 +358,7 @@ hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- Captura de región con anotación. Va en la tecla Print porque SUPER+S ya está tomado por el scratchpad "magic".
-hl.bind("Print", hl.dsp.exec_cmd("hyprshot -m region --raw | satty --filename -"))
+hl.bind("Print", hl.dsp.exec_cmd(screenshot))
 
 -- Tu nueva combinación base: SUPER + CONTROL
 local thirdMod = mainMod .. " + CONTROL"
