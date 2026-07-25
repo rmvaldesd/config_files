@@ -229,8 +229,13 @@ manual desde el ícono de Waybar dura hasta el siguiente de esos eventos.
 
 ### Fondo de pantalla
 
-En cada login se elige **una imagen al azar** de `wallpapers/`. Para sumar
-fondos, copiá imágenes ahí: entran solas en la rotación.
+En cada login se elige **una imagen al azar** de `wallpapers/`, y queda fija el
+resto de la sesión. Para sumar fondos, copiá imágenes ahí: entran solas en la
+rotación.
+
+Lo hace hyprpaper solo, con `path` apuntando al directorio y `order = random`.
+Si querés que además vaya cambiando durante la sesión, agregá
+`timeout = <segundos>` al bloque `wallpaper` de `hyprpaper.conf`.
 
 ### Notificaciones
 
@@ -272,8 +277,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Atajos de Hyprland, autostart | `dotconfig/hypr/hyprland.lua` |
 | Inactividad y bloqueo | `dotconfig/hypr/hypridle.conf` |
 | Pantalla de bloqueo | `dotconfig/hypr/hyprlock.conf` |
-| Fondo de pantalla (fallback) | `dotconfig/hypr/hyprpaper.conf` |
-| Fondo aleatorio | `bin_configs/hyprpaper-random` |
+| Fondo de pantalla | `dotconfig/hypr/hyprpaper.conf` |
 | Barra: módulos | `dotconfig/waybar/config.jsonc` |
 | Barra: estilo | `dotconfig/waybar/style.css` |
 | Notificaciones | `dotconfig/mako/config` |
