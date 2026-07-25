@@ -114,7 +114,7 @@ paquetes_utilidades=(
     zathura           # Visor de documentos minimalista con teclas tipo vim (j/k para desplazar, / para buscar, q para salir). Queda asociado a PDF vía mimeapps.list.
     zathura-pdf-poppler # OBLIGATORIO: zathura por sí solo NO abre ningún archivo, necesita un plugin de backend. Se elige poppler sobre mupdf porque este último arrastra tesseract con sus datos de OCR, innecesario para leer PDFs.
     mpv               # Reproductor de video y audio, nativo de Wayland y controlado por teclado (espacio pausa, flechas saltan, f pantalla completa, q sale). Queda asociado a los formatos de video vía mimeapps.list. Si alguna vez querés una interfaz gráfica, celluloid y haruna son frontends sobre este mismo motor.
-    gimp              # Editor de imágenes. NO se asocia a los tipos de imagen a propósito: esos abren con imv, que es el visor; GIMP queda disponible en el menú "Abrir con" de Thunar para cuando haga falta editar.
+    gimp              # Editor de imágenes. NO se asocia a los tipos de imagen a propósito: esos abren con imv, que es el visor; solo .xcf (image/x-xcf) abre directo en GIMP, porque ningún visor lo lee. Para el resto, GIMP queda en el menú "Abrir con" de Thunar.
     obsidian          # Base de conocimiento sobre archivos Markdown locales.
     brightnessctl     # Utilidad para controlar el brillo de la pantalla (ideal para laptops con teclas multimedia).
     power-profiles-daemon # Expone los perfiles performance/balanced/power-saver y los aplica al platform_profile ACPI y al EPP del intel_pstate. Waybar lo muestra con el módulo 'power-profiles-daemon'. NO instalar junto con tlp: se pisan entre sí.

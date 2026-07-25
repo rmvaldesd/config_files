@@ -165,3 +165,4 @@ application/xml=sublime_text.desktop
 text/csv=sublime_text.desktop
 text/x-makefile=sublime_text.desktop
 text/x-patch=sublime_text.desktop
+image/x-xcf=gimp.desktop
