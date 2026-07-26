@@ -97,7 +97,10 @@
     // %d dia, %b mes abreviado (el locale del equipo es en_US -> "Jul"), %H:%M en
     // formato 24h. Sin el dia de la semana ni el AM/PM, que ocupaban la mitad del ancho.
     "format": "{:%d %b %H:%M}",
-    "tooltip-format": "<tt><small>{calendar}</small></tt>",
+    // Se quita el <small>, que encogía el calendario al 83%. El <tt> se mantiene:
+    // fuerza monoespaciado, que es lo que alinea las columnas de los días.
+    // El tamaño final lo fija 'tooltip label' en style.css.
+    "tooltip-format": "<tt>{calendar}</tt>",
     "calendar": {
       "format": {
         "today": "<span color='#75f1fa'><b>{}</b></span>"

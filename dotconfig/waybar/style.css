@@ -181,5 +181,8 @@ tooltip {
 
 tooltip label {
   color: @dark-0;
-  padding: 2px;
+  /* Un punto por encima del resto de la barra: los tooltips se leen de cerca y con
+     atención, no de reojo como los módulos. Sobre todo el calendario del reloj. */
+  font-size: 13px;
+  padding: 6px;
 }
