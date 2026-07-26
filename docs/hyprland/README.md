@@ -21,10 +21,12 @@ correspondiente en el mismo commit.
 - [Teclas multimedia](#teclas-multimedia)
 - [Terminal: fzf](#terminal-fzf)
 - [Terminal: función `imgs`](#terminal-función-imgs)
+- [Impresión: `add-printer`](#impresión-add-printer)
 - [Waybar: clics](#waybar-clics)
 - [Visores](#visores)
 - [Comportamiento automático](#comportamiento-automático)
 - [Dónde vive cada configuración](#dónde-vive-cada-configuración)
+- [Paleta](#paleta)
 
 ---
 
@@ -146,6 +148,45 @@ imgs ~/Pictures   # desde el que le pases
 | `Esc` | Cancela |
 
 Busca `png`, `jpg`, `jpeg`, `gif`, `webp` y `bmp`.
+
+## Impresión: `add-printer`
+
+Descubre las impresoras de la red y las da de alta en CUPS, sin tener que
+acordarse de la sintaxis de `lpadmin`.
+
+```sh
+add-printer
+```
+
+Corre en bucle sobre un menú, así que se pueden encadenar operaciones sin
+relanzarlo:
+
+| Opción | Qué hace |
+|---|---|
+| `1` Add | Lista lo que hay en la red y da de alta la que elijas |
+| `2` Remove | Lista las colas ya configuradas y borra la elegida |
+| `3` List | Muestra las colas y cuál es la predeterminada |
+| `4` Rescan | Vuelve a escanear (el resultado se cachea porque tarda unos segundos) |
+| `q` | Salir |
+
+Al agregar, marca cada impresora según sea **driverless** (IPP Everywhere: no
+necesita driver) o que **podría necesitar el de la marca**, y muestra hostname,
+IP y si es color o monocromática. Después propone el nombre de la cola, ofrece
+dejarla predeterminada e imprimir una página de prueba.
+
+Al eliminar pide escribir el nombre completo de la cola, no un `s/n`: borrar no
+se deshace. Borra la cola de CUPS, no toca la impresora.
+
+El descubrimiento no pide privilegios; sólo el `lpadmin` final usa sudo.
+
+```sh
+lpstat -p -d      # ver colas y predeterminada
+lp archivo.pdf    # imprimir en la predeterminada
+cancel -a         # vaciar la cola
+```
+
+Si algo falla, el detalle está en `docs/linux/impresion.md`: descubrimiento a
+mano, drivers por marca y diagnóstico.
 
 ## Waybar: clics
 
@@ -288,6 +329,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Asociaciones de archivos | `mimeapps.list` |
 | Ignore global de git | `dotconfig/git/ignore` |
 | Perfiles de energía | `etc/systemd/system/`, `etc/udev/rules.d/`, `etc/polkit-1/rules.d/`, `bin_configs/power-profile-sync` |
+| Asistente de impresión | `bin_configs/add-printer` (enlazado en `/usr/local/bin`) |
 | Instalación completa | `archdesktopinstall.sh` |
 
 Todo lo de `dotconfig/` se enlaza con symlinks a `~/.config/`; lo de `etc/` se
@@ -295,14 +337,21 @@ Todo lo de `dotconfig/` se enlaza con symlinks a `~/.config/`; lo de `etc/` se
 
 ## Paleta
 
-El entorno entero usa los mismos colores:
+El entorno entero usa los mismos colores: la escala **Zinc** de Tailwind más dos
+acentos. La regla que la ordena es que el gris marca **foco y estructura**, y el
+cyan queda para **progreso e interacción**.
 
-| Color | Uso |
-|---|---|
-| `#18181b` | Fondo de la barra, negro base |
-| `#27272a` | Fondo de módulos, terminal, ventanas |
-| `#3f3f46` | Bordes |
-| `#52525b` | Bordes al pasar el mouse, selección |
-| `#fafafa` | Texto |
-| `#75f1fa` | Acento (cyan) |
-| `#e35149` | Estados urgentes y de error |
+| Color | Zinc | Uso |
+|---|---|---|
+| `#18181b` | 950 | Fondo de la barra, negro base |
+| `#27272a` | 800 | Reglas verticales entre módulos de la barra, terminal |
+| `#3f3f46` | 700 | Borde de ventana **inactiva**, borde de las notificaciones |
+| `#52525b` | 600 | Final del degradado del borde de ventana activa |
+| `#71717a` | 500 | Workspaces inactivos |
+| `#d4d4d8` | 300 | Borde de ventana **activa** (inicio) y subrayado del workspace activo |
+| `#fafafa` | 50 | Texto |
+| `#75f1fa` | — | Acento cyan: progreso e interacción (slider de volumen, día de hoy en el calendario, acento de rofi) |
+| `#e35149` | — | Estados urgentes y de error |
+
+Los módulos de la barra **no tienen fondo**: la única separación es la regla
+vertical de 1px, recortada arriba y abajo.
