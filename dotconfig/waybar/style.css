@@ -4,6 +4,12 @@
 @define-color dark-7 rgba(63, 63, 70, 1);
 @define-color dark-6 rgba(82, 82, 91, 1);
 @define-color dark-5 rgba(113, 113, 122, 1);
+/* zinc-300: el tono con que arranca el degradado del borde de ventana activa en
+   hyprland.lua. Marca el workspace activo con la misma gramática que el borde
+   (claro = enfocado), dejando el cyan de @highlight para progreso e interacción. */
+@define-color dark-3 rgba(212, 212, 216, 1);
+/* zinc-50: el mismo blanco roto que usan rofi y mako, en vez de blanco puro. */
+@define-color dark-0 rgba(250, 250, 250, 1);
 
 * {
   /* Iconos: "Symbols Nerd Font" viene versionada en config_files/fonts (instalada por
@@ -24,12 +30,18 @@ window#waybar {
   margin: 7px 0px 7px 7px;
   background: transparent;
   border-radius: 2px;
-  color: white;
+  /* zinc-500 en vez de blanco puro: los inactivos pesaban casi tanto como el activo,
+     y el blanco puro no estaba en la paleta zinc del resto del tema. */
+  color: @dark-5;
+  /* Borde transparente en TODOS los botones: el activo le pone color al suyo, y así
+     no cambia de alto al activarse (el borde suma al box y desalinearía la fila). */
+  border-bottom: 2px solid transparent;
 }
 
 #workspaces button.active {
-  background: @highlight;
-  color: black;
+  background: transparent;
+  color: @dark-0;
+  border-bottom: 2px solid @dark-3;
   font-weight: 700;
 }
 

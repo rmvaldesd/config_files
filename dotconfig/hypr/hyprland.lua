@@ -156,8 +156,18 @@ hl.config({
     border_size      = 2,
 
     col              = {
-      active_border   = { colors = { "rgba(33ccffee)", "rgba(00ff99ee)" }, angle = 45 },
-      inactive_border = "rgba(595959aa)",
+      -- Bordes monocromos sobre la escala Tailwind Zinc del resto del tema (waybar,
+      -- rofi, mako). El activo va de zinc-400 a zinc-600: sin color propio, el borde
+      -- se lee como profundidad en vez de como decoración, y el acento cyan (#75f1fa)
+      -- queda reservado para los componentes que sí comunican estado.
+      -- El default de fábrica de Hyprland (33ccff -> 00ff99) se descartó porque ese
+      -- verde no aparecía en ninguna otra parte del entorno.
+      -- Arranca en zinc-300 y no en zinc-400: con el inactivo en zinc-700, partir de
+      -- zinc-400 dejaba sólo dos escalones de diferencia y en las ventanas donde el
+      -- degradado llegaba a su extremo oscuro costaba distinguir cuál tenía el foco.
+      active_border   = { colors = { "rgba(d4d4d8ee)", "rgba(52525bee)" }, angle = 45 },
+      -- zinc-700, el mismo gris de los bordes de mako.
+      inactive_border = "rgba(3f3f46aa)",
     },
 
     -- Set to true to enable resizing windows by clicking and dragging on borders and gaps
