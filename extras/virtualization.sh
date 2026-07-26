@@ -155,9 +155,12 @@ desinstalar() {
 
     aviso "Stopping services..."
     sudo systemctl disable --now libvirtd.service 2> /dev/null || true
-    # virtlogd no se 'enable'ó explícitamente, pero puede haber quedado activo por
-    # el socket; se baja para no dejar un demonio huérfano corriendo.
-    sudo systemctl stop virtlogd.service virtlogd.socket virtlogd-admin.socket 2> /dev/null || true
+    # virtlogd y virtlockd no se 'enable'aron explícitamente: los arrastra libvirtd
+    # (Requires=/Wants= al arrancar, Also= en el enable). El disable de arriba los
+    # saca del boot, pero su --now sólo detiene a libvirtd; estos quedan corriendo
+    # hasta el reboot si no se paran acá.
+    sudo systemctl stop virtlogd.service virtlogd.socket virtlogd-admin.socket \
+        virtlockd.service virtlockd.socket virtlockd-admin.socket 2> /dev/null || true
 
     if id -nG "$USER" | grep -qw libvirt; then
         sudo gpasswd -d "$USER" libvirt > /dev/null
