@@ -6,6 +6,9 @@
 # de qué impresora y en qué red estés. Este script es ese último paso, hecho
 # interactivo para no tener que acordarse de la sintaxis de lpadmin.
 #
+# Los comentarios van en español como el resto del repo; los mensajes que ve el
+# usuario van en inglés.
+#
 # El descubrimiento no necesita privilegios; sólo el 'lpadmin' final pide sudo.
 #
 # Documentación de fondo: docs/linux/impresion.md
@@ -20,18 +23,18 @@ ok()     { printf '\033[32m->\033[0m %s\n' "$*"; }
 # PREREQUISITOS
 # ==========================================
 for cmd in avahi-browse driverless lpadmin lpstat; do
-    command -v "$cmd" > /dev/null || morir "falta el comando '$cmd'. Corré la sección 5 del script de instalación."
+    command -v "$cmd" > /dev/null || morir "missing command '$cmd'. Run section 5 of the install script."
 done
 
 # avahi es quien hace el descubrimiento: sin él este script no ve absolutamente nada.
 systemctl is-active --quiet avahi-daemon.service || \
-    morir "avahi-daemon no está corriendo. Arrancalo con: sudo systemctl enable --now avahi-daemon.service"
+    morir "avahi-daemon is not running. Start it with: sudo systemctl enable --now avahi-daemon.service"
 
 # ghostscript no impide agregar la impresora, pero sí imprimir: sin él los trabajos
 # mueren con "universal filter failed" en cuanto la impresora no acepte PDF nativo.
 # Se avisa acá y no al final para que no te enteres recién cuando falle un trabajo.
 command -v gs > /dev/null || \
-    aviso "AVISO: ghostscript no está instalado. Vas a poder agregar la impresora, pero los trabajos van a fallar con 'universal filter failed'. Instalalo con: sudo pacman -S ghostscript"
+    aviso "WARNING: ghostscript is not installed. You can still add the printer, but jobs will die with 'universal filter failed'. Install it with: sudo pacman -S ghostscript"
 
 # ==========================================
 # HELPERS DE DECODIFICACIÓN
@@ -65,7 +68,7 @@ sanear_nombre() {
 # DESCUBRIMIENTO
 # ==========================================
 printf '\n'
-aviso "Buscando impresoras en la red (unos segundos)..."
+aviso "Looking for printers on the network (this takes a few seconds)..."
 
 # --- Datos de avahi: hostname, IP y capacidades de cada servicio ---
 # Se indexa por nombre de servicio decodificado. Cada impresora aparece dos veces
@@ -112,10 +115,10 @@ while IFS= read -r linea; do
     detalles=""
     [ -n "$host" ] && detalles=" — ${host%.}"
     [ -n "$ip" ]   && detalles+=" (${ip})"
-    case "$txt" in *'"Color=T"'*) detalles+=" · color";; *'"Color=F"'*) detalles+=" · monocromática";; esac
-    case "$txt" in *'"Duplex=T"'*) detalles+=" · dúplex";; esac
+    case "$txt" in *'"Color=T"'*) detalles+=" · color";; *'"Color=F"'*) detalles+=" · mono";; esac
+    case "$txt" in *'"Duplex=T"'*) detalles+=" · duplex";; esac
 
-    OPCIONES+=("✅ sin driver  │ ${modelo}${detalles}")
+    OPCIONES+=("✅ driverless    │ ${modelo}${detalles}")
     URIS+=("$uri")
     MODELOS+=("$modelo")
 done < <(timeout 25 driverless list 2>/dev/null || true)
@@ -133,30 +136,30 @@ for servicio in "${!AV_HOST[@]}"; do
     [ -n "$ruta" ] || ruta="ipp/print"
     host="${AV_HOST[$servicio]}"
 
-    OPCIONES+=("⚠️  ¿driver?   │ ${modelo} — ${host%.} (${AV_IP[$servicio]})")
+    OPCIONES+=("⚠️  needs driver? │ ${modelo} — ${host%.} (${AV_IP[$servicio]})")
     URIS+=("ipp://${host%.}:${AV_PUERTO[$servicio]}/${ruta}")
     MODELOS+=("$modelo")
 done
 
-[ "${#OPCIONES[@]}" -gt 0 ] || morir "no se encontró ninguna impresora.
-  - ¿Está encendida y en la misma red?
-  - ¿Está la regla de mDNS en el firewall? Revisá con: sudo ufw status | grep 5353
-  - Probá a mano: avahi-browse -rt _ipp._tcp"
+[ "${#OPCIONES[@]}" -gt 0 ] || morir "no printers found.
+  - Is it powered on and on the same network?
+  - Is the mDNS firewall rule in place? Check with: sudo ufw status | grep 5353
+  - Try by hand: avahi-browse -rt _ipp._tcp"
 
 # ==========================================
 # SELECCIÓN
 # ==========================================
 printf '\n'
-ok "Encontradas ${#OPCIONES[@]} impresora(s)."
+ok "Found ${#OPCIONES[@]} printer(s)."
 printf '\n'
 
 # fzf da una lista filtrable; si no está, se cae a un menú numerado para que el
 # script siga funcionando en una instalación mínima.
 if command -v fzf > /dev/null; then
     elegida=$(printf '%s\n' "${OPCIONES[@]}" | \
-        fzf --prompt='Elegí la impresora> ' --height=~15 --border --no-multi \
-            --header='Enter para seleccionar · Esc para cancelar') || true
-    [ -n "$elegida" ] || morir "cancelado."
+        fzf --prompt='Pick a printer> ' --height=~15 --border --no-multi \
+            --header='Enter to select · Esc to cancel') || true
+    [ -n "$elegida" ] || morir "cancelled."
     indice=-1
     for i in "${!OPCIONES[@]}"; do
         [ "${OPCIONES[$i]}" = "$elegida" ] && { indice=$i; break; }
@@ -164,10 +167,10 @@ if command -v fzf > /dev/null; then
 else
     for i in "${!OPCIONES[@]}"; do printf '  %2d) %s\n' "$((i + 1))" "${OPCIONES[$i]}"; done
     printf '\n'
-    read -rp "Número de la impresora (Enter para cancelar): " respuesta
-    [ -n "$respuesta" ] || morir "cancelado."
+    read -rp "Printer number (Enter to cancel): " respuesta
+    [ -n "$respuesta" ] || morir "cancelled."
     [[ "$respuesta" =~ ^[0-9]+$ ]] && [ "$respuesta" -ge 1 ] && [ "$respuesta" -le "${#OPCIONES[@]}" ] \
-        || morir "opción inválida."
+        || morir "invalid choice."
     indice=$((respuesta - 1))
 fi
 
@@ -177,13 +180,13 @@ driverless_ok=0
 [[ "${OPCIONES[$indice]}" == "✅"* ]] && driverless_ok=1
 
 printf '\n'
-ok "Seleccionada: ${modelo}"
+ok "Selected: ${modelo}"
 printf '   URI: %s\n' "$uri"
 
 if [ "$driverless_ok" -eq 0 ]; then
     printf '\n'
-    aviso "Esta impresora NO apareció en 'driverless list', así que puede necesitar el driver de la marca."
-    aviso "Se va a intentar igual con IPP Everywhere. Si imprime en blanco o con basura, mirá la tabla de drivers en docs/linux/impresion.md"
+    aviso "This printer did NOT show up in 'driverless list', so it may need the vendor driver."
+    aviso "Trying IPP Everywhere anyway. If it prints blank or garbage, see the driver table in docs/linux/impresion.md"
 fi
 
 # ==========================================
@@ -191,21 +194,21 @@ fi
 # ==========================================
 sugerido=$(sanear_nombre "$modelo")
 printf '\n'
-read -rp "Nombre de la cola [${sugerido}]: " nombre_cola
+read -rp "Queue name [${sugerido}]: " nombre_cola
 nombre_cola="${nombre_cola:-$sugerido}"
 nombre_cola=$(sanear_nombre "$nombre_cola")
-[ -n "$nombre_cola" ] || morir "el nombre de la cola quedó vacío."
+[ -n "$nombre_cola" ] || morir "the queue name ended up empty."
 
 if lpstat -p "$nombre_cola" > /dev/null 2>&1; then
-    read -rp "Ya existe una cola llamada '${nombre_cola}'. ¿Reemplazarla? [s/N]: " reemplazar
-    [[ "$reemplazar" =~ ^[sSyY]$ ]] || morir "cancelado."
+    read -rp "A queue named '${nombre_cola}' already exists. Replace it? [y/N]: " reemplazar
+    [[ "$reemplazar" =~ ^[yYsS]$ ]] || morir "cancelled."
 fi
 
 # ==========================================
 # ALTA EN CUPS
 # ==========================================
 printf '\n'
-aviso "Agregando la cola (pide sudo)..."
+aviso "Adding the queue (needs sudo)..."
 
 # -m everywhere: CUPS le pregunta a la impresora sus capacidades por IPP y arma el PPD
 #                solo, sin driver.
@@ -213,19 +216,19 @@ aviso "Agregando la cola (pide sudo)..."
 # printer-is-shared=false: no la re-publica en la red; ya la publica ella misma.
 sudo lpadmin -p "$nombre_cola" -E -v "$uri" -m everywhere \
     -D "$modelo" -o printer-is-shared=false \
-    || morir "lpadmin falló.
-  Si dice 'Temporary failure in name resolution', falta nss-mdns o el parche de
-  /etc/nsswitch.conf (ver docs/linux/impresion.md)."
+    || morir "lpadmin failed.
+  If it says 'Temporary failure in name resolution', nss-mdns or the
+  /etc/nsswitch.conf patch is missing (see docs/linux/impresion.md)."
 
-ok "Cola '${nombre_cola}' creada."
+ok "Queue '${nombre_cola}' created."
 
 # 'lpoptions -d' fija la predeterminada del USUARIO y no necesita sudo, a diferencia
 # de 'lpadmin -d', que fija la del sistema. Para un equipo de un solo usuario alcanza.
 printf '\n'
-read -rp "¿Dejarla como impresora predeterminada? [S/n]: " predeterminada
+read -rp "Make it the default printer? [Y/n]: " predeterminada
 if [[ ! "$predeterminada" =~ ^[nN]$ ]]; then
     lpoptions -d "$nombre_cola" > /dev/null
-    ok "Predeterminada: ${nombre_cola}"
+    ok "Default printer: ${nombre_cola}"
 fi
 
 # ==========================================
@@ -234,14 +237,14 @@ fi
 pagina=/usr/share/cups/data/default-testpage.pdf
 if [ -f "$pagina" ]; then
     printf '\n'
-    read -rp "¿Imprimir una página de prueba? [s/N]: " probar
-    if [[ "$probar" =~ ^[sSyY]$ ]]; then
+    read -rp "Print a test page? [y/N]: " probar
+    if [[ "$probar" =~ ^[yYsS]$ ]]; then
         lp -d "$nombre_cola" "$pagina"
         printf '\n'
-        aviso "Enviada. Seguí el estado con:  lpstat -l -W all -o ${nombre_cola}"
+        aviso "Sent. Track it with:  lpstat -l -W all -o ${nombre_cola}"
     fi
 fi
 
 printf '\n'
-ok "Listo. Estado actual:"
+ok "Done. Current status:"
 lpstat -p -d

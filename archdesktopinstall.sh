@@ -334,8 +334,8 @@ echo "-> Enlazado: /usr/local/bin/dbeaver -> ~/config_files/bin_configs/dbeaver"
 # Asistente interactivo para dar de alta una impresora de red. La sección 7 deja toda la
 # infraestructura lista pero no crea ninguna cola, porque eso depende de qué impresora y
 # en qué red estés; este script es ese último paso.
-sudo ln -sfn "$HOME/config_files/bin_configs/agregar-impresora" /usr/local/bin/agregar-impresora
-echo "-> Enlazado: /usr/local/bin/agregar-impresora -> ~/config_files/bin_configs/agregar-impresora"
+sudo ln -sfn "$HOME/config_files/bin_configs/add-printer" /usr/local/bin/add-printer
+echo "-> Enlazado: /usr/local/bin/add-printer -> ~/config_files/bin_configs/add-printer"
 
 # ==========================================
 # 10. CAMBIO AUTOMÁTICO DE PERFIL DE ENERGÍA

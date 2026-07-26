@@ -90,10 +90,10 @@ la interfaz web de CUPS en <http://localhost:631> (pestaña *Administration* →
 ### El camino corto
 
 ```bash
-agregar-impresora
+add-printer
 ```
 
-Es `bin_configs/agregar-impresora`, enlazado en `/usr/local/bin` por la sección 9.
+Es `bin_configs/add-printer`, enlazado en `/usr/local/bin` por la sección 9.
 Descubre las impresoras de la red, te deja elegir una de una lista (con `fzf` si
 está, con un menú numerado si no) y corre el `lpadmin` por vos. Marca cuáles son
 driverless y cuáles podrían necesitar driver, propone el nombre de la cola,
