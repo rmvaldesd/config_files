@@ -11,6 +11,35 @@ fi
 
 echo "=== Iniciando instalación del entorno Hyprland ==="
 
+# --- Prechequeos: fallar a los segundos y con mensaje claro, no a los 10 minutos ---
+# Van ANTES del bloque de sudo para no pedirte la contraseña sólo para dar un error.
+
+# Requiere un sistema BOOTEADO: la sección 7 usa systemctl con --now, timedatectl y
+# udevadm, que necesitan systemd corriendo como init. El check es el sd_booted() de
+# systemd (/run/systemd/system existe sólo bajo systemd como PID 1). El caso
+# arch-chroot igual lo bloquea el check de root de arriba: dentro de un chroot sos root.
+if [ ! -d /run/systemd/system ]; then
+    echo "ERROR: no hay systemd corriendo (¿chroot o contenedor?). Bootea la instalación"
+    echo "       y ejecuta este script desde una TTY con tu usuario normal."
+    exit 1
+fi
+
+# pacman con --noconfirm responde que NO a los prompts de eliminación de conflictos:
+# si el equipo trae la pila de audio vieja (típico de un archinstall con perfil de
+# audio), la sección 3 moriría con "unresolvable package conflicts" al instalar
+# PipeWire, con el 80% del script sin correr. Mejor avisar acá con el comando exacto.
+conflictivos=()
+for paquete in pulseaudio pulseaudio-alsa pulseaudio-bluetooth jack2 pipewire-media-session; do
+    pacman -Qq "$paquete" &>/dev/null && conflictivos+=("$paquete")
+done
+if [ "${#conflictivos[@]}" -gt 0 ]; then
+    echo "ERROR: hay paquetes instalados que entran en conflicto con PipeWire/WirePlumber:"
+    printf '         %s\n' "${conflictivos[@]}"
+    echo "       Eliminálos y volvé a correr el script:"
+    echo "         sudo pacman -Rns ${conflictivos[*]}"
+    exit 1
+fi
+
 # El script está pensado para correr desatendido: pide la contraseña UNA vez acá y
 # después no vuelve a interrumpir.
 #
@@ -170,7 +199,7 @@ paquetes_utilidades=(
     nss-mdns          # Enchufa avahi al resolvedor de nombres del sistema (ver el parche de nsswitch.conf en la sección 7). avahi por sí solo hace el DESCUBRIMIENTO, pero sin esto un 'ipp://IMPRESORA.local' no resuelve y la cola de impresión queda apuntando a un nombre muerto. Es lo que permite usar el hostname en vez de la IP, que el DHCP puede cambiar.
     system-config-printer # GUI para añadir y gestionar impresoras: Hyprland no trae panel de impresoras propio. La alternativa sin instalar nada es la interfaz web de CUPS en http://localhost:631.
     ufw               # Firewall sencillo; se activa en la sección 7 con política deny-incoming/allow-outgoing.
-    spotify-launcher  # Descarga y mantiene actualizado el cliente oficial de Spotify desde los repos de Snap de Spotify.
+    spotify-launcher  # Descarga y mantiene actualizado el cliente oficial de Spotify desde el repositorio propio de Spotify.
 )
 sudo pacman -S --needed --noconfirm "${paquetes_utilidades[@]}"
 
@@ -239,7 +268,8 @@ if systemctl --user is-system-running &>/dev/null || [ -S "/run/user/$UID/bus" ]
     systemctl --user enable --now pipewire-pulse.service # Capa de compatibilidad con PulseAudio (pavucontrol, navegadores, Discord).
     systemctl --user enable --now wireplumber.service    # Gestor de sesiones; sin él PipeWire arranca pero no enruta ningún dispositivo.
 else
-    # Puede pasar si el script se ejecuta desde un chroot o una TTY sin gestor de sesión systemd --user activo.
+    # Puede pasar si se corre desde una sesión sin gestor systemd --user (p. ej. un
+    # 'su - usuario' sin login completo). El caso chroot ya lo cortan los prechequeos.
     echo "-> AVISO: no hay sesión de usuario systemd activa; no se pudieron habilitar los servicios de PipeWire."
     echo "   Ejecuta esto tras iniciar sesión: systemctl --user enable --now pipewire.service pipewire-pulse.service wireplumber.service"
 fi
@@ -261,7 +291,21 @@ clonar_dotfiles() {
 
 if [ -d "$HOME/config_files" ]; then
     if git -C "$HOME/config_files" rev-parse --git-dir > /dev/null 2>&1; then
-        echo "-> ~/config_files ya existe y es un repositorio git válido; se omite el clonado."
+        # Ser un repo git no alcanza: si es OTRO repo que casualmente se llama igual,
+        # saltarse el clonado haría morir las secciones 9-10 a mitad de camino (install
+        # de archivos inexistentes), dejando la instalación parcial que set -e evita.
+        remoto=$(git -C "$HOME/config_files" remote get-url origin 2>/dev/null || true)
+        case "$remoto" in
+            *rmvaldesd/config_files*)
+                echo "-> ~/config_files ya existe y es el repo de dotfiles; se omite el clonado."
+                ;;
+            *)
+                respaldo="$HOME/config_files.ajeno.$(date +%Y%m%d%H%M%S)"
+                mv "$HOME/config_files" "$respaldo"
+                echo "-> ~/config_files existía pero su remoto es '$remoto', no el repo de dotfiles; respaldado como $respaldo"
+                clonar_dotfiles
+                ;;
+        esac
     else
         # Un clone anterior que quedó a medias dejaría los symlinks apuntando a contenido incompleto
         respaldo="$HOME/config_files.corrupto.$(date +%Y%m%d%H%M%S)"
