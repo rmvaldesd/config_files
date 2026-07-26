@@ -8,6 +8,7 @@ estado.
 | Script | Qué instala | Uso |
 |---|---|---|
 | [`virtualization.sh`](./virtualization.sh) | QEMU/KVM + libvirt + virt-manager: todo lo necesario para crear y correr máquinas virtuales, incluido UEFI (edk2-ovmf) y TPM emulado (swtpm) para guests Windows 11. | `./virtualization.sh install \| uninstall \| status` (sin argumentos: menú) |
+| [`docker.sh`](./docker.sh) | Docker engine + Compose v2 + buildx: levantar servicios desde `docker-compose.yaml` con `docker compose up`. Suma al usuario al grupo `docker` y habilita el demonio al boot. | `./docker.sh install \| uninstall \| status` (sin argumentos: menú) |
 
 ## Convenciones
 
