@@ -23,6 +23,7 @@ correspondiente en el mismo commit.
 - [Terminal: función `imgs`](#terminal-función-imgs)
 - [Portapapeles](#portapapeles)
 - [Impresión: `add-printer`](#impresión-add-printer)
+- [Mantenimiento: `clean-orphans`](#mantenimiento-clean-orphans)
 - [Waybar: clics](#waybar-clics)
 - [Visores](#visores)
 - [Comportamiento automático](#comportamiento-automático)
@@ -208,6 +209,32 @@ cancel -a         # vaciar la cola
 
 Si algo falla, el detalle está en `docs/linux/impresion.md`: descubrimiento a
 mano, drivers por marca y diagnóstico.
+
+## Mantenimiento: `clean-orphans`
+
+Lista los paquetes **huérfanos** — instalados como dependencia de algo que ya no
+está — con el tamaño de cada uno y el total, pide confirmación y los elimina.
+
+```sh
+clean-orphans
+```
+
+Los huérfanos aparecen solos con el uso normal: desinstalar un programa deja
+atrás sus dependencias, y los builds de AUR dejan compiladores que ya no hacen
+falta (al desinstalar nmrs quedaron `rust` y `go`: 1.7 GB). Correrlo cada tanto
+recupera ese disco.
+
+Borra **en rondas** hasta que no quede ninguno, porque eliminar un huérfano
+puede dejar huérfanos nuevos. Usa `pacman -Qdt` (y no `-Qdtt`) a propósito: la
+variante con doble `t` incluye dependencias *opcionales*, y borrar esas rompe
+funcionalidades en silencio.
+
+Para mirar sin tocar nada:
+
+```sh
+pacman -Qdt      # huérfanos actuales
+pacman -Qm       # paquetes foráneos (AUR): no son huérfanos, sólo otro origen
+```
 
 ## Waybar: clics
 
