@@ -21,6 +21,7 @@ correspondiente en el mismo commit.
 - [Teclas multimedia](#teclas-multimedia)
 - [Terminal: fzf](#terminal-fzf)
 - [Terminal: función `imgs`](#terminal-función-imgs)
+- [Portapapeles](#portapapeles)
 - [Impresión: `add-printer`](#impresión-add-printer)
 - [Waybar: clics](#waybar-clics)
 - [Visores](#visores)
@@ -148,6 +149,26 @@ imgs ~/Pictures   # desde el que le pases
 | `Esc` | Cancela |
 
 Busca `png`, `jpg`, `jpeg`, `gif`, `webp` y `bmp`.
+
+## Portapapeles
+
+`SUPER + SHIFT + V` abre el historial en rofi: elegís una entrada y queda
+copiada, lista para pegar con `Ctrl + V`.
+
+Lo sostiene `wl-paste --watch cliphist store`, que arranca con la sesión y
+guarda cada cosa que copiás. Es lo que resuelve el problema clásico de Wayland:
+sin ese vigilante, lo copiado **muere al cerrar la aplicación de origen**.
+Guarda también imágenes.
+
+| Comando | Qué hace |
+|---|---|
+| `cliphist list` | Ver el historial |
+| `cliphist wipe` | **Vaciarlo entero** |
+| `cliphist list \| fzf \| cliphist decode \| wl-copy` | Elegir con fzf en vez de rofi |
+
+`cliphist wipe` es el que importa tener a mano: si copiaste una contraseña o un
+token, ahí queda guardado hasta que lo borres. La base vive en
+`~/.cache/cliphist/db`.
 
 ## Impresión: `add-printer`
 
