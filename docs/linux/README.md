@@ -11,8 +11,11 @@ link them below.
   e `installed_programs_dwm.txt`. El `xinitrc` que lanzaba esa sesión se eliminó:
   estaba roto (invocaba un `bin_configs/dwm_status` inexistente) y ninguna de sus
   herramientas sigue instalada.
-- Package management / provisioning — see
-  [`../../install-macos-brew-packages.sh`](../../install-macos-brew-packages.sh).
+- Package management / provisioning — el script que reproduce el equipo entero es
+  [`../../archdesktopinstall.sh`](../../archdesktopinstall.sh): paquetes,
+  servicios, symlinks de los dotfiles y ajustes de sistema, todo comentado paso a
+  paso. El `install-macos-brew-packages.sh` que se enlazaba acá ya no está en el
+  repo.
 - Common CLI recipes, systemd units, networking, troubleshooting.
 
 ## Docs
