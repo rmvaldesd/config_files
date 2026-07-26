@@ -43,9 +43,20 @@ estado() {
 
     printf '\n'
     # is-active imprime el estado también cuando falla; sólo si vino vacío va el placeholder.
-    local srv
+    local srv sck modo
     srv=$(systemctl is-active docker.service 2>/dev/null || true)
+    sck=$(systemctl is-enabled docker.socket 2>/dev/null || true)
+    # Qué se habilitó decide el modo: el .socket habilitado (con el .service no)
+    # significa arranque bajo demanda.
+    if [ "$(systemctl is-enabled docker.service 2>/dev/null || true)" = "enabled" ]; then
+        modo="at boot (docker.service)"
+    elif [ "$sck" = "enabled" ]; then
+        modo="on demand (docker.socket)"
+    else
+        modo="not enabled"
+    fi
     printf 'docker service : %s\n' "${srv:-not-found}"
+    printf 'start mode     : %s\n' "$modo"
     if id -nG "$USER" | grep -qw docker; then
         printf 'docker group   : %s is a member\n' "$USER"
     else
@@ -81,12 +92,37 @@ instalar() {
     aviso "Installing packages..."
     sudo pacman -S --needed --noconfirm "${PAQUETES[@]}"
 
-    # docker.service y NO docker.socket a propósito: con sólo el socket, tras un
-    # reboot los contenedores con 'restart: always/unless-stopped' NO vuelven a
-    # levantarse hasta que algo toque el CLI -- exactamente lo contrario de lo que
-    # uno espera de un compose con servicios. El costo es un demonio residente.
-    aviso "Enabling docker.service..."
-    sudo systemctl enable --now docker.service
+    # Dos modos de arranque, con un tradeoff real que decide el usuario:
+    #
+    #   .service : dockerd corre desde el boot. Los contenedores con
+    #              'restart: always/unless-stopped' vuelven solos tras un reboot.
+    #              Costo medido en este equipo: ~100 MB de RAM (dockerd +
+    #              containerd) y ~1s de arranque, permanentes.
+    #
+    #   .socket  : systemd escucha /run/docker.sock SIN el demonio corriendo y lo
+    #              arranca solo cuando algo se conecta (el primer 'docker ...').
+    #              Es transparente salvo un retardo mínimo en ese primer comando.
+    #              A cambio, tras un reboot NADA vuelve por sí solo: los
+    #              'restart: always' esperan a que toques el CLI.
+    #
+    # Ojo: el socket arranca bajo demanda pero NO apaga al quedar ocioso; una vez
+    # levantado sigue vivo hasta el próximo reboot.
+    printf '\n'
+    aviso "Start mode:"
+    printf '  1) At boot (docker.service) - containers with restart: always come back after a reboot\n'
+    printf '  2) On demand (docker.socket) - daemon starts on first use; nothing auto-restarts after a reboot\n\n'
+    local modo
+    read -rp "Choice [1]: " modo || true
+    if [ "${modo:-1}" = "2" ]; then
+        aviso "Enabling docker.socket (on demand)..."
+        # El disable del .service es por si se corre install de nuevo para cambiar
+        # de modo: sin esto quedarían los dos habilitados y ganaría el del boot.
+        sudo systemctl disable --now docker.service 2> /dev/null || true
+        sudo systemctl enable --now docker.socket
+    else
+        aviso "Enabling docker.service (at boot)..."
+        sudo systemctl enable --now docker.service
+    fi
 
     # El grupo docker permite usar el CLI sin sudo. OJO: es equivalente a root
     # (quien habla con el socket puede montar / dentro de un contenedor); es el

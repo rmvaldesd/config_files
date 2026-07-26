@@ -62,9 +62,19 @@ estado() {
 
     # is-active imprime el estado ('inactive', 'active'...) TAMBIÉN cuando falla o la
     # unit no existe, así que se toma su salida y sólo se cae al placeholder si vino vacía.
-    local srv
+    local srv modo
     srv=$(systemctl is-active libvirtd.service 2>/dev/null || true)
+    # Qué se habilitó decide el modo: el .socket habilitado (con el .service no)
+    # significa arranque bajo demanda.
+    if [ "$(systemctl is-enabled libvirtd.service 2>/dev/null || true)" = "enabled" ]; then
+        modo="at boot (libvirtd.service)"
+    elif [ "$(systemctl is-enabled libvirtd.socket 2>/dev/null || true)" = "enabled" ]; then
+        modo="on demand (libvirtd.socket)"
+    else
+        modo="not enabled"
+    fi
     printf 'libvirtd service : %s\n' "${srv:-not-found}"
+    printf 'start mode       : %s\n' "$modo"
     if id -nG "$USER" | grep -qw libvirt; then
         printf 'libvirt group    : %s is a member\n' "$USER"
     else
@@ -97,9 +107,38 @@ instalar() {
 
     # Se usa el demonio monolítico (libvirtd) y no los modulares (virtqemud & cía):
     # para un equipo de escritorio es la vía simple y la que documenta la wiki para
-    # virt-manager. virtlogd viene arrastrado por Requires= de la propia unit.
-    aviso "Enabling libvirtd..."
-    sudo systemctl enable --now libvirtd.service
+    # virt-manager. virtlogd y virtlockd los arrastra la propia unit.
+    #
+    # Dos modos de arranque, con un tradeoff que decide el usuario:
+    #
+    #   .service : libvirtd corre desde el boot. Las VMs marcadas con autostart
+    #              arrancan solas. Costo medido en este equipo: ~32 MB de RAM y
+    #              ~1.5s de arranque, permanentes, más los dos dnsmasq de la red NAT.
+    #
+    #   .socket  : systemd escucha /run/libvirt/libvirt-sock SIN el demonio y lo
+    #              arranca al primer cliente (virt-manager, virsh). A cambio, las
+    #              VMs con autostart NO arrancan solas tras un reboot, y la red NAT
+    #              no se levanta hasta el primer uso.
+    #
+    # Ojo: el socket arranca bajo demanda pero NO apaga al quedar ocioso; una vez
+    # levantado sigue vivo hasta el próximo reboot.
+    printf '\n'
+    aviso "Start mode:"
+    printf '  1) At boot (libvirtd.service) - VMs marked autostart come back after a reboot\n'
+    printf '  2) On demand (libvirtd.socket) - daemon starts on first use; no VM autostart\n\n'
+    local modo
+    read -rp "Choice [1]: " modo || true
+    if [ "${modo:-1}" = "2" ]; then
+        aviso "Enabling libvirtd.socket (on demand)..."
+        # El disable del .service es por si se corre install de nuevo para cambiar
+        # de modo: sin esto quedarían los dos habilitados y ganaría el del boot.
+        sudo systemctl disable --now libvirtd.service 2> /dev/null || true
+        # El enable del .socket arrastra los -ro y -admin por su Also=.
+        sudo systemctl enable --now libvirtd.socket
+    else
+        aviso "Enabling libvirtd.service (at boot)..."
+        sudo systemctl enable --now libvirtd.service
+    fi
 
     # El grupo libvirt da acceso a qemu:///system sin password (regla polkit que
     # trae el propio paquete). Sin esto, virt-manager pide la clave de root en cada uso.
@@ -112,6 +151,11 @@ instalar() {
 
     # La red NAT 'default' viene definida por libvirt pero apagada y sin autostart.
     # Sin ella las VMs nacen sin conectividad. El net-start se tolera si ya está activa.
+    #
+    # 'autostart' acá significa "cuando libvirtd corra, levantá esta red", así que
+    # respeta el modo elegido arriba: con el socket, la red (y sus dos dnsmasq) no
+    # existen hasta el primer uso. Estos virsh sí despiertan al demonio ahora mismo,
+    # porque hay que hablarle para configurarlo; a partir del próximo boot manda el modo.
     aviso "Enabling the default NAT network..."
     sudo virsh net-autostart default > /dev/null
     sudo virsh net-start default 2> /dev/null || true
