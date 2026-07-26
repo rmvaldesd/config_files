@@ -4,7 +4,7 @@
   // no varíe cuando un módulo aparece o desaparece. Requiere el 'min-height: 0'
   // del selector '*' en style.css: sin eso GTK impone su propio alto mínimo y la
   // barra no baja de ~40px por más que se recorte este valor.
-  "height": 26,
+  "height": 30,
   // Sin separación automática entre módulos: la separación la dan el padding y la
   // regla vertical de 1px definidos en style.css.
   "spacing": 0,
