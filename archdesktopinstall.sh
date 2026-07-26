@@ -117,6 +117,8 @@ paquetes_utilidades=(
     libreoffice-fresh # Suite ofimática. La variante 'fresh' trae las versiones nuevas; 'libreoffice-still' es la conservadora, si preferís estabilidad sobre funciones. No se instala el paquete de idioma (libreoffice-fresh-es) porque el locale de este equipo es en_US.
     gimp              # Editor de imágenes. NO se asocia a los tipos de imagen a propósito: esos abren con imv, que es el visor; solo .xcf (image/x-xcf) abre directo en GIMP, porque ningún visor lo lee. Para el resto, GIMP queda en el menú "Abrir con" de Thunar.
     obsidian          # Base de conocimiento sobre archivos Markdown locales.
+    dbeaver           # Cliente SQL universal (Eclipse/SWT sobre GTK3). Corre en Wayland NATIVO sin tocar nada: no le pongas GDK_BACKEND=x11, que a escala 2x lo dejaría borroso. Ver docs/linux/dbeaver.md.
+    jre21-openjdk     # Runtime de Java para dbeaver, que pide java-runtime>=21. Se fija el 21 (LTS) en vez del jre-openjdk suelto porque es la versión que DBeaver embebe en sus builds oficiales, o sea contra la que upstream realmente lo prueba. Es JRE y no JDK: sólo hace falta ejecutar, no compilar.
     brightnessctl     # Utilidad para controlar el brillo de la pantalla (ideal para laptops con teclas multimedia).
     power-profiles-daemon # Expone los perfiles performance/balanced/power-saver y los aplica al platform_profile ACPI y al EPP del intel_pstate. Waybar lo muestra con el módulo 'power-profiles-daemon'. NO instalar junto con tlp: se pisan entre sí.
     python-gobject    # Dependencia OPCIONAL de power-profiles-daemon pero obligatoria acá: sin ella 'powerprofilesctl' no arranca (ModuleNotFoundError: gi.repository) y power-profile-sync no puede cambiar el perfil.
@@ -148,6 +150,10 @@ paquetes_utilidades=(
     gvfs-mtp          # Soporte MTP para gvfs; permite a Thunar acceder a celulares Android.
     xdg-user-dirs     # Crea los directorios estándar del usuario (~/Descargas, ~/Documentos, etc.).
     cliphist          # Historial del portapapeles para Wayland; sin él, lo copiado muere al cerrar la app de origen.
+    cups              # Servidor de impresión. Arrastra cups-filters (los conversores que traducen el PDF que manda la app al formato que entiende la impresora).
+    avahi             # Descubrimiento de servicios en la red local por mDNS/DNS-SD: es quien encuentra la impresora wifi sin que tengas que saber su IP. Ya viene como dependencia de cups, pero se lista explícito para que quede marcado como instalado a propósito y un futuro 'pacman -Rns cups' no se lo lleve.
+    nss-mdns          # Enchufa avahi al resolvedor de nombres del sistema (ver el parche de nsswitch.conf en la sección 7). avahi por sí solo hace el DESCUBRIMIENTO, pero sin esto un 'ipp://IMPRESORA.local' no resuelve y la cola de impresión queda apuntando a un nombre muerto. Es lo que permite usar el hostname en vez de la IP, que el DHCP puede cambiar.
+    system-config-printer # GUI para añadir y gestionar impresoras: Hyprland no trae panel de impresoras propio. La alternativa sin instalar nada es la interfaz web de CUPS en http://localhost:631.
     ufw               # Firewall sencillo; se activa en la sección 7 con política deny-incoming/allow-outgoing.
     spotify-launcher  # Descarga y mantiene actualizado el cliente oficial de Spotify desde los repos de Snap de Spotify.
 )
@@ -178,6 +184,35 @@ sudo systemctl enable ly@tty1.service                     # Pantalla de login TU
 sudo systemctl enable --now fstrim.timer             # TRIM semanal del SSD; mantiene el rendimiento del disco a largo plazo.
 sudo systemctl enable --now ufw.service              # Arranca el firewall en cada boot.
 sudo systemctl enable --now power-profiles-daemon.service  # Demonio de perfiles de energía. Sin 'enable' explícito sólo se activaría por D-Bus bajo demanda y no estaría listo al bootear.
+
+# --- Impresión (avahi descubre la impresora en la red, cups la gestiona) ---
+# systemd-resolved TAMBIÉN implementa mDNS y por defecto lo trae activado. Con los dos
+# demonios respondiendo en el puerto 5353 el descubrimiento sale intermitente y ambos
+# intentan publicar el mismo nombre .local. Se le apaga a resolved y se deja el mDNS en
+# manos de avahi, que es el que CUPS consulta por D-Bus para listar impresoras.
+sudo install -d /etc/systemd/resolved.conf.d
+printf '[Resolve]\nMulticastDNS=no\n' | sudo tee /etc/systemd/resolved.conf.d/10-mdns-a-avahi.conf > /dev/null
+# El restart va condicionado: en una instalación limpia resolved puede estar instalado
+# pero sin arrancar, y un 'restart' a secas lo levantaría (cambiando el resolvedor DNS
+# del sistema a mitad del script). Si no corre, el drop-in ya queda escrito para cuando arranque.
+if systemctl is-active --quiet systemd-resolved.service; then
+    sudo systemctl restart systemd-resolved.service
+fi
+# Con el mDNS de resolved apagado, los nombres .local dejan de resolver salvo que se
+# enganche avahi al NSS. Este parche mete mdns_minimal al principio de la línea 'hosts:'
+# de /etc/nsswitch.conf: sólo contesta nombres .local y para el resto devuelve UNAVAIL,
+# así que el resto de la cadena (resolve, files, dns) sigue funcionando igual.
+# El grep hace el paso idempotente: correr el script dos veces no duplica la entrada.
+if ! grep -q 'mdns_minimal' /etc/nsswitch.conf; then
+    sudo cp /etc/nsswitch.conf /etc/nsswitch.conf.bak.$(date +%Y%m%d%H%M%S)
+    sudo sed -i -E 's/^(hosts:[[:space:]]*)/\1mdns_minimal [NOTFOUND=return] /' /etc/nsswitch.conf
+    echo "-> nsswitch.conf: añadido mdns_minimal (respaldo con timestamp al lado)."
+fi
+
+sudo systemctl enable --now avahi-daemon.service     # Descubrimiento mDNS/DNS-SD; sin él la impresora wifi no aparece en la lista.
+sudo systemctl enable --now cups.socket              # Se habilita el .socket y NO el .service a propósito: systemd levanta cupsd sólo cuando algo imprime o abre la GUI, en vez de tenerlo corriendo siempre.
+
+sudo ufw allow 5353/udp comment 'mDNS: descubrimiento de impresoras y servicios en la LAN'  # La política deny-incoming descarta las respuestas mDNS (llegan como multicast, no como respuesta a una conexión saliente rastreada), así que sin esta regla la impresora nunca se descubre.
 sudo ufw --force enable                              # Activa ufw con la política por defecto: bloquear entrante, permitir saliente.
 sudo timedatectl set-ntp true                        # Sincronización de hora por NTP; un reloj desviado rompe TLS y las firmas de git/pacman.
 
@@ -287,6 +322,13 @@ bash "$HOME/config_files/scripts/install-fonts.sh"
 # Enlaza hyprshutdown (menú de apagado con rofi) en el PATH del sistema para que el bind SUPER+SHIFT+M lo encuentre
 sudo ln -sfn "$HOME/config_files/bin_configs/hyprshutdown" /usr/local/bin/hyprshutdown
 echo "-> Enlazado: /usr/local/bin/hyprshutdown -> ~/config_files/bin_configs/hyprshutdown"
+
+# Wrapper que le sube el heap a DBeaver de 1 GB a 4 GB. Va en /usr/local/bin, que en el
+# PATH precede a /usr/bin, así que TAPA al /usr/bin/dbeaver del paquete: aplica tanto al
+# lanzarlo desde rofi como desde la terminal. El porqué de no editar dbeaver.ini está
+# comentado dentro del propio script y en docs/linux/dbeaver.md.
+sudo ln -sfn "$HOME/config_files/bin_configs/dbeaver" /usr/local/bin/dbeaver
+echo "-> Enlazado: /usr/local/bin/dbeaver -> ~/config_files/bin_configs/dbeaver"
 
 # ==========================================
 # 10. CAMBIO AUTOMÁTICO DE PERFIL DE ENERGÍA
@@ -499,4 +541,31 @@ exit 0
 #
 # Para cambiar qué perfil corresponde a cada estado, editá el if de
 # bin_configs/power-profile-sync y volvé a correr la sección 10.
+#
+# ------------------------------------------------------------------------------
+# 9. IMPRESIÓN WIFI (paquetes en la sección 5, servicios en la sección 7)
+# ------------------------------------------------------------------------------
+# Para añadir la impresora: ejecutá 'system-config-printer' y entrá en "Añadir".
+# Debería aparecer sola bajo "Impresoras de red". La otra vía es http://localhost:631.
+#
+# NO se instala ningún driver a propósito: cualquier impresora de los últimos años
+# soporta IPP Everywhere / AirPrint, o sea que CUPS habla con ella sin driver. Sólo
+# si la tuya es vieja o imprime mal hace falta uno, y depende de la marca:
+#   HP      -> hplip                          (repos oficiales)
+#   Epson   -> epson-inkjet-printer-escpr     (repos oficiales)
+#   Brother -> yay -S brother-<modelo>        (AUR, buscá tu modelo exacto)
+#   Canon / genéricas -> gutenprint + foomatic-db
+#
+# El usuario NO necesita estar en ningún grupo extra: cups-files.conf de Arch trae
+# 'SystemGroup sys root wheel' y este usuario ya está en wheel (sale del instalador
+# de Arch). El grupo 'lp' sólo hace falta para impresoras USB conectadas directo.
+#
+# Diagnóstico cuando la impresora no aparece:
+#   avahi-browse -rt _ipp._tcp          # ¿la ve la red? Si sale vacío, es avahi/firewall
+#   systemctl status avahi-daemon cups  # ¿están corriendo los dos?
+#   sudo ufw status | grep 5353         # ¿está la regla de mDNS?
+#   resolvectl mdns                     # debe decir 'no' en todos lados (lo apaga la sección 7)
+#   lpstat -p -d                        # impresoras ya configuradas y cuál es la predeterminada
+#
+# Documentación ampliada: docs/linux/impresion.md
 #

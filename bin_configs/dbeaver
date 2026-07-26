@@ -1,0 +1,30 @@
+#!/bin/sh
+# Wrapper de DBeaver: lo único que hace es subirle el heap de 1 GB a 4 GB.
+#
+# POR QUÉ NO SE EDITA /usr/lib/dbeaver/dbeaver.ini
+# Ese archivo trae '-Xmx1024m', que se queda corto con result sets grandes o
+# exportaciones, pero NO está en el array 'backup' del paquete (pacman -Qii
+# dbeaver -> "Backup Files: None"): cada actualización lo pisa sin avisar y sin
+# dejar un .pacnew. Cualquier ajuste ahí se pierde en silencio.
+#
+# POR QUÉ NO SE PASA -vmargs EN LA LÍNEA DE COMANDOS
+# En los lanzadores de Eclipse los -vmargs de la línea de comandos REEMPLAZAN a
+# los del .ini, no se suman. Se perderían los ~25 '--add-opens' que DBeaver
+# necesita para arrancar contra un JDK moderno.
+#
+# POR QUÉ _JAVA_OPTIONS Y NO JAVA_TOOL_OPTIONS
+# Es puro orden de precedencia de la JVM: JAVA_TOOL_OPTIONS se procesa ANTES que
+# la línea de comandos, así que el -Xmx1024m del .ini la pisaría. _JAVA_OPTIONS
+# se procesa DESPUÉS y gana. Efecto colateral: la JVM imprime en stderr un
+# "Picked up _JAVA_OPTIONS: -Xmx4g" que es inofensivo.
+#
+# Se instala como symlink en /usr/local/bin/dbeaver (sección 9 del script de
+# instalación), que en el PATH va antes que /usr/bin. Así aplica tanto si lo
+# lanzás desde rofi (la entrada .desktop del paquete dice 'Exec=dbeaver', que se
+# resuelve por PATH) como si escribís 'dbeaver' en la terminal.
+#
+# Ojo con el nombre: este script SE LLAMA IGUAL que el del paquete, así que la
+# llamada de abajo tiene que ser por ruta absoluta o entra en recursión infinita.
+# /usr/bin/dbeaver sigue siendo el que exporta GTK_OVERLAY_SCROLLING=0.
+export _JAVA_OPTIONS=-Xmx4g
+exec /usr/bin/dbeaver "$@"

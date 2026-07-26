@@ -19,4 +19,9 @@ link them below.
 - [CLI recipes](./cli-recipes.md)
 -->
 
-_(nothing here yet)_
+- [Impresión wifi (CUPS + Avahi)](./impresion.md) — cómo descubre la impresora,
+  el conflicto mDNS con systemd-resolved, la regla de ufw, drivers por marca y
+  diagnóstico.
+- [DBeaver en Wayland](./dbeaver.md) — por qué no lleva configuración, por qué
+  forzar XWayland lo empeora a escala 2x, y cómo subirle la memoria sin que la
+  próxima actualización se lo lleve.
