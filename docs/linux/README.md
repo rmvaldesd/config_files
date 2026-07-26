@@ -5,9 +5,12 @@ link them below.
 
 ## Suggested topics
 
-- Desktop / window manager (this repo carries a `suckless/` dwm setup and
-  `xinitrc`) — see also [`../../notes_and_instructions/dwm_shortcuts`](../../notes_and_instructions/dwm_shortcuts)
-  and `installed_programs_dwm.txt`.
+- Desktop / window manager. El entorno actual es Hyprland (ver
+  [`../hyprland/`](../hyprland/)). Como referencia histórica queda `suckless/`
+  con los parches de dwm, más [`../../notes_and_instructions/dwm_shortcuts`](../../notes_and_instructions/dwm_shortcuts)
+  e `installed_programs_dwm.txt`. El `xinitrc` que lanzaba esa sesión se eliminó:
+  estaba roto (invocaba un `bin_configs/dwm_status` inexistente) y ninguna de sus
+  herramientas sigue instalada.
 - Package management / provisioning — see
   [`../../install-macos-brew-packages.sh`](../../install-macos-brew-packages.sh).
 - Common CLI recipes, systemd units, networking, troubleshooting.
