@@ -87,6 +87,23 @@ system-config-printer
 la interfaz web de CUPS en <http://localhost:631> (pestaña *Administration* →
 *Add Printer*; pide usuario y contraseña del sistema).
 
+### El camino corto
+
+```bash
+agregar-impresora
+```
+
+Es `bin_configs/agregar-impresora`, enlazado en `/usr/local/bin` por la sección 9.
+Descubre las impresoras de la red, te deja elegir una de una lista (con `fzf` si
+está, con un menú numerado si no) y corre el `lpadmin` por vos. Marca cuáles son
+driverless y cuáles podrían necesitar driver, propone el nombre de la cola,
+ofrece dejarla predeterminada e imprimir una página de prueba. También chequea
+antes que avahi esté corriendo y que `ghostscript` esté instalado, que son los
+dos motivos habituales de que después no imprima.
+
+El resto de esta sección explica lo que hace por dentro, por si algún día hay
+que hacerlo a mano o entender por qué falló.
+
 Para hacerlo por línea de comandos, primero hay que descubrirla.
 
 ## Descubrir y añadir por línea de comandos

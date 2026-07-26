@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+# Descubre las impresoras de la red, te deja elegir una y la agrega a CUPS.
+#
+# El script de instalación deja lista toda la infraestructura (cups, avahi,
+# nss-mdns, ghostscript, la regla de ufw), pero NO crea ninguna cola: eso depende
+# de qué impresora y en qué red estés. Este script es ese último paso, hecho
+# interactivo para no tener que acordarse de la sintaxis de lpadmin.
+#
+# El descubrimiento no necesita privilegios; sólo el 'lpadmin' final pide sudo.
+#
+# Documentación de fondo: docs/linux/impresion.md
+
+set -euo pipefail
+
+morir()  { printf '\033[31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
+aviso()  { printf '\033[33m->\033[0m %s\n' "$*"; }
+ok()     { printf '\033[32m->\033[0m %s\n' "$*"; }
+
+# ==========================================
+# PREREQUISITOS
+# ==========================================
+for cmd in avahi-browse driverless lpadmin lpstat; do
+    command -v "$cmd" > /dev/null || morir "falta el comando '$cmd'. Corré la sección 5 del script de instalación."
+done
+
+# avahi es quien hace el descubrimiento: sin él este script no ve absolutamente nada.
+systemctl is-active --quiet avahi-daemon.service || \
+    morir "avahi-daemon no está corriendo. Arrancalo con: sudo systemctl enable --now avahi-daemon.service"
+
+# ghostscript no impide agregar la impresora, pero sí imprimir: sin él los trabajos
+# mueren con "universal filter failed" en cuanto la impresora no acepte PDF nativo.
+# Se avisa acá y no al final para que no te enteres recién cuando falle un trabajo.
+command -v gs > /dev/null || \
+    aviso "AVISO: ghostscript no está instalado. Vas a poder agregar la impresora, pero los trabajos van a fallar con 'universal filter failed'. Instalalo con: sudo pacman -S ghostscript"
+
+# ==========================================
+# HELPERS DE DECODIFICACIÓN
+# ==========================================
+# avahi-browse -p escapa los caracteres especiales del nombre del servicio como
+# \DDD en DECIMAL (\032 = espacio, \040 = '(', \041 = ')'). Hay que revertirlo para
+# poder cruzar ese nombre con el que viene dentro del URI de 'driverless'.
+decodificar_avahi() {
+    awk '{
+        s = $0
+        while (match(s, /\\[0-9][0-9][0-9]/)) {
+            codigo = substr(s, RSTART + 1, 3) + 0
+            s = substr(s, 1, RSTART - 1) sprintf("%c", codigo) substr(s, RSTART + 4)
+        }
+        print s
+    }' <<< "$1"
+}
+
+# Los URI vienen percent-encoded ("HP%20LaserJet"). El truco de convertir cada '%'
+# en '\x' y pasarlo por 'printf %b' hace la decodificación sin depender de python ni perl.
+decodificar_uri() {
+    printf '%b' "${1//%/\\x}"
+}
+
+# CUPS no acepta espacios, '/' ni '#' en el nombre de la cola.
+sanear_nombre() {
+    printf '%s' "$1" | tr ' /#' '___' | tr -cd '[:alnum:]_.-'
+}
+
+# ==========================================
+# DESCUBRIMIENTO
+# ==========================================
+printf '\n'
+aviso "Buscando impresoras en la red (unos segundos)..."
+
+# --- Datos de avahi: hostname, IP y capacidades de cada servicio ---
+# Se indexa por nombre de servicio decodificado. Cada impresora aparece dos veces
+# (IPv4 e IPv6) con los mismos datos, así que nos quedamos con una sola fila por nombre.
+declare -A AV_HOST AV_IP AV_PUERTO AV_TXT
+while IFS=';' read -r _ _ _ nombre _ _ host ip puerto txt; do
+    [ -n "${nombre:-}" ] || continue
+    nombre=$(decodificar_avahi "$nombre")
+    [ -n "${AV_HOST[$nombre]:-}" ] && continue     # ya la vimos por el otro protocolo
+    AV_HOST[$nombre]=$host
+    AV_IP[$nombre]=$ip
+    AV_PUERTO[$nombre]=$puerto
+    AV_TXT[$nombre]=$txt
+done < <( { timeout 10 avahi-browse -rtp _ipp._tcp  2>/dev/null || true
+            timeout 10 avahi-browse -rtp _ipps._tcp 2>/dev/null || true; } | grep '^=' || true )
+
+# --- Impresoras sin driver, según el propio cups-filters ---
+# 'driverless list' es la fuente autoritativa: si algo aparece acá, es IPP Everywhere
+# y se agrega sin driver. Además devuelve el URI ya armado. El stderr trae líneas
+# DEBUG que no interesan.
+declare -A ES_DRIVERLESS
+OPCIONES=()      # líneas que se muestran en el menú
+URIS=()          # URI paralelo a OPCIONES
+MODELOS=()       # modelo paralelo a OPCIONES, para proponer el nombre de la cola
+
+while IFS= read -r linea; do
+    [ -n "$linea" ] || continue
+    # Los campos vienen entre comillas: "uri" idioma "marca" "marca y modelo" "device-id"
+    mapfile -t campos < <(grep -o '"[^"]*"' <<< "$linea" | sed 's/^"//; s/"$//')
+    [ "${#campos[@]}" -ge 3 ] || continue
+
+    uri="${campos[0]#driverless:}"
+    modelo="${campos[2]%%,*}"                       # corta el ", driverless, cups-filters X"
+
+    # El nombre del servicio es lo que va entre '://' y '._ipp'/'._ipps'
+    servicio=$(decodificar_uri "${uri#*://}")
+    servicio="${servicio%%._ipp*}"
+    ES_DRIVERLESS[$servicio]=1
+
+    host="${AV_HOST[$servicio]:-}"
+    ip="${AV_IP[$servicio]:-}"
+    txt="${AV_TXT[$servicio]:-}"
+
+    detalles=""
+    [ -n "$host" ] && detalles=" — ${host%.}"
+    [ -n "$ip" ]   && detalles+=" (${ip})"
+    case "$txt" in *'"Color=T"'*) detalles+=" · color";; *'"Color=F"'*) detalles+=" · monocromática";; esac
+    case "$txt" in *'"Duplex=T"'*) detalles+=" · dúplex";; esac
+
+    OPCIONES+=("✅ sin driver  │ ${modelo}${detalles}")
+    URIS+=("$uri")
+    MODELOS+=("$modelo")
+done < <(timeout 25 driverless list 2>/dev/null || true)
+
+# --- Impresoras que avahi vio pero driverless no reconoció ---
+# Se listan igual, marcadas, porque lo más probable es que necesiten el driver de la
+# marca. Se les arma un URI ipp:// clásico con el 'rp=' que anuncian.
+for servicio in "${!AV_HOST[@]}"; do
+    [ -n "${ES_DRIVERLESS[$servicio]:-}" ] && continue
+
+    txt="${AV_TXT[$servicio]}"
+    modelo=$(grep -o '"ty=[^"]*"' <<< "$txt" | head -1 | sed 's/"ty=//; s/"$//') || true
+    [ -n "$modelo" ] || modelo="$servicio"
+    ruta=$(grep -o '"rp=[^"]*"' <<< "$txt" | head -1 | sed 's/"rp=//; s/"$//') || true
+    [ -n "$ruta" ] || ruta="ipp/print"
+    host="${AV_HOST[$servicio]}"
+
+    OPCIONES+=("⚠️  ¿driver?   │ ${modelo} — ${host%.} (${AV_IP[$servicio]})")
+    URIS+=("ipp://${host%.}:${AV_PUERTO[$servicio]}/${ruta}")
+    MODELOS+=("$modelo")
+done
+
+[ "${#OPCIONES[@]}" -gt 0 ] || morir "no se encontró ninguna impresora.
+  - ¿Está encendida y en la misma red?
+  - ¿Está la regla de mDNS en el firewall? Revisá con: sudo ufw status | grep 5353
+  - Probá a mano: avahi-browse -rt _ipp._tcp"
+
+# ==========================================
+# SELECCIÓN
+# ==========================================
+printf '\n'
+ok "Encontradas ${#OPCIONES[@]} impresora(s)."
+printf '\n'
+
+# fzf da una lista filtrable; si no está, se cae a un menú numerado para que el
+# script siga funcionando en una instalación mínima.
+if command -v fzf > /dev/null; then
+    elegida=$(printf '%s\n' "${OPCIONES[@]}" | \
+        fzf --prompt='Elegí la impresora> ' --height=~15 --border --no-multi \
+            --header='Enter para seleccionar · Esc para cancelar') || true
+    [ -n "$elegida" ] || morir "cancelado."
+    indice=-1
+    for i in "${!OPCIONES[@]}"; do
+        [ "${OPCIONES[$i]}" = "$elegida" ] && { indice=$i; break; }
+    done
+else
+    for i in "${!OPCIONES[@]}"; do printf '  %2d) %s\n' "$((i + 1))" "${OPCIONES[$i]}"; done
+    printf '\n'
+    read -rp "Número de la impresora (Enter para cancelar): " respuesta
+    [ -n "$respuesta" ] || morir "cancelado."
+    [[ "$respuesta" =~ ^[0-9]+$ ]] && [ "$respuesta" -ge 1 ] && [ "$respuesta" -le "${#OPCIONES[@]}" ] \
+        || morir "opción inválida."
+    indice=$((respuesta - 1))
+fi
+
+uri="${URIS[$indice]}"
+modelo="${MODELOS[$indice]}"
+driverless_ok=0
+[[ "${OPCIONES[$indice]}" == "✅"* ]] && driverless_ok=1
+
+printf '\n'
+ok "Seleccionada: ${modelo}"
+printf '   URI: %s\n' "$uri"
+
+if [ "$driverless_ok" -eq 0 ]; then
+    printf '\n'
+    aviso "Esta impresora NO apareció en 'driverless list', así que puede necesitar el driver de la marca."
+    aviso "Se va a intentar igual con IPP Everywhere. Si imprime en blanco o con basura, mirá la tabla de drivers en docs/linux/impresion.md"
+fi
+
+# ==========================================
+# NOMBRE DE LA COLA
+# ==========================================
+sugerido=$(sanear_nombre "$modelo")
+printf '\n'
+read -rp "Nombre de la cola [${sugerido}]: " nombre_cola
+nombre_cola="${nombre_cola:-$sugerido}"
+nombre_cola=$(sanear_nombre "$nombre_cola")
+[ -n "$nombre_cola" ] || morir "el nombre de la cola quedó vacío."
+
+if lpstat -p "$nombre_cola" > /dev/null 2>&1; then
+    read -rp "Ya existe una cola llamada '${nombre_cola}'. ¿Reemplazarla? [s/N]: " reemplazar
+    [[ "$reemplazar" =~ ^[sSyY]$ ]] || morir "cancelado."
+fi
+
+# ==========================================
+# ALTA EN CUPS
+# ==========================================
+printf '\n'
+aviso "Agregando la cola (pide sudo)..."
+
+# -m everywhere: CUPS le pregunta a la impresora sus capacidades por IPP y arma el PPD
+#                solo, sin driver.
+# -E:            la habilita y acepta trabajos de entrada.
+# printer-is-shared=false: no la re-publica en la red; ya la publica ella misma.
+sudo lpadmin -p "$nombre_cola" -E -v "$uri" -m everywhere \
+    -D "$modelo" -o printer-is-shared=false \
+    || morir "lpadmin falló.
+  Si dice 'Temporary failure in name resolution', falta nss-mdns o el parche de
+  /etc/nsswitch.conf (ver docs/linux/impresion.md)."
+
+ok "Cola '${nombre_cola}' creada."
+
+# 'lpoptions -d' fija la predeterminada del USUARIO y no necesita sudo, a diferencia
+# de 'lpadmin -d', que fija la del sistema. Para un equipo de un solo usuario alcanza.
+printf '\n'
+read -rp "¿Dejarla como impresora predeterminada? [S/n]: " predeterminada
+if [[ ! "$predeterminada" =~ ^[nN]$ ]]; then
+    lpoptions -d "$nombre_cola" > /dev/null
+    ok "Predeterminada: ${nombre_cola}"
+fi
+
+# ==========================================
+# PRUEBA
+# ==========================================
+pagina=/usr/share/cups/data/default-testpage.pdf
+if [ -f "$pagina" ]; then
+    printf '\n'
+    read -rp "¿Imprimir una página de prueba? [s/N]: " probar
+    if [[ "$probar" =~ ^[sSyY]$ ]]; then
+        lp -d "$nombre_cola" "$pagina"
+        printf '\n'
+        aviso "Enviada. Seguí el estado con:  lpstat -l -W all -o ${nombre_cola}"
+    fi
+fi
+
+printf '\n'
+ok "Listo. Estado actual:"
+lpstat -p -d
