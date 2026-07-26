@@ -1,15 +1,16 @@
-@define-color highlight rgba(117, 241, 250, 1);
-@define-color dark-9 rgba(24, 24, 27, 1);
-@define-color dark-8 rgba(39, 39, 42, 1);
-@define-color dark-7 rgba(63, 63, 70, 1);
-@define-color dark-6 rgba(82, 82, 91, 1);
-@define-color dark-5 rgba(113, 113, 122, 1);
-/* zinc-300: el tono con que arranca el degradado del borde de ventana activa en
-   hyprland.lua. Marca el workspace activo con la misma gramática que el borde
-   (claro = enfocado), dejando el cyan de @highlight para progreso e interacción. */
-@define-color dark-3 rgba(212, 212, 216, 1);
-/* zinc-50: el mismo blanco roto que usan rofi y mako, en vez de blanco puro. */
-@define-color dark-0 rgba(250, 250, 250, 1);
+/* ==========================================================================
+   Paleta: Tailwind Zinc, la misma de hyprland.lua, rofi y mako.
+   El gris marca foco y estructura; el cyan queda para progreso e interacción.
+   ========================================================================== */
+@define-color highlight rgba(117, 241, 250, 1);   /* cyan  #75f1fa */
+@define-color urgent    rgba(227, 81, 73, 1);     /* coral #e35149 */
+@define-color dark-9 rgba(24, 24, 27, 1);         /* zinc-950 #18181b - fondo   */
+@define-color dark-8 rgba(39, 39, 42, 1);         /* zinc-800 #27272a           */
+@define-color dark-7 rgba(63, 63, 70, 1);         /* zinc-700 #3f3f46 - reglas  */
+@define-color dark-6 rgba(82, 82, 91, 1);         /* zinc-600 #52525b           */
+@define-color dark-5 rgba(113, 113, 122, 1);      /* zinc-500 #71717a - apagado */
+@define-color dark-3 rgba(212, 212, 216, 1);      /* zinc-300 #d4d4d8 - acento  */
+@define-color dark-0 rgba(250, 250, 250, 1);      /* zinc-50  #fafafa - texto   */
 
 * {
   /* Iconos: "Symbols Nerd Font" viene versionada en config_files/fonts (instalada por
@@ -17,59 +18,133 @@
      así se ve idéntico en Arch y Fedora sin depender de los paquetes de cada distro.
      Las familias Font Awesome quedan solo como fallback (v7 en Arch, v6 en Fedora). */
   font-family: "JetBrains Mono", "Symbols Nerd Font", "Symbols Nerd Font Mono", "Font Awesome 7 Free", "Font Awesome 7 Brands", "Font Awesome 6 Free", "Font Awesome 6 Brands", sans-serif;
-  font-size: 13px;
+  font-size: 12px;
+  /* IMPRESCINDIBLE para una barra baja: GTK le impone a cada widget un alto mínimo
+     propio y sin esto la barra no baja de ~40px por más que se recorten paddings. */
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  text-shadow: none;
 }
 
 window#waybar {
   background-color: @dark-9;
-  color: white;
+  color: @dark-3;
+}
+
+/* --------------------------------------------------------------------------
+   WORKSPACES
+   Sin pastilla: el activo se marca con un subrayado de 2px en zinc-300, el
+   mismo color y grosor que el borde de la ventana activa en hyprland.lua.
+   -------------------------------------------------------------------------- */
+#workspaces {
+  margin: 0;
+  padding: 0;
 }
 
 #workspaces button {
-  padding: 3px;
-  margin: 7px 0px 7px 7px;
+  padding: 0 9px;
+  margin: 0;
   background: transparent;
-  border-radius: 2px;
-  /* zinc-500 en vez de blanco puro: los inactivos pesaban casi tanto como el activo,
-     y el blanco puro no estaba en la paleta zinc del resto del tema. */
   color: @dark-5;
-  /* Borde transparente en TODOS los botones: el activo le pone color al suyo, y así
-     no cambia de alto al activarse (el borde suma al box y desalinearía la fila). */
+  /* El borde transparente va en TODOS los botones para que el activo no crezca
+     2px al activarse y desalinee la fila. */
   border-bottom: 2px solid transparent;
+  min-width: 0;
+}
+
+#workspaces button:hover {
+  background: transparent;
+  color: @dark-3;
+  border-bottom: 2px solid @dark-7;
 }
 
 #workspaces button.active {
-  background: transparent;
   color: @dark-0;
   border-bottom: 2px solid @dark-3;
   font-weight: 700;
 }
 
-#custom-language,
+#workspaces button.urgent {
+  color: @urgent;
+  border-bottom: 2px solid @urgent;
+}
+
+/* --------------------------------------------------------------------------
+   RELOJ (centro)
+   -------------------------------------------------------------------------- */
+#clock {
+  padding: 0 12px;
+  color: @dark-0;
+}
+
+/* --------------------------------------------------------------------------
+   MÓDULOS DE LA DERECHA
+   Sin fondo ni bordes redondeados: la única separación es una regla vertical
+   de 1px en zinc-700. El borde va a la IZQUIERDA de cada módulo, así el primero
+   de la fila también queda separado del reloj y no hay que tratar aparte al
+   último. Los módulos que se ocultan (bluetooth sin dispositivos, submap fuera
+   de un submapa) no dejan una regla huérfana: waybar no los renderiza.
+   -------------------------------------------------------------------------- */
 #submap,
+#custom-language,
+#volume,
 #battery,
 #power-profiles-daemon,
 #bluetooth,
 #network,
 #cpu,
-#memory,
-#volume {
-  border-radius: 8px;
-  padding: 5px 8px;
-  background: @dark-8;
-  margin: 5px 10px 5px 0px;
+#memory {
+  padding: 0 11px;
+  margin: 0;
+  background-color: transparent;
+  /* La regla se dibuja como imagen de fondo y NO con border-left porque un borde
+     ocupa siempre el alto completo de la caja y quedaría pegado a los bordes de la
+     barra. Tampoco se usa un margin vertical para recortarlo: en una barra de 26px
+     eso achica la caja hasta recortar el texto. Con el gradiente, la línea vive
+     entre el 22% y el 78% del alto y el layout no se entera.
+     zinc-800 está a un solo escalón del fondo (zinc-950): la regla tiene que
+     insinuar la división, no dibujarla. */
+  background-image: linear-gradient(to bottom,
+                                    transparent 22%,
+                                    @dark-8 22%, @dark-8 78%,
+                                    transparent 78%);
+  background-size: 1px 100%;
+  background-repeat: no-repeat;
+  background-position: left center;
 }
 
-#submap,
-#workspaces button.urgent {
-  background: rgba(227, 81, 73, 1);
-  color: black;
+/* Aire al borde derecho de la pantalla, que si no el último módulo queda pegado. */
+#memory {
+  padding-right: 14px;
 }
 
+/* El submapa es un estado modal: tiene que cantar. Como ya no hay pastilla,
+   lo hace con el color del texto en vez de con un fondo coral. */
+#submap {
+  color: @urgent;
+  font-weight: 700;
+}
+
+#battery.warning,
+#battery.critical {
+  color: @urgent;
+}
+
+#network.disconnected,
+#bluetooth.disabled {
+  color: @dark-5;
+}
+
+/* --------------------------------------------------------------------------
+   SLIDER DE VOLUMEN
+   Queda definido aunque hoy 'pulseaudio/slider' esté comentado en config.jsonc:
+   si se reactiva, el cyan es el acento de progreso del tema.
+   -------------------------------------------------------------------------- */
 #pulseaudio-slider {
-  padding: 0px;
-  margin: 0px;
-  margin-left: 8px;
+  padding: 0;
+  margin: 0 0 0 8px;
 }
 
 #pulseaudio-slider slider {
@@ -83,23 +158,28 @@ window#waybar {
 }
 
 #pulseaudio-slider trough {
-  min-height: 8px;
-  min-width: 75px;
-  border-radius: 5px;
+  min-height: 6px;
+  min-width: 70px;
+  border-radius: 3px;
   background: @dark-7;
 }
 
 #pulseaudio-slider highlight {
   min-width: 10px;
-  border-radius: 5px;
+  border-radius: 3px;
   background: @highlight;
 }
 
+/* --------------------------------------------------------------------------
+   TOOLTIPS
+   -------------------------------------------------------------------------- */
 tooltip {
   background: @dark-9;
-  border-radius: 5px;
+  border: 1px solid @dark-7;
+  border-radius: 4px;
 }
 
 tooltip label {
-  color: white;
+  color: @dark-0;
+  padding: 2px;
 }

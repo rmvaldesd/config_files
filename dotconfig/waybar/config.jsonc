@@ -1,5 +1,13 @@
 {
   "layer": "top",
+  // Barra baja y compacta. El alto se fija acá y no se deja al contenido para que
+  // no varíe cuando un módulo aparece o desaparece. Requiere el 'min-height: 0'
+  // del selector '*' en style.css: sin eso GTK impone su propio alto mínimo y la
+  // barra no baja de ~40px por más que se recorte este valor.
+  "height": 26,
+  // Sin separación automática entre módulos: la separación la dan el padding y la
+  // regla vertical de 1px definidos en style.css.
+  "spacing": 0,
   "modules-left": [
     "hyprland/workspaces"
   ],
@@ -86,7 +94,9 @@
     "on-click": "exec nmrs"
   },
   "clock": {
-    "format": "{:%a, %d. %b %I:%M %p}",
+    // %d dia, %b mes abreviado (el locale del equipo es en_US -> "Jul"), %H:%M en
+    // formato 24h. Sin el dia de la semana ni el AM/PM, que ocupaban la mitad del ancho.
+    "format": "{:%d %b %H:%M}",
     "tooltip-format": "<tt><small>{calendar}</small></tt>",
     "calendar": {
       "format": {
