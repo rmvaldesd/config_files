@@ -91,7 +91,9 @@
     "tooltip-format-ethernet": "{ifname} ",
     "tooltip-format-disconnected": "󰖪",
     "max-length": 50,
-    "on-click": "exec nmrs"
+    // nmtui viene dentro del propio networkmanager, así que no suma ningún paquete.
+    // Mismo patrón que el módulo de bluetooth con bluetui: una TUI en su terminal.
+    "on-click": "exec ghostty --title=nmtui -e nmtui"
   },
   "clock": {
     // %d dia, %b mes abreviado (el locale del equipo es en_US -> "Jul"), %H:%M en

@@ -282,7 +282,7 @@ mkdir -p "$HOME/.config"
 # Enlaza cada directorio de config_files/dotconfig dentro de ~/.config.
 # El guard de existencia permite sumar o quitar directorios del repo sin tocar este
 # script: los que no estén en dotconfig/ simplemente se saltean.
-for dir in nvim hypr waybar rofi mako ghostty git nmrs; do
+for dir in nvim hypr waybar rofi mako ghostty git; do
     origen="$HOME/config_files/dotconfig/$dir"
     [ -d "$origen" ] || continue
     destino="$HOME/.config/$dir"
@@ -447,8 +447,7 @@ fi
 # 'wpctl' viene incluido en wireplumber, 'gsettings' en glib2 y 'loginctl'/'systemctl' en systemd.
 echo "-> Instalando paquetes desde AUR..."
 paquetes_aur=(
-    nmrs              # GUI Wayland-nativa para NetworkManager (on-click del módulo network en Waybar). Solo existe en AUR.
-    sublime-text-4    # Editor gráfico. No está en repos oficiales: el paquete de AUR descarga el binario oficial de sublimehq. Queda asociado a los archivos de texto y código vía mimeapps.list; neovim sigue siendo el editor de terminal.
+    sublime-text-4   # Editor gráfico. No está en repos oficiales: el paquete de AUR descarga el binario oficial de sublimehq. Queda asociado a los archivos de texto y código vía mimeapps.list; neovim sigue siendo el editor de terminal.
 )
 yay -S --needed --noconfirm "${paquetes_aur[@]}" || \
     echo "AVISO: falló la instalación desde AUR; el resto del entorno quedó completo. Reintenta luego con: yay -S ${paquetes_aur[*]}"

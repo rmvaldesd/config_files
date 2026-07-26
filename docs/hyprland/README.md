@@ -218,7 +218,7 @@ mano, drivers por marca y diagnóstico.
 | Batería | — (`format-alt`: alterna a tiempo restante) |
 | Perfil de energía | Cicla entre performance / balanced / power-saver |
 | Bluetooth | bluetui, en una terminal |
-| Red | nmrs |
+| Red | nmtui, en una terminal |
 | CPU | btop, en una terminal |
 | Memoria | htop, en una terminal |
 | Idioma del teclado | Cambia al siguiente layout |
@@ -345,7 +345,6 @@ solo: `xdg-mime` escribe a través del symlink.
 | Notificaciones | `dotconfig/mako/config` |
 | Lanzador | `dotconfig/rofi/config.rasi` y `dark.rasi` |
 | Terminal | `dotconfig/ghostty/config.ghostty` |
-| Gestor de red | `dotconfig/nmrs/style.css` |
 | fzf y función `imgs` | `zshrc.local` |
 | Asociaciones de archivos | `mimeapps.list` |
 | Ignore global de git | `dotconfig/git/ignore` |
