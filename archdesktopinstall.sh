@@ -395,6 +395,11 @@ echo "-> Enlazado: /usr/local/bin/dbeaver -> ~/config_files/bin_configs/dbeaver"
 sudo ln -sfn "$HOME/config_files/bin_configs/add-printer" /usr/local/bin/add-printer
 echo "-> Enlazado: /usr/local/bin/add-printer -> ~/config_files/bin_configs/add-printer"
 
+# Mantenimiento: lista los paquetes huérfanos con su tamaño y los elimina en rondas
+# (borrar un huérfano puede dejar huérfanos nuevos) previa confirmación.
+sudo ln -sfn "$HOME/config_files/bin_configs/clean-orphans" /usr/local/bin/clean-orphans
+echo "-> Enlazado: /usr/local/bin/clean-orphans -> ~/config_files/bin_configs/clean-orphans"
+
 # ==========================================
 # 10. CAMBIO AUTOMÁTICO DE PERFIL DE ENERGÍA
 # ==========================================

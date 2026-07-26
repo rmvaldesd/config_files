@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Lista los paquetes huérfanos (instalados como dependencia y que ya nada necesita),
+# muestra cuánto disco ocupa cada uno y los elimina previa confirmación.
+#
+# Por qué en rondas: eliminar un huérfano puede convertir en huérfanos a paquetes
+# que eran dependencia de OTROS (el -Rns sólo cascadea sobre lo que borra), así que
+# se repite hasta que 'pacman -Qdtq' quede vacío. Es el bucle clásico de la wiki.
+#
+# Se usa -Qdt y no -Qdtt a propósito: la variante con doble t incluye paquetes que
+# alguien lista como dependencia OPCIONAL, y borrar esos rompe features en silencio
+# (el caso python-gobject/powerprofilesctl documentado en archdesktopinstall.sh).
+#
+# Los comentarios van en español como el resto del repo; los mensajes en inglés.
+
+set -euo pipefail
+
+morir()  { printf '\033[31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
+aviso()  { printf '\033[33m->\033[0m %s\n' "$*"; }
+ok()     { printf '\033[32m->\033[0m %s\n' "$*"; }
+
+# pacman -Qdtq sale con 1 cuando NO hay huérfanos; el || true evita que set -e
+# convierta el caso feliz en un abort.
+mapfile -t huerfanos < <(pacman -Qdtq 2>/dev/null || true)
+
+if [ "${#huerfanos[@]}" -eq 0 ]; then
+    ok "No orphaned packages. Nothing to do."
+    exit 0
+fi
+
+# Tabla nombre + tamaño instalado + total. LANG=C fija el formato de pacman -Qi
+# ("Installed Size : 12.34 MiB") para que el parseo no dependa del locale.
+printf '\n\033[1mOrphaned packages:\033[0m\n\n'
+LANG=C pacman -Qi "${huerfanos[@]}" 2>/dev/null | awk -F' *: *' '
+    /^Name/           { nombre = $2 }
+    /^Installed Size/ {
+        split($2, s, " ")
+        # Normaliza todo a MiB para poder sumar unidades mezcladas.
+        factor = (s[2] == "KiB") ? 1/1024 : (s[2] == "GiB") ? 1024 : 1
+        mib = s[1] * factor
+        total += mib
+        printf "  %-28s %10.2f MiB\n", nombre, mib
+    }
+    END { printf "  %-28s %10.2f MiB\n", "TOTAL", total }
+'
+
+printf '\n'
+read -rp "Remove them (pacman -Rns, repeated until no orphans remain)? [y/N]: " confirmar
+[[ "${confirmar:-}" =~ ^[yYsS]$ ]] || { aviso "Cancelled."; exit 0; }
+
+sudo -v
+
+# Tope de rondas como red de seguridad: si algo oscilara (no debería), mejor cortar
+# con un aviso que quedar en bucle pidiendo -Rns para siempre.
+ronda=1
+while :; do
+    mapfile -t lote < <(pacman -Qdtq 2>/dev/null || true)
+    [ "${#lote[@]}" -eq 0 ] && break
+    if [ "$ronda" -gt 1 ]; then
+        aviso "Round $ronda - removing packages orphaned by the previous round: ${lote[*]}"
+    fi
+    sudo pacman -Rns --noconfirm "${lote[@]}"
+    ronda=$((ronda + 1))
+    [ "$ronda" -gt 10 ] && morir "still finding orphans after 10 rounds; something is off. Check: pacman -Qdt"
+done
+
+printf '\n'
+ok "Done. No orphans remain."

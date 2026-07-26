@@ -350,6 +350,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Ignore global de git | `dotconfig/git/ignore` |
 | Perfiles de energía | `etc/systemd/system/`, `etc/udev/rules.d/`, `etc/polkit-1/rules.d/`, `bin_configs/power-profile-sync` |
 | Asistente de impresión | `bin_configs/add-printer` (enlazado en `/usr/local/bin`) |
+| Limpieza de huérfanos | `bin_configs/clean-orphans` (enlazado en `/usr/local/bin`) |
 | Instalación completa | `archdesktopinstall.sh` |
 
 Todo lo de `dotconfig/` se enlaza con symlinks a `~/.config/`; lo de `etc/` se
