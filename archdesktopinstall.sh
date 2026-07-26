@@ -11,8 +11,22 @@ fi
 
 echo "=== Iniciando instalación del entorno Hyprland ==="
 
-# Pide la contraseña de sudo una sola vez y la mantiene viva durante todo el script
-# (las descargas largas superan el timeout de 5 minutos y sudo volvería a preguntar a mitad de proceso)
+# El script está pensado para correr desatendido: pide la contraseña UNA vez acá y
+# después no vuelve a interrumpir.
+#
+# Son dos mecanismos distintos y hacen falta los dos:
+#   1. Este bloque, para la contraseña: 'sudo -v' la pide una vez y el bucle en
+#      segundo plano refresca el timestamp cada 60s. Sin él, las descargas largas
+#      superan el timeout de 5 minutos y sudo volvería a preguntar a mitad de proceso.
+#      El trap mata el keepalive al salir, pase lo que pase.
+#   2. El '--noconfirm' de cada pacman/yay/makepkg, para los prompts de los propios
+#      instaladores ("Proceed with installation? [Y/n]"), que no tienen nada que ver
+#      con sudo.
+#
+# Ojo con --noconfirm: toma la respuesta POR DEFECTO en todo, incluida la elección de
+# proveedor cuando una dependencia tiene varios candidatos. En una instalación limpia
+# con estos paquetes el default es el correcto, pero si algún día agregás algo con
+# proveedores en conflicto, revisá esa parte a mano.
 sudo -v
 ( while true; do sudo -n true; sleep 60; done ) 2>/dev/null &
 SUDO_KEEPALIVE_PID=$!
@@ -36,7 +50,7 @@ paquetes_base=(
     wget              # Descarga de archivos por línea de comandos.
     curl              # Transferencia de datos por URL; requerido por muchos scripts e instaladores.
 )
-sudo pacman -Syu --needed "${paquetes_base[@]}"
+sudo pacman -Syu --needed --noconfirm "${paquetes_base[@]}"
 
 # ==========================================
 # 2. INSTALACIÓN DE YAY (AUR HELPER)
@@ -74,7 +88,7 @@ paquetes_sistema=(
     bluez              # Pila oficial del protocolo Bluetooth en Linux.
     bluez-utils        # Herramientas de línea de comandos para emparejar y gestionar dispositivos Bluetooth.
 )
-sudo pacman -S --needed "${paquetes_sistema[@]}"
+sudo pacman -S --needed --noconfirm "${paquetes_sistema[@]}"
 
 # ==========================================
 # 4. NÚCLEO DEL ENTORNO DE ESCRITORIO
@@ -95,7 +109,7 @@ paquetes_escritorio=(
     qt5-wayland                   # Añade soporte nativo de Wayland para aplicaciones desarrolladas en Qt5.
     ly                            # Display manager minimalista en TUI; pantalla de login que lanza la sesión de Hyprland.
 )
-sudo pacman -S --needed "${paquetes_escritorio[@]}"
+sudo pacman -S --needed --noconfirm "${paquetes_escritorio[@]}"
 
 # ==========================================
 # 5. UTILIDADES DEL ECOSISTEMA Y PREFERENCIAS
@@ -158,7 +172,7 @@ paquetes_utilidades=(
     ufw               # Firewall sencillo; se activa en la sección 7 con política deny-incoming/allow-outgoing.
     spotify-launcher  # Descarga y mantiene actualizado el cliente oficial de Spotify desde los repos de Snap de Spotify.
 )
-sudo pacman -S --needed "${paquetes_utilidades[@]}"
+sudo pacman -S --needed --noconfirm "${paquetes_utilidades[@]}"
 
 # ==========================================
 # 6. FUENTES, TIPOGRAFÍAS Y APARIENCIA
@@ -173,7 +187,7 @@ paquetes_apariencia=(
     adw-gtk-theme               # Tema GTK3 'adw-gtk3-dark' que hyprland.lua activa vía gsettings en el autostart.
     lxappearance                # Herramienta gráfica sencilla para cambiar el tema oscuro/claro, iconos y cursores GTK.
 )
-sudo pacman -S --needed "${paquetes_apariencia[@]}"
+sudo pacman -S --needed --noconfirm "${paquetes_apariencia[@]}"
 
 # ==========================================
 # 7. ACTIVACIÓN DE SERVICIOS DEL SISTEMA
