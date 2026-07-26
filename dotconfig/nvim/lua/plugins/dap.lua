@@ -114,7 +114,7 @@ return {
     local dap_ui_ok, ui = pcall(require, "dapui")
 
     if not (dap_ok and dap_ui_ok) then
-      require("notify")("nvim-dap or dap-ui not installed!", "warning") -- nvim-notify is a separate plugin, I recommend it too!
+      vim.notify("nvim-dap or dap-ui not installed!", vim.log.levels.WARN)
       return
     end
 
@@ -234,7 +234,7 @@ return {
 
     vim.keymap.set("n", "<leader>cb", function()
       dap.clear_breakpoints()
-      require("notify")("Breakpoints cleared", "warn")
+      vim.notify("Breakpoints cleared", vim.log.levels.WARN)
     end, { desc = "[dap] - [c]lear [b]reakpoints" })
 
     -- Evaluate the expression under the cursor (normal) or the visual selection.
