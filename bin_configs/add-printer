@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
-# Descubre las impresoras de la red, te deja elegir una y la agrega a CUPS.
+# Gestor interactivo de impresoras de red: descubre, agrega, lista y elimina colas
+# de CUPS sin tener que acordarse de la sintaxis de lpadmin.
 #
 # El script de instalación deja lista toda la infraestructura (cups, avahi,
 # nss-mdns, ghostscript, la regla de ufw), pero NO crea ninguna cola: eso depende
-# de qué impresora y en qué red estés. Este script es ese último paso, hecho
-# interactivo para no tener que acordarse de la sintaxis de lpadmin.
+# de qué impresora y en qué red estés. Este script es ese último paso.
+#
+# Corre en bucle sobre un menú, así que se pueden encadenar varias operaciones
+# (agregar dos impresoras, borrar una vieja) sin volver a lanzarlo.
 #
 # Los comentarios van en español como el resto del repo; los mensajes que ve el
 # usuario van en inglés.
 #
-# El descubrimiento no necesita privilegios; sólo el 'lpadmin' final pide sudo.
+# El descubrimiento no necesita privilegios; sólo 'lpadmin' pide sudo.
 #
 # Documentación de fondo: docs/linux/impresion.md
 
 set -euo pipefail
 
 morir()  { printf '\033[31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
+error()  { printf '\033[31mERROR:\033[0m %s\n' "$*" >&2; }
 aviso()  { printf '\033[33m->\033[0m %s\n' "$*"; }
 ok()     { printf '\033[32m->\033[0m %s\n' "$*"; }
 
@@ -32,9 +36,9 @@ systemctl is-active --quiet avahi-daemon.service || \
 
 # ghostscript no impide agregar la impresora, pero sí imprimir: sin él los trabajos
 # mueren con "universal filter failed" en cuanto la impresora no acepte PDF nativo.
-# Se avisa acá y no al final para que no te enteres recién cuando falle un trabajo.
+# Se avisa al arrancar y no al final para que no te enteres recién cuando falle un trabajo.
 command -v gs > /dev/null || \
-    aviso "WARNING: ghostscript is not installed. You can still add the printer, but jobs will die with 'universal filter failed'. Install it with: sudo pacman -S ghostscript"
+    aviso "WARNING: ghostscript is not installed. You can still add printers, but jobs will die with 'universal filter failed'. Install it with: sudo pacman -S ghostscript"
 
 # ==========================================
 # HELPERS DE DECODIFICACIÓN
@@ -64,187 +68,297 @@ sanear_nombre() {
     printf '%s' "$1" | tr ' /#' '___' | tr -cd '[:alnum:]_.-'
 }
 
+# Selector genérico: usa fzf si está, y si no cae a un menú numerado para que el
+# script siga funcionando en una instalación mínima. Deja el índice elegido en
+# la global INDICE_ELEGIDO, o devuelve 1 si se canceló.
+# Uso: elegir_de "prompt" "${array[@]}"
+INDICE_ELEGIDO=-1
+elegir_de() {
+    local prompt="$1"; shift
+    local items=("$@")
+    INDICE_ELEGIDO=-1
+
+    if command -v fzf > /dev/null; then
+        local elegido
+        elegido=$(printf '%s\n' "${items[@]}" | \
+            fzf --prompt="$prompt> " --height=~15 --border --no-multi \
+                --header='Enter to select · Esc to cancel') || true
+        [ -n "$elegido" ] || return 1
+        local i
+        for i in "${!items[@]}"; do
+            [ "${items[$i]}" = "$elegido" ] && { INDICE_ELEGIDO=$i; return 0; }
+        done
+        return 1
+    fi
+
+    local i respuesta
+    for i in "${!items[@]}"; do printf '  %2d) %s\n' "$((i + 1))" "${items[$i]}"; done
+    printf '\n'
+    read -rp "${prompt} (Enter to cancel): " respuesta || return 1
+    [ -n "$respuesta" ] || return 1
+    [[ "$respuesta" =~ ^[0-9]+$ ]] && [ "$respuesta" -ge 1 ] && [ "$respuesta" -le "${#items[@]}" ] \
+        || { error "invalid choice."; return 1; }
+    INDICE_ELEGIDO=$((respuesta - 1))
+}
+
 # ==========================================
 # DESCUBRIMIENTO
 # ==========================================
-printf '\n'
-aviso "Looking for printers on the network (this takes a few seconds)..."
-
-# --- Datos de avahi: hostname, IP y capacidades de cada servicio ---
-# Se indexa por nombre de servicio decodificado. Cada impresora aparece dos veces
-# (IPv4 e IPv6) con los mismos datos, así que nos quedamos con una sola fila por nombre.
-declare -A AV_HOST AV_IP AV_PUERTO AV_TXT
-while IFS=';' read -r _ _ _ nombre _ _ host ip puerto txt; do
-    [ -n "${nombre:-}" ] || continue
-    nombre=$(decodificar_avahi "$nombre")
-    [ -n "${AV_HOST[$nombre]:-}" ] && continue     # ya la vimos por el otro protocolo
-    AV_HOST[$nombre]=$host
-    AV_IP[$nombre]=$ip
-    AV_PUERTO[$nombre]=$puerto
-    AV_TXT[$nombre]=$txt
-done < <( { timeout 10 avahi-browse -rtp _ipp._tcp  2>/dev/null || true
-            timeout 10 avahi-browse -rtp _ipps._tcp 2>/dev/null || true; } | grep '^=' || true )
-
-# --- Impresoras sin driver, según el propio cups-filters ---
-# 'driverless list' es la fuente autoritativa: si algo aparece acá, es IPP Everywhere
-# y se agrega sin driver. Además devuelve el URI ya armado. El stderr trae líneas
-# DEBUG que no interesan.
-declare -A ES_DRIVERLESS
+# El escaneo tarda varios segundos, así que el resultado se cachea y sólo se repite
+# si se pide "Rescan" desde el menú.
+DESCUBIERTO=0
 OPCIONES=()      # líneas que se muestran en el menú
 URIS=()          # URI paralelo a OPCIONES
 MODELOS=()       # modelo paralelo a OPCIONES, para proponer el nombre de la cola
 
-while IFS= read -r linea; do
-    [ -n "$linea" ] || continue
-    # Los campos vienen entre comillas: "uri" idioma "marca" "marca y modelo" "device-id"
-    mapfile -t campos < <(grep -o '"[^"]*"' <<< "$linea" | sed 's/^"//; s/"$//')
-    [ "${#campos[@]}" -ge 3 ] || continue
+descubrir() {
+    printf '\n'
+    aviso "Looking for printers on the network (this takes a few seconds)..."
 
-    uri="${campos[0]#driverless:}"
-    modelo="${campos[2]%%,*}"                       # corta el ", driverless, cups-filters X"
+    OPCIONES=(); URIS=(); MODELOS=()
 
-    # El nombre del servicio es lo que va entre '://' y '._ipp'/'._ipps'
-    servicio=$(decodificar_uri "${uri#*://}")
-    servicio="${servicio%%._ipp*}"
-    ES_DRIVERLESS[$servicio]=1
+    # --- Datos de avahi: hostname, IP y capacidades de cada servicio ---
+    # Se indexa por nombre de servicio decodificado. Cada impresora aparece dos veces
+    # (IPv4 e IPv6) con los mismos datos, así que se toma una sola fila por nombre.
+    local -A AV_HOST AV_IP AV_PUERTO AV_TXT
+    local nombre host ip puerto txt
+    while IFS=';' read -r _ _ _ nombre _ _ host ip puerto txt; do
+        [ -n "${nombre:-}" ] || continue
+        nombre=$(decodificar_avahi "$nombre")
+        [ -n "${AV_HOST[$nombre]:-}" ] && continue     # ya la vimos por el otro protocolo
+        AV_HOST[$nombre]=$host
+        AV_IP[$nombre]=$ip
+        AV_PUERTO[$nombre]=$puerto
+        AV_TXT[$nombre]=$txt
+    done < <( { timeout 10 avahi-browse -rtp _ipp._tcp  2>/dev/null || true
+                timeout 10 avahi-browse -rtp _ipps._tcp 2>/dev/null || true; } | grep '^=' || true )
 
-    host="${AV_HOST[$servicio]:-}"
-    ip="${AV_IP[$servicio]:-}"
-    txt="${AV_TXT[$servicio]:-}"
+    # --- Impresoras sin driver, según el propio cups-filters ---
+    # 'driverless list' es la fuente autoritativa: si algo aparece acá, es IPP Everywhere
+    # y se agrega sin driver. Además devuelve el URI ya armado. Su stderr trae líneas
+    # DEBUG que no interesan.
+    local -A ES_DRIVERLESS
+    local linea campos uri modelo servicio detalles
+    while IFS= read -r linea; do
+        [ -n "$linea" ] || continue
+        # Los campos vienen entre comillas: "uri" idioma "marca" "marca y modelo" "device-id"
+        mapfile -t campos < <(grep -o '"[^"]*"' <<< "$linea" | sed 's/^"//; s/"$//')
+        [ "${#campos[@]}" -ge 3 ] || continue
 
-    detalles=""
-    [ -n "$host" ] && detalles=" — ${host%.}"
-    [ -n "$ip" ]   && detalles+=" (${ip})"
-    case "$txt" in *'"Color=T"'*) detalles+=" · color";; *'"Color=F"'*) detalles+=" · mono";; esac
-    case "$txt" in *'"Duplex=T"'*) detalles+=" · duplex";; esac
+        uri="${campos[0]#driverless:}"
+        modelo="${campos[2]%%,*}"                       # corta el ", driverless, cups-filters X"
 
-    OPCIONES+=("✅ driverless    │ ${modelo}${detalles}")
-    URIS+=("$uri")
-    MODELOS+=("$modelo")
-done < <(timeout 25 driverless list 2>/dev/null || true)
+        # El nombre del servicio es lo que va entre '://' y '._ipp'/'._ipps'
+        servicio=$(decodificar_uri "${uri#*://}")
+        servicio="${servicio%%._ipp*}"
+        ES_DRIVERLESS[$servicio]=1
 
-# --- Impresoras que avahi vio pero driverless no reconoció ---
-# Se listan igual, marcadas, porque lo más probable es que necesiten el driver de la
-# marca. Se les arma un URI ipp:// clásico con el 'rp=' que anuncian.
-for servicio in "${!AV_HOST[@]}"; do
-    [ -n "${ES_DRIVERLESS[$servicio]:-}" ] && continue
+        host="${AV_HOST[$servicio]:-}"
+        ip="${AV_IP[$servicio]:-}"
+        txt="${AV_TXT[$servicio]:-}"
 
-    txt="${AV_TXT[$servicio]}"
-    modelo=$(grep -o '"ty=[^"]*"' <<< "$txt" | head -1 | sed 's/"ty=//; s/"$//') || true
-    [ -n "$modelo" ] || modelo="$servicio"
-    ruta=$(grep -o '"rp=[^"]*"' <<< "$txt" | head -1 | sed 's/"rp=//; s/"$//') || true
-    [ -n "$ruta" ] || ruta="ipp/print"
-    host="${AV_HOST[$servicio]}"
+        detalles=""
+        [ -n "$host" ] && detalles=" — ${host%.}"
+        [ -n "$ip" ]   && detalles+=" (${ip})"
+        case "$txt" in *'"Color=T"'*) detalles+=" · color";; *'"Color=F"'*) detalles+=" · mono";; esac
+        case "$txt" in *'"Duplex=T"'*) detalles+=" · duplex";; esac
 
-    OPCIONES+=("⚠️  needs driver? │ ${modelo} — ${host%.} (${AV_IP[$servicio]})")
-    URIS+=("ipp://${host%.}:${AV_PUERTO[$servicio]}/${ruta}")
-    MODELOS+=("$modelo")
-done
+        OPCIONES+=("✅ driverless    │ ${modelo}${detalles}")
+        URIS+=("$uri")
+        MODELOS+=("$modelo")
+    done < <(timeout 25 driverless list 2>/dev/null || true)
 
-[ "${#OPCIONES[@]}" -gt 0 ] || morir "no printers found.
+    # --- Impresoras que avahi vio pero driverless no reconoció ---
+    # Se listan igual, marcadas, porque lo más probable es que necesiten el driver de
+    # la marca. Se les arma un URI ipp:// clásico con el 'rp=' que anuncian.
+    local ruta
+    for servicio in "${!AV_HOST[@]}"; do
+        [ -n "${ES_DRIVERLESS[$servicio]:-}" ] && continue
+
+        txt="${AV_TXT[$servicio]}"
+        modelo=$(grep -o '"ty=[^"]*"' <<< "$txt" | head -1 | sed 's/"ty=//; s/"$//') || true
+        [ -n "$modelo" ] || modelo="$servicio"
+        ruta=$(grep -o '"rp=[^"]*"' <<< "$txt" | head -1 | sed 's/"rp=//; s/"$//') || true
+        [ -n "$ruta" ] || ruta="ipp/print"
+        host="${AV_HOST[$servicio]}"
+
+        OPCIONES+=("⚠️  needs driver? │ ${modelo} — ${host%.} (${AV_IP[$servicio]})")
+        URIS+=("ipp://${host%.}:${AV_PUERTO[$servicio]}/${ruta}")
+        MODELOS+=("$modelo")
+    done
+
+    DESCUBIERTO=1
+    ok "Found ${#OPCIONES[@]} printer(s) on the network."
+}
+
+# ==========================================
+# ACCIÓN: AGREGAR
+# ==========================================
+agregar() {
+    [ "$DESCUBIERTO" -eq 1 ] || descubrir
+
+    if [ "${#OPCIONES[@]}" -eq 0 ]; then
+        error "no printers found.
   - Is it powered on and on the same network?
   - Is the mDNS firewall rule in place? Check with: sudo ufw status | grep 5353
   - Try by hand: avahi-browse -rt _ipp._tcp"
+        return 1
+    fi
 
-# ==========================================
-# SELECCIÓN
-# ==========================================
-printf '\n'
-ok "Found ${#OPCIONES[@]} printer(s)."
-printf '\n'
-
-# fzf da una lista filtrable; si no está, se cae a un menú numerado para que el
-# script siga funcionando en una instalación mínima.
-if command -v fzf > /dev/null; then
-    elegida=$(printf '%s\n' "${OPCIONES[@]}" | \
-        fzf --prompt='Pick a printer> ' --height=~15 --border --no-multi \
-            --header='Enter to select · Esc to cancel') || true
-    [ -n "$elegida" ] || morir "cancelled."
-    indice=-1
-    for i in "${!OPCIONES[@]}"; do
-        [ "${OPCIONES[$i]}" = "$elegida" ] && { indice=$i; break; }
-    done
-else
-    for i in "${!OPCIONES[@]}"; do printf '  %2d) %s\n' "$((i + 1))" "${OPCIONES[$i]}"; done
     printf '\n'
-    read -rp "Printer number (Enter to cancel): " respuesta
-    [ -n "$respuesta" ] || morir "cancelled."
-    [[ "$respuesta" =~ ^[0-9]+$ ]] && [ "$respuesta" -ge 1 ] && [ "$respuesta" -le "${#OPCIONES[@]}" ] \
-        || morir "invalid choice."
-    indice=$((respuesta - 1))
-fi
+    elegir_de "Pick a printer to add" "${OPCIONES[@]}" || { aviso "Cancelled."; return 1; }
 
-uri="${URIS[$indice]}"
-modelo="${MODELOS[$indice]}"
-driverless_ok=0
-[[ "${OPCIONES[$indice]}" == "✅"* ]] && driverless_ok=1
+    local indice=$INDICE_ELEGIDO
+    local uri="${URIS[$indice]}"
+    local modelo="${MODELOS[$indice]}"
+    local driverless_ok=0
+    [[ "${OPCIONES[$indice]}" == "✅"* ]] && driverless_ok=1
 
-printf '\n'
-ok "Selected: ${modelo}"
-printf '   URI: %s\n' "$uri"
-
-if [ "$driverless_ok" -eq 0 ]; then
     printf '\n'
-    aviso "This printer did NOT show up in 'driverless list', so it may need the vendor driver."
-    aviso "Trying IPP Everywhere anyway. If it prints blank or garbage, see the driver table in docs/linux/impresion.md"
-fi
+    ok "Selected: ${modelo}"
+    printf '   URI: %s\n' "$uri"
 
-# ==========================================
-# NOMBRE DE LA COLA
-# ==========================================
-sugerido=$(sanear_nombre "$modelo")
-printf '\n'
-read -rp "Queue name [${sugerido}]: " nombre_cola
-nombre_cola="${nombre_cola:-$sugerido}"
-nombre_cola=$(sanear_nombre "$nombre_cola")
-[ -n "$nombre_cola" ] || morir "the queue name ended up empty."
+    if [ "$driverless_ok" -eq 0 ]; then
+        printf '\n'
+        aviso "This printer did NOT show up in 'driverless list', so it may need the vendor driver."
+        aviso "Trying IPP Everywhere anyway. If it prints blank or garbage, see the driver table in docs/linux/impresion.md"
+    fi
 
-if lpstat -p "$nombre_cola" > /dev/null 2>&1; then
-    read -rp "A queue named '${nombre_cola}' already exists. Replace it? [y/N]: " reemplazar
-    [[ "$reemplazar" =~ ^[yYsS]$ ]] || morir "cancelled."
-fi
+    local sugerido nombre_cola reemplazar
+    sugerido=$(sanear_nombre "$modelo")
+    printf '\n'
+    read -rp "Queue name [${sugerido}]: " nombre_cola || return 1
+    nombre_cola="${nombre_cola:-$sugerido}"
+    nombre_cola=$(sanear_nombre "$nombre_cola")
+    [ -n "$nombre_cola" ] || { error "the queue name ended up empty."; return 1; }
 
-# ==========================================
-# ALTA EN CUPS
-# ==========================================
-printf '\n'
-aviso "Adding the queue (needs sudo)..."
+    if lpstat -p "$nombre_cola" > /dev/null 2>&1; then
+        read -rp "A queue named '${nombre_cola}' already exists. Replace it? [y/N]: " reemplazar || return 1
+        [[ "$reemplazar" =~ ^[yYsS]$ ]] || { aviso "Cancelled."; return 1; }
+    fi
 
-# -m everywhere: CUPS le pregunta a la impresora sus capacidades por IPP y arma el PPD
-#                solo, sin driver.
-# -E:            la habilita y acepta trabajos de entrada.
-# printer-is-shared=false: no la re-publica en la red; ya la publica ella misma.
-sudo lpadmin -p "$nombre_cola" -E -v "$uri" -m everywhere \
-    -D "$modelo" -o printer-is-shared=false \
-    || morir "lpadmin failed.
+    printf '\n'
+    aviso "Adding the queue (needs sudo)..."
+
+    # -m everywhere: CUPS le pregunta a la impresora sus capacidades por IPP y arma el
+    #                PPD solo, sin driver.
+    # -E:            la habilita y acepta trabajos de entrada.
+    # printer-is-shared=false: no la re-publica en la red; ya la publica ella misma.
+    if ! sudo lpadmin -p "$nombre_cola" -E -v "$uri" -m everywhere \
+            -D "$modelo" -o printer-is-shared=false; then
+        error "lpadmin failed.
   If it says 'Temporary failure in name resolution', nss-mdns or the
   /etc/nsswitch.conf patch is missing (see docs/linux/impresion.md)."
-
-ok "Queue '${nombre_cola}' created."
-
-# 'lpoptions -d' fija la predeterminada del USUARIO y no necesita sudo, a diferencia
-# de 'lpadmin -d', que fija la del sistema. Para un equipo de un solo usuario alcanza.
-printf '\n'
-read -rp "Make it the default printer? [Y/n]: " predeterminada
-if [[ ! "$predeterminada" =~ ^[nN]$ ]]; then
-    lpoptions -d "$nombre_cola" > /dev/null
-    ok "Default printer: ${nombre_cola}"
-fi
-
-# ==========================================
-# PRUEBA
-# ==========================================
-pagina=/usr/share/cups/data/default-testpage.pdf
-if [ -f "$pagina" ]; then
-    printf '\n'
-    read -rp "Print a test page? [y/N]: " probar
-    if [[ "$probar" =~ ^[yYsS]$ ]]; then
-        lp -d "$nombre_cola" "$pagina"
-        printf '\n'
-        aviso "Sent. Track it with:  lpstat -l -W all -o ${nombre_cola}"
+        return 1
     fi
-fi
 
-printf '\n'
-ok "Done. Current status:"
-lpstat -p -d
+    ok "Queue '${nombre_cola}' created."
+
+    # 'lpoptions -d' fija la predeterminada del USUARIO y no necesita sudo, a diferencia
+    # de 'lpadmin -d', que fija la del sistema. Para un equipo de un solo usuario alcanza.
+    local predeterminada probar
+    printf '\n'
+    read -rp "Make it the default printer? [Y/n]: " predeterminada || true
+    if [[ ! "${predeterminada:-}" =~ ^[nN]$ ]]; then
+        lpoptions -d "$nombre_cola" > /dev/null
+        ok "Default printer: ${nombre_cola}"
+    fi
+
+    local pagina=/usr/share/cups/data/default-testpage.pdf
+    if [ -f "$pagina" ]; then
+        printf '\n'
+        read -rp "Print a test page? [y/N]: " probar || true
+        if [[ "${probar:-}" =~ ^[yYsS]$ ]]; then
+            lp -d "$nombre_cola" "$pagina"
+            printf '\n'
+            aviso "Sent. Track it with:  lpstat -l -W all -o ${nombre_cola}"
+        fi
+    fi
+}
+
+# ==========================================
+# ACCIÓN: ELIMINAR
+# ==========================================
+# Lista las colas YA configuradas en CUPS (no las de la red) y borra la elegida.
+eliminar() {
+    local colas=() etiquetas=() nombre uri descripcion
+    local predeterminada_actual
+    predeterminada_actual=$(lpstat -d 2>/dev/null | sed -n 's/^system default destination: //p') || true
+
+    # 'lpstat -v' da una línea por cola: "device for NOMBRE: URI"
+    while IFS= read -r linea; do
+        nombre="${linea#device for }"
+        nombre="${nombre%%:*}"
+        uri="${linea#*: }"
+        [ -n "$nombre" ] || continue
+        colas+=("$nombre")
+        descripcion=""
+        [ "$nombre" = "$predeterminada_actual" ] && descripcion=" [default]"
+        etiquetas+=("${nombre}${descripcion} — ${uri}")
+    done < <(lpstat -v 2>/dev/null || true)
+
+    if [ "${#colas[@]}" -eq 0 ]; then
+        aviso "There are no printers configured in CUPS."
+        return 0
+    fi
+
+    printf '\n'
+    elegir_de "Pick a printer to REMOVE" "${etiquetas[@]}" || { aviso "Cancelled."; return 1; }
+
+    local elegida="${colas[$INDICE_ELEGIDO]}"
+    local confirmar
+
+    # Borrar una cola es destructivo y no se puede deshacer sin volver a darla de alta,
+    # así que se pide el nombre completo en vez de un simple s/n: evita el enter de más.
+    printf '\n'
+    aviso "About to remove the queue '${elegida}'. This cannot be undone (the printer itself is untouched)."
+    read -rp "Type the queue name to confirm: " confirmar || return 1
+    [ "$confirmar" = "$elegida" ] || { aviso "Names do not match. Cancelled."; return 1; }
+
+    printf '\n'
+    aviso "Removing the queue (needs sudo)..."
+    if ! sudo lpadmin -x "$elegida"; then
+        error "lpadmin -x failed."
+        return 1
+    fi
+    ok "Queue '${elegida}' removed."
+
+    [ "$elegida" = "$predeterminada_actual" ] && \
+        aviso "That was the default printer; set a new one with option 1 or: lpoptions -d NAME"
+    return 0
+}
+
+# ==========================================
+# ACCIÓN: LISTAR
+# ==========================================
+listar() {
+    printf '\n'
+    ok "Printers configured in CUPS:"
+    lpstat -p -d 2>&1 || true
+    printf '\n'
+    lpstat -v 2>/dev/null || true
+}
+
+# ==========================================
+# MENÚ PRINCIPAL
+# ==========================================
+# El bucle es lo que permite encadenar operaciones: agregar dos impresoras seguidas,
+# o borrar una y dar de alta otra, sin relanzar el script.
+while true; do
+    printf '\n\033[1m=== Printer manager ===\033[0m\n'
+    printf '  1) Add a printer\n'
+    printf '  2) Remove a printer\n'
+    printf '  3) List configured printers\n'
+    printf '  4) Rescan the network\n'
+    printf '  q) Quit\n\n'
+
+    read -rp "Choice: " opcion || break
+    case "${opcion:-}" in
+        1) agregar || true ;;
+        2) eliminar || true ;;
+        3) listar || true ;;
+        4) descubrir || true ;;
+        q|Q|"") printf '\n'; ok "Bye."; break ;;
+        *) error "invalid choice." ;;
+    esac
+done

@@ -6,6 +6,7 @@ diagnosticar cuando la impresora no aparece.
 - [Cómo funciona](#cómo-funciona)
 - [Qué instala el script](#qué-instala-el-script)
 - [Añadir una impresora](#añadir-una-impresora) (por GUI)
+  - [El camino corto: `add-printer`](#el-camino-corto-add-printer)
 - [Descubrir y añadir por línea de comandos](#descubrir-y-añadir-por-línea-de-comandos)
 - [Drivers](#drivers)
 - [Diagnóstico](#diagnóstico)
@@ -87,24 +88,43 @@ system-config-printer
 la interfaz web de CUPS en <http://localhost:631> (pestaña *Administration* →
 *Add Printer*; pide usuario y contraseña del sistema).
 
-### El camino corto
+### El camino corto: `add-printer`
 
 ```bash
 add-printer
 ```
 
-Es `bin_configs/add-printer`, enlazado en `/usr/local/bin` por la sección 9.
-Descubre las impresoras de la red, te deja elegir una de una lista (con `fzf` si
-está, con un menú numerado si no) y corre el `lpadmin` por vos. Marca cuáles son
-driverless y cuáles podrían necesitar driver, propone el nombre de la cola,
-ofrece dejarla predeterminada e imprimir una página de prueba. También chequea
-antes que avahi esté corriendo y que `ghostscript` esté instalado, que son los
-dos motivos habituales de que después no imprima.
+Es `bin_configs/add-printer`, enlazado en `/usr/local/bin` por la sección 9. Es
+un gestor con menú en bucle, así que se pueden encadenar operaciones sin
+relanzarlo:
 
-El resto de esta sección explica lo que hace por dentro, por si algún día hay
-que hacerlo a mano o entender por qué falló.
+```
+=== Printer manager ===
+  1) Add a printer
+  2) Remove a printer
+  3) List configured printers
+  4) Rescan the network
+  q) Quit
+```
 
-Para hacerlo por línea de comandos, primero hay que descubrirla.
+**Agregar** descubre las impresoras de la red, te deja elegir una de una lista
+(con `fzf` si está, con un menú numerado si no) y corre el `lpadmin` por vos.
+Marca cuáles son driverless y cuáles podrían necesitar driver, propone el nombre
+de la cola, ofrece dejarla predeterminada e imprimir una página de prueba.
+
+**Eliminar** lista las colas ya configuradas (con el URI y cuál es la
+predeterminada) y hace `lpadmin -x`. Como es destructivo y no se deshace, pide
+escribir el nombre completo de la cola para confirmar, no un simple `s/n`. Borra
+la cola, no la impresora.
+
+El escaneo de red se cachea, por eso existe **Rescan**: si enchufás una
+impresora mientras el script está abierto, esa es la forma de que aparezca.
+
+También chequea al arrancar que avahi esté corriendo y que `ghostscript` esté
+instalado, que son los dos motivos habituales de que después no imprima.
+
+La sección que sigue explica lo que `add-printer` hace por dentro, por si algún
+día hay que hacerlo a mano o entender por qué falló.
 
 ## Descubrir y añadir por línea de comandos
 
