@@ -35,6 +35,7 @@ PAQUETES=(
     edk2-ovmf            # Firmware UEFI para las VMs. Necesario para instalar Windows 11 y para cualquier guest que no quiera BIOS legacy.
     swtpm                # TPM 2.0 emulado. Windows 11 lo exige; los guests Linux no lo necesitan.
     dmidecode            # libvirt lo usa para leer/inyectar datos SMBIOS del host en los guests.
+    virtiofsd            # Compartir carpetas host<->guest (virtiofs). Es paquete SEPARADO desde que lo sacaron de qemu; sin él, virt-manager ofrece el filesystem passthrough igual y la VM falla al arrancar con un error confuso.
 )
 
 # ==========================================
@@ -117,6 +118,15 @@ instalar() {
 
     printf '\n'
     ok "Done. Open 'virt-manager' to create a VM (log out first if the group was just added)."
+    printf '\n'
+    # Los dos "peros" que el host no puede resolver y conviene saber ANTES de crear la VM:
+    # el ISO de drivers para guests Windows no está empaquetado en los repos oficiales,
+    # y los agentes de integración se instalan DENTRO del guest, no acá.
+    aviso "Windows guests: the installer ships no virtio drivers, so it won't see the disk."
+    aviso "  Grab the virtio-win ISO (Fedora project / AUR) and attach it as a second CD-ROM."
+    aviso "Inside Linux guests, install: spice-vdagent (shared clipboard, auto-resize)"
+    aviso "  and qemu-guest-agent (clean shutdown from virt-manager)."
+    printf '\n'
     # ufw antepone DROP al forwarding; libvirt mete sus propias cadenas LIBVIRT_FWI/FWO
     # al frente así que en general convive bien, pero es EL sospechoso si un guest no navega.
     aviso "Note: this machine runs ufw. libvirt inserts its own forward rules and normally"
