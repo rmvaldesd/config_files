@@ -68,7 +68,8 @@ sudo ufw allow 5353/udp comment 'mDNS: descubrimiento de impresoras y servicios 
 
 `archdesktopinstall.sh` lo cubre en dos lugares:
 
-- **Sección 5** (paquetes): `cups`, `avahi`, `nss-mdns`, `system-config-printer`.
+- **Sección 5** (paquetes): `cups`, `ghostscript`, `avahi`, `nss-mdns`,
+  `system-config-printer`.
 - **Sección 7** (servicios): el drop-in de resolved, el parche de
   `nsswitch.conf`, `avahi-daemon.service`, `cups.socket` y la regla de ufw.
 
@@ -109,7 +110,7 @@ Lo que importa de esa línea:
 | Parte | Qué te dice |
 |-------|-------------|
 | `ipps://` vs `ipp://` | si soporta IPP sobre TLS. Usá `ipps` cuando esté. |
-| `..._tcp.local/` | es un nombre de **servicio DNS-SD**, no un hostname. CUPS lo resuelve por avahi en cada trabajo, así que la cola sobrevive tanto a un cambio de IP como de hostname. Es el URI más robusto. |
+| `..._tcp.local/` | es un nombre de **servicio DNS-SD**, no un hostname. CUPS se lo pregunta a avahi en cada trabajo, así que la cola sobrevive a que la impresora cambie de IP o de hostname. Es el URI más robusto — pero **no** te ahorra `nss-mdns`: avahi devuelve un hostname `.local`, y resolver *eso* a una IP sigue pasando por el NSS. Sin `nss-mdns` el propio `lpadmin` falla con `Temporary failure in name resolution`. |
 | `CMD:...URF` / `PWGRaster` | los lenguajes que entiende. `URF` o `PWGRaster` = driverless de verdad. |
 
 Si `driverless list` sale vacío pero la impresora está encendida, no es
@@ -201,6 +202,22 @@ lpstat -p -d                        # impresoras ya configuradas y cuál es la p
 
 Si imprime en blanco o con basura, ahí sí el problema es el driver: probá el
 paquete de la marca de la tabla de arriba.
+
+### `universal filter failed`
+
+El trabajo entra en la cola y muere ahí. Casi siempre falta **`ghostscript`**:
+es `Optional Deps` de `cups-filters`, o sea que pacman no lo instala solo, y hace
+falta para toda impresora que no acepte PDF nativo — mirá si su `pdl=` incluye
+`application/pdf` o sólo `PCLm`/`urf`/`pwg-raster`.
+
+```bash
+command -v gs || sudo pacman -S ghostscript
+cancel -a                                     # limpiar los trabajos que fallaron
+lp /usr/share/cups/data/default-testpage.pdf  # reintentar
+```
+
+Para ver el error completo: `sudo journalctl -u cups -n 50` o
+`sudo tail -50 /var/log/cups/error_log`.
 
 Trabajos atascados en la cola:
 
