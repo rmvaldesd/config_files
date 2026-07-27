@@ -22,6 +22,7 @@ correspondiente en el mismo commit.
 - [Terminal: fzf](#terminal-fzf)
 - [Terminal: función `imgs`](#terminal-función-imgs)
 - [Portapapeles](#portapapeles)
+- [Selector de ventanas: `pick-window`](#selector-de-ventanas-pick-window)
 - [Impresión: `add-printer`](#impresión-add-printer)
 - [Mantenimiento](#mantenimiento)
 - [Waybar: clics](#waybar-clics)
@@ -171,6 +172,36 @@ Guarda también imágenes.
 `cliphist wipe` es el que importa tener a mano: si copiaste una contraseña o un
 token, ahí queda guardado hasta que lo borres. La base vive en
 `~/.cache/cliphist/db`.
+
+## Selector de ventanas: `pick-window`
+
+`SUPER + W` (de *window*) abre un menú de rofi con las ventanas del workspace
+**actual**: elegís una y salta el foco. Muestra clase y título de cada una y se
+filtra escribiendo.
+
+También se puede llamar suelto:
+
+```sh
+pick-window
+```
+
+### Por qué no alcanza con `rofi -show window`
+
+Ese modo lista las ventanas de *todos* los workspaces y no hay forma de
+filtrarlas. El modo que sí filtraba por escritorio actual (`windowcd`) existe en
+el rofi clásico de X11 pero no en el de Wayland: ahí rofi usa el protocolo
+`wlr-foreign-toplevel`, que no expone a qué workspace pertenece cada ventana.
+
+Esa información la tiene Hyprland, así que el script se la pide a él y usa rofi
+sólo como menú.
+
+### Por qué `W` y no `SUPER + ALT`
+
+Atar un **modificador** como tecla no funciona. Al pulsar ALT, Hyprland
+actualiza el estado de modificadores en vez de mandarlo por el matcher de binds,
+así que el bind nunca dispara. Ni siquiera con `release` (el `bindr`, que
+engancha el soltar y suele rescatar estos casos). Con cualquier tecla normal
+anda a la primera.
 
 ## Impresión: `add-printer`
 
