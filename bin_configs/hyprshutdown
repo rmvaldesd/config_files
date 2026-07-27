@@ -8,7 +8,10 @@ seleccion=$(echo -e "$opciones" | rofi -dmenu -i -p "Salir" -theme-str 'window {
 
 case "$seleccion" in
     *Bloquear)       hyprlock ;;
-    *"Cerrar sesión") hyprctl dispatch exit ;;
+    # Con la config en lua, 'hyprctl dispatch exit' NO funciona: se interpreta como
+    # código lua, 'exit' es nil ahí, y hyprctl devuelve exit 0 igual -- o sea que la
+    # opción no hacía nada y no avisaba. La forma correcta es el dispatcher de lua.
+    *"Cerrar sesión") hyprctl dispatch 'hl.dsp.exit()' ;;
     *Suspender)      systemctl suspend ;;
     *Reiniciar)      systemctl reboot ;;
     *Apagar)         systemctl poweroff ;;

@@ -564,8 +564,8 @@ exit 0
 #   }
 #   listener {
 #       timeout = 600                                 # 10 minutos
-#       on-timeout = hyprctl dispatch dpms off        # Apaga el monitor de forma nativa
-#       on-resume = hyprctl dispatch dpms on          # Enciende el monitor al mover el mouse
+#       on-timeout = hyprctl dispatch 'hl.dsp.dpms({ state = "off" })'   # Apaga el monitor
+#       on-resume = hyprctl dispatch 'hl.dsp.dpms({ state = "on" })'     # Lo enciende al mover el mouse
 #   }
 #
 # ------------------------------------------------------------------------------
