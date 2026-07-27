@@ -181,8 +181,19 @@ token, ahí queda guardado hasta que lo borres. La base vive en
 filtra escribiendo.
 
 `SUPER + SHIFT + W` hace lo mismo pero con **todas** las ventanas de todos los
-workspaces, agrupadas por workspace. Al elegir una que está en otro, salta a ese
-workspace y la enfoca.
+workspaces. Al elegir una que está en otro, salta a ese workspace y la enfoca.
+
+En este modo el menú suma una columna con el workspace de cada ventana, y viene
+ordenado por ella:
+
+```
+ws1   firefox                  Google — Mozilla Firefox
+ws1   com.mitchellh.ghostty    ~/config_files
+ws2   firefox                  Index of /archlinux/iso/...
+```
+
+Eso también la vuelve filtrable: escribir `ws2` en el buscador deja sólo las de
+ese workspace.
 
 En los dos casos, si la ventana elegida estaba tapada por otra maximizada, esa
 otra se restaura sola. No es algo que haga el script: el dispatcher de foco de
