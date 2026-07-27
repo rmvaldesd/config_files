@@ -363,6 +363,18 @@ hl.bind(secondMod .. " + F", hl.dsp.window.fullscreen({ mode = "maximized" }))
 
 hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("hyprlock"))
 
+-- SALIDA DE EMERGENCIA para una pantalla que quedo negra. 'D' de DPMS.
+-- Un 'dpms off' que NO haya disparado hypridle queda PEGADO: el 'on-resume' de
+-- hypridle solo corre para el listener que efectivamente hizo timeout, asi que si
+-- el apagado vino de otro lado (un hyprctl a mano, una prueba, un script) mover el
+-- mouse no enciende nada y la unica salida era reiniciar el equipo. Este bind se
+-- puede pulsar A CIEGAS con la pantalla apagada: el teclado le sigue llegando a
+-- Hyprland aunque no haya senal de video.
+-- OJO: el campo es 'action', NO 'state'. Con una clave desconocida el dispatcher cae
+-- a TOGGLE (es el valor 0 del enum), o sea que dpms({ state = "on" }) APAGARIA una
+-- pantalla encendida. Ver la explicacion larga en hypridle.conf.
+hl.bind(mainMod .. " + D", hl.dsp.dpms({ action = "on" }))
+
 -- Historial del portapapeles (cliphist): elegir una entrada con rofi y copiarla
 hl.bind(secondMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu -p 'Portapapeles' | cliphist decode | wl-copy"))
 

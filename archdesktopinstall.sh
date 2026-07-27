@@ -564,9 +564,14 @@ exit 0
 #   }
 #   listener {
 #       timeout = 600                                 # 10 minutos
-#       on-timeout = hyprctl dispatch 'hl.dsp.dpms({ state = "off" })'   # Apaga el monitor
-#       on-resume = hyprctl dispatch 'hl.dsp.dpms({ state = "on" })'     # Lo enciende al mover el mouse
+#       on-timeout = hyprctl dispatch 'hl.dsp.dpms({ action = "off" })'  # Apaga el monitor
+#       on-resume = hyprctl dispatch 'hl.dsp.dpms({ action = "on" })'    # Lo enciende al mover el mouse
 #   }
+#
+# Con la config de Hyprland en lua, 'hyprctl dispatch dpms off' NO funciona (se
+# interpreta como codigo lua) y el campo se llama 'action', no 'state': con una clave
+# desconocida el dispatcher cae a TOGGLE y termina apagando en vez de encender. Las dos
+# fallas devuelven exit 0, asi que no avisan. Detalle completo en hypridle.conf.
 #
 # ------------------------------------------------------------------------------
 # 6. ESTILEADO DE LA BARRA (~/.config/waybar/)

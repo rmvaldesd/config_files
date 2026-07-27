@@ -88,6 +88,7 @@ con `Return` o `Escape`.
 | `SUPER + W` | Selector de ventanas **del workspace actual** (rofi) |
 | `SUPER + SHIFT + W` | Selector de **todas** las ventanas; salta al workspace de la elegida |
 | `SUPER + SHIFT + Q` | Bloquear la pantalla (hyprlock) |
+| `SUPER + D` | **Salida de emergencia:** enciende la pantalla si quedó negra |
 | `SUPER + SHIFT + M` | Menú de apagado (hyprshutdown) |
 | `SUPER + A` | **Esta ayuda**, en una terminal flotante |
 
@@ -376,6 +377,23 @@ sesión abierta detrás de una pantalla negra.
 
 Si hay un inhibidor activo (por ejemplo un video reproduciéndose en el
 navegador), no se bloquea.
+
+#### Si la pantalla queda negra
+
+Apretá **`SUPER + D`**. Se puede pulsar a ciegas: aunque no haya señal de video,
+el teclado le sigue llegando a Hyprland.
+
+Hace falta porque un apagado de pantalla que **no** haya disparado hypridle queda
+*pegado*. El `on-resume` de hypridle solo corre para el listener que efectivamente
+hizo timeout, así que si el `dpms off` vino de otro lado — un `hyprctl` a mano, un
+script, una prueba — mover el mouse no enciende nada, y sin este atajo la única
+salida es reiniciar el equipo.
+
+Desde una TTY (`Ctrl + Alt + F2`) el equivalente es:
+
+```sh
+hyprctl dispatch 'hl.dsp.dpms({ action = "on" })'
+```
 
 ### Perfil de energía
 
