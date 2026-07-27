@@ -23,7 +23,7 @@ correspondiente en el mismo commit.
 - [Terminal: función `imgs`](#terminal-función-imgs)
 - [Portapapeles](#portapapeles)
 - [Impresión: `add-printer`](#impresión-add-printer)
-- [Mantenimiento: `clean-orphans`](#mantenimiento-clean-orphans)
+- [Mantenimiento](#mantenimiento)
 - [Waybar: clics](#waybar-clics)
 - [Visores](#visores)
 - [Comportamiento automático](#comportamiento-automático)
@@ -211,7 +211,9 @@ cancel -a         # vaciar la cola
 Si algo falla, el detalle está en `docs/linux/impresion.md`: descubrimiento a
 mano, drivers por marca y diagnóstico.
 
-## Mantenimiento: `clean-orphans`
+## Mantenimiento
+
+### Paquetes huérfanos: `clean-orphans`
 
 Lista los paquetes **huérfanos** — instalados como dependencia de algo que ya no
 está — con el tamaño de cada uno y el total, pide confirmación y los elimina.
@@ -236,6 +238,24 @@ Para mirar sin tocar nada:
 pacman -Qdt      # huérfanos actuales
 pacman -Qm       # paquetes foráneos (AUR): no son huérfanos, sólo otro origen
 ```
+
+### Scripts propios: `link-bins.sh`
+
+Los ejecutables del repo (`hyprshutdown`, `add-printer`, `clean-orphans`,
+`pick-window`, el wrapper `dbeaver`) viven en `bin_configs/` y se usan desde el
+PATH gracias a un symlink en `/usr/local/bin`. El instalador los crea, pero al
+**sumar un script nuevo** en una máquina ya instalada hay que reponerlos:
+
+```sh
+bash ~/config_files/scripts/link-bins.sh
+```
+
+Enlaza todo lo ejecutable de `bin_configs/` y es idempotente, así que repone
+sólo lo que falte. Omite a propósito `power-profile-sync`, que se instala
+*copiado* y no enlazado (ver [Perfil de energía](#perfil-de-energía)).
+
+Si una terminal ya abierta sigue sin encontrar el comando nuevo, es el caché de
+zsh: `rehash`.
 
 ## Waybar: clics
 
@@ -380,6 +400,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Asistente de impresión | `bin_configs/add-printer` (enlazado en `/usr/local/bin`) |
 | Limpieza de huérfanos | `bin_configs/clean-orphans` (enlazado en `/usr/local/bin`) |
 | Selector de ventanas | `bin_configs/pick-window` (enlazado en `/usr/local/bin`) |
+| Enlazar los scripts propios | `scripts/link-bins.sh` |
 | Instalación completa | `archdesktopinstall.sh` |
 
 Todo lo de `dotconfig/` se enlaza con symlinks a `~/.config/`; lo de `etc/` se
