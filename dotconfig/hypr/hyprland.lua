@@ -377,6 +377,11 @@ hl.bind(secondMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu -p 'Po
 -- rescatar estos casos). Con una tecla normal funciona a la primera.
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("pick-window"))
 
+-- Variante que lista TODOS los workspaces. Elegir una ventana de otro workspace salta
+-- a ese workspace, restaura lo que estuviera maximizado y la enfoca: las tres cosas
+-- las hace el dispatcher de foco de Hyprland solo, el script no las programa.
+hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("pick-window --all"))
+
 
 -- Activar el submapa al pulsar Mod + R
 hl.bind("SUPER + R", hl.dsp.submap("resize"))

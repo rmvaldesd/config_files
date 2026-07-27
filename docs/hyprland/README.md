@@ -86,6 +86,7 @@ con `Return` o `Escape`.
 | `SUPER + SHIFT + Space` | Ejecutar comando (`rofi -show run`) |
 | `SUPER + SHIFT + V` | Historial del portapapeles (cliphist en rofi) |
 | `SUPER + W` | Selector de ventanas **del workspace actual** (rofi) |
+| `SUPER + SHIFT + W` | Selector de **todas** las ventanas; salta al workspace de la elegida |
 | `SUPER + SHIFT + Q` | Bloquear la pantalla (hyprlock) |
 | `SUPER + SHIFT + M` | Menú de apagado (hyprshutdown) |
 | `SUPER + A` | **Esta ayuda**, en una terminal flotante |
@@ -179,10 +180,19 @@ token, ahí queda guardado hasta que lo borres. La base vive en
 **actual**: elegís una y salta el foco. Muestra clase y título de cada una y se
 filtra escribiendo.
 
+`SUPER + SHIFT + W` hace lo mismo pero con **todas** las ventanas de todos los
+workspaces, agrupadas por workspace. Al elegir una que está en otro, salta a ese
+workspace y la enfoca.
+
+En los dos casos, si la ventana elegida estaba tapada por otra maximizada, esa
+otra se restaura sola. No es algo que haga el script: el dispatcher de foco de
+Hyprland ya cambia de workspace y saca el estado maximizado por su cuenta.
+
 También se puede llamar suelto:
 
 ```sh
-pick-window
+pick-window          # workspace actual
+pick-window --all    # todos
 ```
 
 ### Por qué no alcanza con `rofi -show window`

@@ -1,40 +1,64 @@
 #!/usr/bin/env bash
-# Selector de ventanas del workspace ACTUAL, con rofi.
-# Invocado por el bind SUPER+W en hyprland.lua.
+# Selector de ventanas con rofi. Dos modos:
 #
-# Por qué un script y no 'rofi -show window' a secas: ese modo lista las ventanas de
-# TODOS los workspaces, sin forma de filtrarlas. Y 'windowcd' -- el modo del rofi
-# clásico que sí filtraba por escritorio actual -- no existe en el fork de Wayland
-# (rofi 2.x): bajo Wayland rofi usa el protocolo wlr-foreign-toplevel, que no expone
-# a qué workspace pertenece cada ventana. La info sí la tiene Hyprland, así que se la
-# pedimos a él y usamos rofi sólo como menú.
+#   pick-window          sólo las del workspace ACTUAL   (bind SUPER + W)
+#   pick-window --all    todas, de todos los workspaces  (bind SUPER + SHIFT + W)
+#
+# En el modo --all, elegir una ventana de otro workspace SALTA a ese workspace y la
+# enfoca. No hace falta código para eso ni para desmaximizar lo que la tape: las tres
+# cosas las hace el dispatcher de foco de Hyprland solo. Verificado.
+#
+# Por qué un script y no 'rofi -show window' a secas: ese modo no permite filtrar por
+# workspace, que es justo lo que hace útil al modo por defecto. Y 'windowcd' -- el modo
+# del rofi clásico que sí filtraba por escritorio actual -- no existe en el fork de
+# Wayland (rofi 2.x): bajo Wayland rofi usa el protocolo wlr-foreign-toplevel, que no
+# expone a qué workspace pertenece cada ventana. La info sí la tiene Hyprland, así que
+# se la pedimos a él y usamos rofi sólo como menú.
 
 set -euo pipefail
 
-ws=$(hyprctl -j activeworkspace | jq -r '.id')
+todas=0
+case "${1:-}" in
+    --all|-a) todas=1 ;;
+    "")       ;;
+    *)        printf 'uso: %s [--all]\n' "$0" >&2; exit 1 ;;
+esac
 
-# Formato: "dirección<TAB>etiqueta visible". La dirección viaja pegada a cada línea
-# para no tener que re-buscar la ventana por título (que puede repetirse o cambiar
-# entre que se muestra el menú y se elige).
-lista=$(hyprctl -j clients | jq -r --argjson ws "$ws" '
-    .[]
-    | select(.workspace.id == $ws)
-    | select(.title != "")
-    | "\(.address)\t\(.class)\t\(.title)"
-')
+if [ "$todas" -eq 1 ]; then
+    # Se antepone el número de workspace como columna propia para poder ordenar por él
+    # y para que se vea de dónde viene cada ventana.
+    prompt="Ventanas (todas)"
+    columnas="2,3,4"
+    lista=$(hyprctl -j clients | jq -r '
+        .[]
+        | select(.title != "")
+        | "\(.address)\tws\(.workspace.id)\t\(.class)\t\(.title)"
+    ' | sort -k2,2V)
+else
+    ws=$(hyprctl -j activeworkspace | jq -r '.id')
+    prompt="Ventanas (ws $ws)"
+    columnas="2,3"
+    lista=$(hyprctl -j clients | jq -r --argjson ws "$ws" '
+        .[]
+        | select(.workspace.id == $ws)
+        | select(.title != "")
+        | "\(.address)\t\(.class)\t\(.title)"
+    ')
+fi
 
 if [ -z "$lista" ]; then
     # Sin ventanas no tiene sentido abrir el menú; un aviso y afuera.
-    notify-send "Ventanas" "No hay ventanas en el workspace $ws" 2> /dev/null || true
+    notify-send "Ventanas" "No hay ventanas que mostrar" 2> /dev/null || true
     exit 0
 fi
 
-# -display-columns 2,3 hace que rofi MUESTRE sólo clase y título, pero devuelva la
-# línea entera: así la dirección queda disponible sin ensuciar el menú.
-# -i para búsqueda insensible a mayúsculas, como el resto de los menús del entorno.
+# -display-columns oculta la primera columna (la dirección): rofi MUESTRA sólo las
+# indicadas pero DEVUELVE la línea entera, así la dirección viaja sin ensuciar el menú.
+# Va pegada a cada línea y no se re-busca por título porque los títulos se repiten y
+# pueden cambiar entre que se dibuja el menú y se elige.
 seleccion=$(printf '%s\n' "$lista" | rofi -dmenu -i \
-    -p "Ventanas (ws $ws)" \
-    -display-columns 2,3 \
+    -p "$prompt" \
+    -display-columns "$columnas" \
     -theme-str 'window {width: 700px;}') || exit 0
 
 [ -n "$seleccion" ] || exit 0
@@ -46,7 +70,4 @@ direccion=${seleccion%%$'\t'*}
 # y falla con "')' expected near 'address'". Encima 'hyprctl' devuelve exit 0 igual, así
 # que el error pasa desapercibido y el script parece andar sin enfocar nada.
 # La forma que funciona con el parser lua es esta.
-#
-# No hace falta desmaximizar a mano la ventana que tape a la elegida: Hyprland saca el
-# estado maximizado solo al mover el foco a otra ventana. Verificado.
 hyprctl dispatch "hl.dsp.focus({ window = \"address:$direccion\" })" > /dev/null
