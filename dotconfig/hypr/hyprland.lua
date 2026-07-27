@@ -525,7 +525,26 @@ hl.window_rule({
 -- conserve el tamaño que pide.
 hl.window_rule({
   name  = "waybar-tui-flotantes",
-  match = { title = "^(wiremix|bluetui|nmtui|btop|htop)$" },
+  match = { title = "^(wiremix|bluetui|nmtui|htop)$" },
 
   float = true,
+})
+
+-- btop va aparte porque necesita mucho más espacio que las otras: con el tamaño por
+-- defecto de ghostty (800x600) se queja de que la terminal es chica y no dibuja sus
+-- paneles.
+--
+-- OJO con el formato: 'size' sólo acepta una TABLA DE DOS NÚMEROS en píxeles lógicos.
+-- Las variantes size = "80% 85%" y size = { "80%", "85%" } se aceptan sin error pero
+-- NO hacen nada -- la ventana sale con el tamaño por defecto y uno no se entera.
+-- Verificado probando las tres formas.
+--
+-- Píxeles lógicos (y no físicos) significa que el recuento de caracteres se mantiene
+-- entre monitores con distinta escala, que es lo que le importa a btop.
+hl.window_rule({
+  name  = "btop-flotante-grande",
+  match = { title = "^btop$" },
+
+  float = true,
+  size  = { 1024, 680 },
 })
