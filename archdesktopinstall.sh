@@ -170,7 +170,7 @@ paquetes_utilidades=(
     hyprshot          # Wrapper de grim+slurp para capturas de pantalla; usado en el bind de screenshot de hyprland.lua.
     bluetui           # TUI para gestionar dispositivos Bluetooth (on-click del módulo bluetooth en Waybar).
     playerctl         # Controla la reproducción multimedia (play/pause/next/prev) desde las teclas multimedia.
-    pavucontrol       # Mezclador de audio gráfico para PulseAudio/PipeWire (on-click del módulo de volumen en Waybar).
+    wiremix           # Mezclador de audio en TUI (on-click del módulo de volumen en Waybar). Reemplaza a pavucontrol: cubre las mismas cinco pestañas -- incluida 'configuration', la de perfiles de tarjeta (A2DP/HSP, analógico/HDMI) que los mixers de terminal suelen no traer -- y habla PipeWire nativo en vez de pasar por la capa de compatibilidad PulseAudio.
     btop              # Monitor de recursos moderno en la terminal (on-click del módulo de CPU en Waybar).
     htop              # Monitor de procesos clásico en la terminal (on-click del módulo de memoria en Waybar).
     jq                # Procesador de JSON en la terminal; kb_layout.sh lo usa para leer la salida de 'hyprctl -j'.
@@ -265,7 +265,7 @@ sudo timedatectl set-ntp true                        # Sincronización de hora p
 echo "-> Habilitando los servicios de audio de PipeWire para el usuario..."
 if systemctl --user is-system-running &>/dev/null || [ -S "/run/user/$UID/bus" ]; then
     systemctl --user enable --now pipewire.service       # Servidor de audio/video principal.
-    systemctl --user enable --now pipewire-pulse.service # Capa de compatibilidad con PulseAudio (pavucontrol, navegadores, Discord).
+    systemctl --user enable --now pipewire-pulse.service # Capa de compatibilidad con PulseAudio (navegadores, Discord, y todo lo que hable el protocolo de PulseAudio).
     systemctl --user enable --now wireplumber.service    # Gestor de sesiones; sin él PipeWire arranca pero no enruta ningún dispositivo.
 else
     # Puede pasar si se corre desde una sesión sin gestor systemd --user (p. ej. un

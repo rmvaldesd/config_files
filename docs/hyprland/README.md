@@ -241,7 +241,7 @@ pacman -Qm       # paquetes foráneos (AUR): no son huérfanos, sólo otro orige
 | Módulo | Clic izquierdo abre |
 |---|---|
 | Reloj | Google Calendar (chromium en modo app) |
-| Volumen | pavucontrol |
+| Volumen | wiremix, en una terminal |
 | Batería | — (`format-alt`: alterna a tiempo restante) |
 | Perfil de energía | Cicla entre performance / balanced / power-saver |
 | Bluetooth | bluetui, en una terminal |

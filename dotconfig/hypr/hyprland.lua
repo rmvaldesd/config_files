@@ -513,9 +513,9 @@ hl.window_rule({
   float = true,
 })
 
--- Las TUI que abren los clics de Waybar (bluetooth, red, CPU, memoria) son consultas
--- puntuales que se cierran enseguida: salen flotantes para no reacomodar el mosaico
--- entero por una mirada de dos segundos.
+-- Las TUI que abren los clics de Waybar (volumen, bluetooth, red, CPU, memoria) son
+-- consultas puntuales que se cierran enseguida: salen flotantes para no reacomodar el
+-- mosaico entero por una mirada de dos segundos.
 --
 -- El match va por TITULO y no por clase porque todas son la misma app (ghostty); lo
 -- que las distingue es el '--title=' que les pasa cada on-click en waybar/config.jsonc.
@@ -525,17 +525,7 @@ hl.window_rule({
 -- conserve el tamaño que pide.
 hl.window_rule({
   name  = "waybar-tui-flotantes",
-  match = { title = "^(bluetui|nmtui|btop|htop)$" },
-
-  float = true,
-})
-
--- Mismo criterio para el mezclador de audio, que abre el clic en el módulo de volumen.
--- Acá el match es por clase porque es una app gráfica propia. Se cubren los dos
--- app_id posibles: GTK puede reportar el nombre del binario o el ID inverso del .desktop.
-hl.window_rule({
-  name  = "pavucontrol-flotante",
-  match = { class = "^(pavucontrol|org\\.pulseaudio\\.pavucontrol)$" },
+  match = { title = "^(wiremix|bluetui|nmtui|btop|htop)$" },
 
   float = true,
 })

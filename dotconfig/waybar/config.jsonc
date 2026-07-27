@@ -123,7 +123,9 @@
     "ignored-sinks": [
       "Easy Effects Sink"
     ],
-    "on-click": "pavucontrol"
+    // wiremix es TUI, así que va en su propia terminal como bluetui/nmtui/btop/htop.
+    // El --title es lo que matchea la regla de ventana flotante en hyprland.lua.
+    "on-click": "exec ghostty --title=wiremix -e wiremix"
   },
   "pulseaudio/slider": {
     "min": 0,
