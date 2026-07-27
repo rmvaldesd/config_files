@@ -40,4 +40,13 @@ seleccion=$(printf '%s\n' "$lista" | rofi -dmenu -i \
 [ -n "$seleccion" ] || exit 0
 
 direccion=${seleccion%%$'\t'*}
-hyprctl dispatch focuswindow "address:$direccion" > /dev/null
+
+# OJO con la sintaxis: como la config de Hyprland es en lua, 'hyprctl dispatch' NO
+# acepta la forma clásica 'focuswindow address:0x...' -- la interpreta como código lua
+# y falla con "')' expected near 'address'". Encima 'hyprctl' devuelve exit 0 igual, así
+# que el error pasa desapercibido y el script parece andar sin enfocar nada.
+# La forma que funciona con el parser lua es esta.
+#
+# No hace falta desmaximizar a mano la ventana que tape a la elegida: Hyprland saca el
+# estado maximizado solo al mover el foco a otra ventana. Verificado.
+hyprctl dispatch "hl.dsp.focus({ window = \"address:$direccion\" })" > /dev/null
