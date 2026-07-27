@@ -378,31 +378,19 @@ echo "-> Enlazado: ~/.zshrc.local -> ~/config_files/zshrc.local"
 # Es el mismo script que se usa en Fedora, así ambas máquinas ven exactamente los mismos glifos.
 bash "$HOME/config_files/scripts/install-fonts.sh"
 
-# Enlaza hyprshutdown (menú de apagado con rofi) en el PATH del sistema para que el bind SUPER+SHIFT+M lo encuentre
-sudo ln -sfn "$HOME/config_files/bin_configs/hyprshutdown" /usr/local/bin/hyprshutdown
-echo "-> Enlazado: /usr/local/bin/hyprshutdown -> ~/config_files/bin_configs/hyprshutdown"
-
-# Wrapper que le sube el heap a DBeaver de 1 GB a 4 GB. Va en /usr/local/bin, que en el
-# PATH precede a /usr/bin, así que TAPA al /usr/bin/dbeaver del paquete: aplica tanto al
-# lanzarlo desde rofi como desde la terminal. El porqué de no editar dbeaver.ini está
-# comentado dentro del propio script y en docs/linux/dbeaver.md.
-sudo ln -sfn "$HOME/config_files/bin_configs/dbeaver" /usr/local/bin/dbeaver
-echo "-> Enlazado: /usr/local/bin/dbeaver -> ~/config_files/bin_configs/dbeaver"
-
-# Asistente interactivo para dar de alta una impresora de red. La sección 7 deja toda la
-# infraestructura lista pero no crea ninguna cola, porque eso depende de qué impresora y
-# en qué red estés; este script es ese último paso.
-sudo ln -sfn "$HOME/config_files/bin_configs/add-printer" /usr/local/bin/add-printer
-echo "-> Enlazado: /usr/local/bin/add-printer -> ~/config_files/bin_configs/add-printer"
-
-# Mantenimiento: lista los paquetes huérfanos con su tamaño y los elimina en rondas
-# (borrar un huérfano puede dejar huérfanos nuevos) previa confirmación.
-sudo ln -sfn "$HOME/config_files/bin_configs/clean-orphans" /usr/local/bin/clean-orphans
-echo "-> Enlazado: /usr/local/bin/clean-orphans -> ~/config_files/bin_configs/clean-orphans"
-
-# Selector de ventanas del workspace actual (bind SUPER + W en hyprland.lua).
-sudo ln -sfn "$HOME/config_files/bin_configs/pick-window" /usr/local/bin/pick-window
-echo "-> Enlazado: /usr/local/bin/pick-window -> ~/config_files/bin_configs/pick-window"
+# Enlaza en /usr/local/bin todo lo ejecutable de bin_configs/, que en el PATH precede a
+# /usr/bin (por eso el wrapper 'dbeaver' logra tapar al binario del paquete). Hoy son:
+#   hyprshutdown  menú de apagado, lo llama el bind SUPER+SHIFT+M
+#   dbeaver       wrapper que le sube el heap de 1 GB a 4 GB (ver docs/linux/dbeaver.md)
+#   add-printer   asistente de impresoras de red; la sección 7 deja la infraestructura
+#                 lista pero no crea ninguna cola, porque eso depende de tu red
+#   clean-orphans limpieza de paquetes huérfanos
+#   pick-window   selector de ventanas del workspace actual, bind SUPER+W
+#
+# Va como script aparte y en un loop, y no como cinco 'ln' acá, para que sumar un
+# ejecutable a bin_configs/ no requiera acordarse de tocar este archivo. El script
+# excluye power-profile-sync, que la sección 10 instala COPIADO y no enlazado.
+bash "$HOME/config_files/scripts/link-bins.sh"
 
 # ==========================================
 # 10. CAMBIO AUTOMÁTICO DE PERFIL DE ENERGÍA
