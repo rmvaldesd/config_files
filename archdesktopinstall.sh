@@ -400,6 +400,10 @@ echo "-> Enlazado: /usr/local/bin/add-printer -> ~/config_files/bin_configs/add-
 sudo ln -sfn "$HOME/config_files/bin_configs/clean-orphans" /usr/local/bin/clean-orphans
 echo "-> Enlazado: /usr/local/bin/clean-orphans -> ~/config_files/bin_configs/clean-orphans"
 
+# Selector de ventanas del workspace actual (bind SUPER + W en hyprland.lua).
+sudo ln -sfn "$HOME/config_files/bin_configs/pick-window" /usr/local/bin/pick-window
+echo "-> Enlazado: /usr/local/bin/pick-window -> ~/config_files/bin_configs/pick-window"
+
 # ==========================================
 # 10. CAMBIO AUTOMÁTICO DE PERFIL DE ENERGÍA
 # ==========================================

@@ -84,6 +84,7 @@ con `Return` o `Escape`.
 | `SUPER + Space` | Lanzador de apps (`rofi -show drun`, con iconos) |
 | `SUPER + SHIFT + Space` | Ejecutar comando (`rofi -show run`) |
 | `SUPER + SHIFT + V` | Historial del portapapeles (cliphist en rofi) |
+| `SUPER + W` | Selector de ventanas **del workspace actual** (rofi) |
 | `SUPER + SHIFT + Q` | Bloquear la pantalla (hyprlock) |
 | `SUPER + SHIFT + M` | Menú de apagado (hyprshutdown) |
 | `SUPER + A` | **Esta ayuda**, en una terminal flotante |
@@ -378,6 +379,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Perfiles de energía | `etc/systemd/system/`, `etc/udev/rules.d/`, `etc/polkit-1/rules.d/`, `bin_configs/power-profile-sync` |
 | Asistente de impresión | `bin_configs/add-printer` (enlazado en `/usr/local/bin`) |
 | Limpieza de huérfanos | `bin_configs/clean-orphans` (enlazado en `/usr/local/bin`) |
+| Selector de ventanas | `bin_configs/pick-window` (enlazado en `/usr/local/bin`) |
 | Instalación completa | `archdesktopinstall.sh` |
 
 Todo lo de `dotconfig/` se enlaza con symlinks a `~/.config/`; lo de `etc/` se

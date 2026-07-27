@@ -366,6 +366,17 @@ hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("hyprlock"))
 -- Historial del portapapeles (cliphist): elegir una entrada con rofi y copiarla
 hl.bind(secondMod .. " + V", hl.dsp.exec_cmd("cliphist list | rofi -dmenu -p 'Portapapeles' | cliphist decode | wl-copy"))
 
+-- Selector de ventanas del workspace ACTUAL. Va a un script (bin_configs/pick-window)
+-- y no a un 'rofi -show window' porque ese modo lista las ventanas de todos los
+-- workspaces; el que filtraba por escritorio actual ('windowcd') no existe en el rofi
+-- de Wayland. El script le pide la lista a Hyprland y usa rofi sólo como menú.
+-- W de 'window'. La idea original era SUPER + ALT, pero no es viable: ALT es un
+-- MODIFICADOR, y al pulsarlo Hyprland actualiza el estado de modificadores en vez de
+-- mandarlo por el matcher de binds. Probado que no dispara ni como bind normal ni con
+-- release = true (el 'bindr' de Hyprland, que engancha el soltar y es lo que suele
+-- rescatar estos casos). Con una tecla normal funciona a la primera.
+hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("pick-window"))
+
 
 -- Activar el submapa al pulsar Mod + R
 hl.bind("SUPER + R", hl.dsp.submap("resize"))
