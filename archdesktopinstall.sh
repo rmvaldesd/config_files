@@ -341,6 +341,27 @@ for dir in nvim hypr waybar rofi mako ghostty git; do
     echo "-> Enlazado: $destino -> ~/config_files/dotconfig/$dir"
 done
 
+# Perfil de bloqueo de pantalla por defecto (hypridle).
+#
+# profiles/active.conf es un symlink al perfil elegido y NO está versionado (va en
+# .gitignore): es estado de esta máquina, no configuración común. Por eso un clon
+# recién bajado no lo trae y hay que crearlo acá.
+#
+# Sin él hypridle igual arranca seguro -- cae en los valores inline de hypridle.conf,
+# que son los de oficina -- pero loguea un error de 'source= globbing' en cada inicio,
+# y ese ruido taparía un error de config real más adelante. Mejor dejarlo explícito.
+#
+# Se elige OFFICE a propósito: ante la duda, el perfil más restrictivo (bloqueo a los
+# 5 min en vez de 10). Cambiarlo después es 'hypridle-profile home'.
+#
+# El '-e' sigue el symlink, así que esto NO pisa una elección previa válida pero SÍ
+# repone un enlace roto. Es idempotente: reejecutar el instalador no cambia tu perfil.
+perfiles_hypr="$HOME/config_files/dotconfig/hypr/profiles"
+if [ -d "$perfiles_hypr" ] && [ ! -e "$perfiles_hypr/active.conf" ]; then
+    ln -sfn "office.conf" "$perfiles_hypr/active.conf"
+    echo "-> Perfil de bloqueo inicial: office (cambialo con 'hypridle-profile home')"
+fi
+
 # Enlaza las asociaciones de archivos (qué app abre cada tipo de archivo).
 # Va aparte del loop de arriba porque ese enlaza directorios y esto es un archivo suelto
 # dentro de ~/.config. Verificado que 'xdg-mime default' y Thunar escriben A TRAVÉS del

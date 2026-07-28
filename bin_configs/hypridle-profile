@@ -1,0 +1,108 @@
+#!/bin/sh
+# Selector de perfil de bloqueo de pantalla para hypridle.
+#
+#   hypridle-profile           -> muestra el perfil activo y los disponibles
+#   hypridle-profile office    -> bloqueo a los 5 minutos
+#   hypridle-profile home      -> bloqueo a los 10 minutos
+#
+# Cómo funciona: cada perfil es un archivo en ~/.config/hypr/profiles/ que define las
+# cuatro variables de tiempo ($WARN, $LOCK, $DPMS, $SUSPEND). El perfil ACTIVO es el
+# symlink active.conf, que hypridle.conf sourcea. Cambiar de perfil es mover ese
+# symlink y relanzar hypridle.
+#
+# POR QUÉ UN ARCHIVO Y NO UNA VARIABLE DE ENTORNO EN EL ZSHRC
+# hyprlang sí expande variables de entorno en el config (verificado: con MI_PERFIL=4444
+# registra el listener en 4444s), así que la idea de exportar una variable parece que
+# tendría que andar. Pero no sirve como fuente de verdad acá, por dos razones:
+#
+#   1) A hypridle lo lanza HYPRLAND al iniciar sesión (hyprland.lua, hyprland.start),
+#      no una shell interactiva. Su entorno lo hereda del compositor, así que nunca ve
+#      lo que exportes en el zshrc. Confirmado con 'ps -o ppid': el padre de hypridle
+#      es Hyprland, no zsh.
+#   2) Aunque la exportaras antes de relanzarlo a mano, el valor viviría sólo en ese
+#      proceso: al reiniciar la sesión vuelve a lo que hubiera al arrancar. Para que
+#      sobreviva a un reboot hay que persistirlo en un archivo igual, así que el
+#      archivo es el estado real y la variable de entorno sería una capa de más que
+#      sólo agrega formas de desincronizarse.
+#
+# El symlink NO está versionado (.gitignore): es estado de esta máquina. Si falta,
+# hypridle cae en los valores inline de hypridle.conf, que son los de oficina -- el
+# perfil más seguro. Ver la explicación larga allá.
+
+set -e
+
+dir_perfiles="$HOME/.config/hypr/profiles"
+activo="$dir_perfiles/active.conf"
+
+[ -d "$dir_perfiles" ] || { echo "ERROR: no existe $dir_perfiles"; exit 1; }
+
+# Nombre del perfil apuntado por el symlink, o vacío si no hay ninguno.
+perfil_actual() {
+    [ -L "$activo" ] || return 0
+    basename "$(readlink "$activo")" .conf
+}
+
+# Los perfiles disponibles son los .conf del directorio, menos el symlink activo.
+perfiles_disponibles() {
+    for archivo in "$dir_perfiles"/*.conf; do
+        [ -f "$archivo" ] || continue
+        [ -L "$archivo" ] && continue
+        basename "$archivo" .conf
+    done
+}
+
+# Sin argumentos: sólo informa.
+if [ $# -eq 0 ]; then
+    actual=$(perfil_actual)
+    if [ -n "$actual" ]; then
+        echo "Perfil activo: $actual"
+    else
+        # Sin symlink hypridle usa los valores inline, que son los de oficina.
+        echo "Perfil activo: (ninguno) -- hypridle está usando los valores por defecto de hypridle.conf (office)"
+    fi
+    echo "Disponibles:"
+    perfiles_disponibles | sed 's/^/  /'
+    exit 0
+fi
+
+nuevo="$1"
+
+# Validar contra los perfiles que existen de verdad. Sin esto, un typo ('ofice')
+# crearía un symlink roto y hypridle arrancaría degradado sin avisar.
+if [ ! -f "$dir_perfiles/$nuevo.conf" ]; then
+    echo "ERROR: no existe el perfil '$nuevo'."
+    echo "Disponibles:"
+    perfiles_disponibles | sed 's/^/  /'
+    exit 1
+fi
+
+# Symlink RELATIVO: apunta a un hermano dentro del mismo directorio, así que sigue
+# siendo válido aunque el repo se mueva de lugar (~/.config/hypr ya es un symlink a
+# config_files/dotconfig/hypr; un target absoluto agregaría un segundo lugar donde
+# la ruta puede quedar vieja).
+ln -sfn "$nuevo.conf" "$activo"
+
+# Relanzar hypridle para que relea la config. No tiene reload por señal en v0.1.8.
+pkill -x hypridle 2>/dev/null || true
+
+# OJO CON LA FORMA DEL DISPATCH -- es la misma trampa que documenta hypridle.conf.
+# Este equipo configura Hyprland en LUA, así que 'hyprctl dispatch exec hypridle' se
+# parsea como código Lua y muere con "')' expected near 'hypridle'". Verificado: con
+# la forma clásica el proceso NO se lanza; con hl.dsp.exec_cmd sí.
+#
+# Además conviene que lo lance Hyprland y no este script: así hypridle queda colgando
+# del compositor igual que cuando arranca la sesión, y no de la terminal desde la que
+# corriste esto (que al cerrarse se lo llevaría puesto).
+hyprctl dispatch 'hl.dsp.exec_cmd("hypridle")' >/dev/null
+
+# Verificar que realmente quedó corriendo. hyprctl devuelve 'ok' aunque el comando de
+# adentro falle, así que su código de salida no prueba nada: hay que mirar el proceso.
+# El sleep le da tiempo a Hyprland a hacer el fork.
+sleep 1
+if pidof hypridle >/dev/null; then
+    echo "Perfil de bloqueo: $nuevo (hypridle relanzado)"
+else
+    echo "ERROR: se cambió el perfil a '$nuevo' pero hypridle NO quedó corriendo."
+    echo "       La pantalla no se va a bloquear sola. Levantalo con: hypridle &"
+    exit 1
+fi

@@ -1,3 +1,4 @@
 dotconfig/nvim/plugin/
 dotconfig/nvim/lazy-lock.json
 dotconfig/nvim/tmux-client*.log
+dotconfig/hypr/profiles/active.conf
