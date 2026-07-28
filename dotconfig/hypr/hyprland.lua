@@ -102,7 +102,9 @@ hl.on("hyprland.start", function()
   -- Fondo de pantalla. La elección al azar entre las imágenes de
   -- config_files/wallpapers la hace hyprpaper.conf con 'order = random'.
   hl.exec_cmd("hyprpaper")
-  hl.exec_cmd("waybar")
+  -- auto-reload.sh LANZA waybar además de vigilarla y recargarla, así que acá no va
+  -- un 'hl.exec_cmd("waybar")' aparte: serían dos barras superpuestas, y la que
+  -- supervisa el script no sería la visible. Ver el encabezado de auto-reload.sh.
   hl.exec_cmd("~/.config/waybar/auto-reload.sh")
   hl.exec_cmd("hypridle")
   hl.exec_cmd("mako")
