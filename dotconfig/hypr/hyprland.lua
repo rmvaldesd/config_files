@@ -34,12 +34,12 @@ hl.monitor({
 ---------------------
 
 -- Set programs that you use
-local terminal    = "ghostty"
-local fileManager = "thunar"
-local launcher    = "rofi -show drun -show-icons"
-local runner      = "rofi -show run"
-local bar         = "waybar"
-local browser     = "firefox"
+local terminal          = "ghostty"
+local fileManager       = "thunar"
+local launcher          = "rofi -show drun -show-icons"
+local runner            = "rofi -show run"
+local bar               = "waybar"
+local browser           = "firefox"
 
 -- Capturas de pantalla (los binds están más abajo, junto a la tecla Print).
 --
@@ -58,7 +58,7 @@ local browser     = "firefox"
 --   --actions-on-enter ...   Enter copia, sin tener que buscar el botón.
 --   --early-exit copy        cierra satty apenas copió, en vez de quedar abierto.
 local screenshot        = "hyprshot -m region -z --raw | satty --filename - "
-                       .. "--copy-command wl-copy --actions-on-enter save-to-clipboard --early-exit copy"
+    .. "--copy-command wl-copy --actions-on-enter save-to-clipboard --early-exit copy"
 
 -- SHIFT + Print: región directo al portapapeles, sin pasar por satty.
 local screenshotCopy    = "hyprshot -m region -z --clipboard-only"
@@ -78,9 +78,9 @@ local screenshotMonitor = "hyprshot -m output -m active --clipboard-only"
 -- para que salga flotante y no como una ventana mas en el mosaico.
 -- Usa glow si esta instalado (renderiza las tablas) y cae a less si no, asi el
 -- atajo nunca queda roto.
-local ayuda = "ghostty --title=ayuda-atajos -e sh -c "
-           .. "'D=$HOME/config_files/docs/hyprland/README.md; "
-           .. "if command -v glow >/dev/null 2>&1; then glow -p \"$D\"; else less \"$D\"; fi'"
+local ayuda             = "ghostty --title=ayuda-atajos -e sh -c "
+    .. "'D=$HOME/config_files/docs/hyprland/README.md; "
+    .. "if command -v glow >/dev/null 2>&1; then glow -p \"$D\"; else less \"$D\"; fi'"
 
 
 -------------------
@@ -432,11 +432,11 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- Capturas de pantalla. Van en la tecla Print porque SUPER+S ya está tomado por el scratchpad "magic".
 -- Los comandos están definidos arriba, en el bloque MY PROGRAMS.
-hl.bind("Print", hl.dsp.exec_cmd(screenshot))                            -- región + anotar + portapapeles
-hl.bind("SHIFT + Print", hl.dsp.exec_cmd(screenshotCopy))                -- región -> portapapeles
-hl.bind("CONTROL + Print", hl.dsp.exec_cmd(screenshotSave))              -- región -> ~/Pictures + portapapeles
-hl.bind("ALT + Print", hl.dsp.exec_cmd(screenshotWindow))                -- ventana activa -> portapapeles
-hl.bind(mainMod .. " + Print", hl.dsp.exec_cmd(screenshotMonitor))       -- monitor completo -> portapapeles
+hl.bind("Print", hl.dsp.exec_cmd(screenshot))                      -- región + anotar + portapapeles
+hl.bind("SHIFT + Print", hl.dsp.exec_cmd(screenshotCopy))          -- región -> portapapeles
+hl.bind("CONTROL + Print", hl.dsp.exec_cmd(screenshotSave))        -- región -> ~/Pictures + portapapeles
+hl.bind("ALT + Print", hl.dsp.exec_cmd(screenshotWindow))          -- ventana activa -> portapapeles
+hl.bind(mainMod .. " + Print", hl.dsp.exec_cmd(screenshotMonitor)) -- monitor completo -> portapapeles
 
 -- Ayuda: referencia de atajos. 'A' de ayuda.
 -- Se usa una LETRA a proposito: el layout de este equipo es latam, donde la barra
