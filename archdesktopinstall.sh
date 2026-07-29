@@ -375,6 +375,18 @@ fi
 ln -sfn "$HOME/config_files/mimeapps.list" "$HOME/.config/mimeapps.list"
 echo "-> Enlazado: ~/.config/mimeapps.list -> ~/config_files/mimeapps.list"
 
+# Enlaza la config de spotify-launcher, que le pasa a Spotify los flags de Ozone
+# para que arranque en Wayland nativo en vez de XWayland (si no, con el monitor a
+# escala 2 se ve borroso). Otro archivo suelto en ~/.config, igual que el de arriba.
+# El porqué está en docs/linux/spotify.md.
+if [ -e "$HOME/.config/spotify-launcher.conf" ] && [ ! -L "$HOME/.config/spotify-launcher.conf" ]; then
+    respaldo="$HOME/.config/spotify-launcher.conf.bak.$(date +%Y%m%d%H%M%S)"
+    mv "$HOME/.config/spotify-launcher.conf" "$respaldo"
+    echo "-> ~/.config/spotify-launcher.conf ya existía; respaldado como $respaldo"
+fi
+ln -sfn "$HOME/config_files/spotify-launcher.conf" "$HOME/.config/spotify-launcher.conf"
+echo "-> Enlazado: ~/.config/spotify-launcher.conf -> ~/config_files/spotify-launcher.conf"
+
 # Enlaza la configuración de tmux directamente en el home
 if [ -e "$HOME/.tmux.conf" ] && [ ! -L "$HOME/.tmux.conf" ]; then
     respaldo="$HOME/.tmux.conf.bak.$(date +%Y%m%d%H%M%S)"

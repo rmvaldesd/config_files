@@ -31,3 +31,7 @@ link them below.
 - [DBeaver en Wayland](./dbeaver.md) — por qué no lleva configuración, por qué
   forzar XWayland lo empeora a escala 2x, y cómo subirle la memoria sin que la
   próxima actualización se lo lleve.
+- [Spotify en Wayland](./spotify.md) — los flags de Ozone que lo sacan de
+  XWayland para que deje de verse borroso, por qué
+  `ELECTRON_OZONE_PLATFORM_HINT` no le aplica y por qué no hay que forzar la
+  escala a mano.
