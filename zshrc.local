@@ -94,7 +94,7 @@ if command -v fzf > /dev/null 2>&1; then
                     --bind "change:reload:$rg_cmd {q} || true" \
                     --delimiter : \
                     --preview "$preview_cmd" \
-                    --preview-window 'right:60%:+{2}-5' \
+                    --preview-window 'down:60%:+{2}-5' \
                     --prompt 'grep> '
             )
 
