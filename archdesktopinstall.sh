@@ -407,6 +407,9 @@ bash "$HOME/config_files/scripts/install-fonts.sh"
 #                 lista pero no crea ninguna cola, porque eso depende de tu red
 #   clean-orphans limpieza de paquetes huérfanos
 #   pick-window   selector de ventanas del workspace actual, bind SUPER+W
+#   hypridle-profile  cambia entre los perfiles de bloqueo home/office. El symlink del
+#                 perfil activo lo dejó unas líneas más arriba esta misma sección, así
+#                 que al terminar el instalador los perfiles quedan andando solos.
 #
 # Va como script aparte y en un loop, y no como cinco 'ln' acá, para que sumar un
 # ejecutable a bin_configs/ no requiera acordarse de tocar este archivo. El script
