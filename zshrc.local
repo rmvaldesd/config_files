@@ -38,6 +38,7 @@ if command -v fzf > /dev/null 2>&1; then
 
     # Atajos que quedan disponibles:
     #   Ctrl+T  insertar un archivo/directorio en la linea de comandos
+    #   Ctrl+G  buscar por contenido (ripgrep) e insertar "+linea archivo"
     #   Ctrl+R  buscar en el historial
     #   Alt+C   cd a un subdirectorio
     # Y el autocompletado con **<TAB>, por ejemplo: vim **<TAB>
@@ -59,6 +60,61 @@ if command -v fzf > /dev/null 2>&1; then
         --color=info:#a1a1aa,prompt:#75f1fa,pointer:#75f1fa
         --color=marker:#75f1fa,spinner:#75f1fa,header:#71717a
         --color=border:#3f3f46"
+
+    # Ctrl-G: buscar por CONTENIDO con ripgrep, independiente de **<TAB> (nombres
+    # de archivo) y Ctrl-T (tambien nombres). Inserta "+linea archivo" en la
+    # linea de comandos, en el punto donde este el cursor -- igual que hace
+    # Ctrl-T con la ruta, pero con el formato que esperan vim/nvim para abrir
+    # directo en esa linea.
+    #
+    # --disabled deja que ripgrep haga el filtrado (una corrida nueva por cada
+    # tecla, via el bind de 'change'); sin eso fzf ademas aplicaria su propio
+    # fuzzy-match sobre resultados que ripgrep ya filtro, doble trabajo y mas
+    # confuso. El '?? true' evita que fzf cierre el preview cuando ripgrep no
+    # encuentra nada (exit code 1) o cuando el patron aun no es un regex valido
+    # a mitad de tipeo.
+    if (( $+commands[rg] )); then
+        fzf-live-grep-widget() {
+            emulate -L zsh
+
+            local rg_cmd='rg --column --line-number --no-heading --color=always --smart-case'
+            local selected file line
+
+            # bat con resaltado de sintaxis y la linea marcada; si no esta
+            # instalado cae al 'sed' de siempre (mismo patron que 'fd -> find'
+            # en la funcion imgs). '--' antes de {1} evita que un nombre de
+            # archivo que empiece con '-' se interprete como flag de bat.
+            local preview_cmd='
+                (bat --style=numbers --color=always --highlight-line {2} -- {1} 2>/dev/null) ||
+                sed -n "$(( {2}>5 ? {2}-5 : 1 )),$(( {2}+15 ))p" {1}'
+
+            selected=$(
+                FZF_DEFAULT_COMMAND="$rg_cmd ''" \
+                fzf --ansi --disabled \
+                    --bind "change:reload:$rg_cmd {q} || true" \
+                    --delimiter : \
+                    --preview "$preview_cmd" \
+                    --preview-window 'right:60%:+{2}-5' \
+                    --prompt 'grep> '
+            )
+
+            [[ -n $selected ]] || { zle redisplay; return }
+
+            file=${selected%%:*}
+            line=${${(s.:.)selected}[2]}
+            # (q-): cita la ruta solo si hace falta, con comillas simples.
+            # Sin esto, una ruta con espacios o parentesis -- frecuente en el
+            # vault de Obsidian -- se re-parte en varios argumentos al apretar
+            # Enter, y los parentesis rompen con "no matches found" porque zsh
+            # los toma como un patron de glob. Ctrl-T no sufre esto porque lo
+            # cita fzf mismo (fzf --zsh); esta insercion es manual, asi que la
+            # responsabilidad de citar es nuestra.
+            LBUFFER+="+${line} ${(q-)file}"
+            zle redisplay
+        }
+        zle -N fzf-live-grep-widget
+        bindkey '^G' fzf-live-grep-widget
+    fi
 fi
 
 # ---------------------------------------------------------------------------
