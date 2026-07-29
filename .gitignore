@@ -2,3 +2,7 @@ dotconfig/nvim/plugin/
 dotconfig/nvim/lazy-lock.json
 dotconfig/nvim/tmux-client*.log
 dotconfig/hypr/profiles/active.conf
+
+# rclone bisync deja un hash del archivo de filtros JUNTO a él (así detecta que lo
+# editaste y pide un --resync). Es estado del workdir de esta máquina, no configuración.
+scripts/rclone-sync-filtros.txt.md5

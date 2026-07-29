@@ -555,7 +555,7 @@ hl.window_rule({
 -- conserve el tamaño que pide.
 hl.window_rule({
   name  = "waybar-tui-flotantes",
-  match = { title = "^(wiremix|bluetui|nmtui|htop)$" },
+  match = { title = "^(wiremix|bluetui|nmtui|htop|rclone-sync|rclone-log)$" },
 
   float = true,
 })

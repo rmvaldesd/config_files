@@ -1,0 +1,27 @@
+[Unit]
+Description=Sincronización bidireccional con rclone (rclone-sync)
+Documentation=file:%h/config_files/scripts/rclone-sync
+# Se enlaza a ~/.config/systemd/user/ desde install-rclone-sync.sh.
+#
+# Es un servicio y no un timer a propósito: el intervalo tiene que ser una variable
+# editable en caliente (rclone-sync.conf), y con un .timer viviría en OnUnitActiveSec=
+# de este archivo, obligando a un daemon-reload cada vez que lo cambiaras.
+
+[Service]
+Type=simple
+ExecStart=%h/config_files/scripts/rclone-sync daemon
+
+# Si el proceso se muere por lo que sea, systemd lo levanta. El estado de la barra pasa
+# por "detenido" durante esos 30 segundos, que es justo lo que se quiere ver.
+Restart=always
+RestartSec=30
+
+# Sincronizar es trabajo de fondo: que no le compita al escritorio por CPU ni por disco.
+Nice=10
+IOSchedulingClass=idle
+
+# Un sync colgado no puede quedarse tomado el lock para siempre.
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

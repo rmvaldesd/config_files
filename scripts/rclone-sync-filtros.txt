@@ -1,0 +1,40 @@
+# Reglas de filtrado de rclone para rclone-sync (sintaxis --filters-file).
+#   - patrón   excluye        + patrón   incluye
+# Se aplican a los DOS lados: lo excluido acá ni se sube ni se baja, y tampoco se borra
+# en el otro lado por "faltar".
+#
+# OJO: bisync guarda un hash de este archivo junto con su línea base. Editarlo hace que
+# la siguiente vuelta falle pidiendo --resync; rclone-sync lo detecta y lo rehace solo,
+# pero esa pasada tarda más de lo normal. No es un error, es lo esperado.
+#
+# Si no querés filtrar nada, poné FILTROS="" en el .conf en vez de vaciar este archivo.
+
+# --- Basura del sistema operativo y de los editores -------------------------
+- .DS_Store
+- Thumbs.db
+- desktop.ini
+- *~
+- *.swp
+- *.swo
+- .Trash-*/**
+- .~lock.*#
+
+# --- Archivos a medio escribir ----------------------------------------------
+# Los .partial son los temporales del propio rclone: sincronizarlos sería copiar
+# descargas incompletas de una máquina a la otra.
+- *.partial
+- *.crdownload
+- *.tmp
+
+# --- Dependencias y builds: pesados, regenerables y con miles de archivos ----
+# Cada archivo cuesta una llamada a la API de Drive al listar. Un solo node_modules
+# puede multiplicar por diez lo que tarda cada vuelta.
+- node_modules/**
+- .venv/**
+- venv/**
+- __pycache__/**
+- .mypy_cache/**
+- .pytest_cache/**
+- target/debug/**
+- target/release/**
+- .cache/**

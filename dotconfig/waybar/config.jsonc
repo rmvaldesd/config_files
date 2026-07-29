@@ -21,6 +21,7 @@
     "battery",
     "power-profiles-daemon",
     "bluetooth",
+    "custom/rclone",
     "network",
     "cpu",
     "memory"
@@ -144,5 +145,29 @@
     "interval": 1,
     "format": "{}",
     "on-click": "hyprctl switchxkblayout all next"
+  },
+  // Estado de la sincronización de ~/home-laptop con Google Drive.
+  // El script vive en config_files/scripts (no en waybar/scripts) porque el módulo es
+  // sólo una de sus cinco caras: el mismo ejecutable es el demonio que corre bajo
+  // systemd, el comando de terminal y esta salida JSON.
+  //
+  // El 'interval' NO es el intervalo de sincronización (ese está en
+  // ~/.config/rclone-sync.conf): acá sólo refresca el "hace Xm" del tooltip y sirve de
+  // red de seguridad. Los cambios de estado llegan al instante por la señal 8, que el
+  // script emite con pkill -RTMIN+8 apenas empieza o termina una sincronización.
+  //
+  // Este bloque queda acá SIEMPRE, incluso en las máquinas donde no instalaste la
+  // sincronización: como este archivo es el mismo repo en todos los equipos, sacar el
+  // módulo al desinstalar le borraría el icono al otro computador en el próximo pull.
+  // En vez de eso el módulo se esconde solo -- 'rclone-sync status' devuelve {"text":""}
+  // cuando no está instalado, y waybar oculta el módulo custom sin texto.
+  "custom/rclone": {
+    "exec": "~/config_files/scripts/rclone-sync status",
+    "return-type": "json",
+    "interval": 30,
+    "signal": 8,
+    "format": "{}",
+    "on-click": "exec ghostty --title=rclone-sync -e ~/config_files/scripts/rclone-sync menu",
+    "on-click-right": "exec ghostty --title=rclone-log -e ~/config_files/scripts/rclone-sync log"
   }
 }

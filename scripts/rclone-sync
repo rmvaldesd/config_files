@@ -1,0 +1,903 @@
+#!/usr/bin/env bash
+# Sincronización BIDIRECCIONAL periódica de una carpeta local contra un remoto de
+# rclone, con reporte de estado para waybar.
+#
+#   rclone-sync daemon    -> bucle: sincroniza cada $INTERVALO segundos (lo que corre systemd)
+#   rclone-sync once      -> una sola pasada, ahora (lo que dispara el clic en waybar)
+#   rclone-sync status    -> una línea JSON para el módulo custom de waybar
+#   rclone-sync menu      -> menú interactivo (activar/desactivar); lo abre el clic en la barra
+#   rclone-sync resync    -> rehace la línea base de bisync (ver "RESYNC" más abajo)
+#   rclone-sync forzar    -> aprueba un borrado masivo que la protección de bisync frenó
+#   rclone-sync log       -> muestra el log; si es una terminal, lo sigue con -f
+#
+# Se instala y se desinstala con scripts/install-rclone-sync.sh (con menú, o con
+# --instalar / --desinstalar): instala el paquete rclone si falta, crea los symlinks y
+# habilita el servicio de usuario. El icono de waybar aparece y desaparece con eso, sin
+# tocar el config de la barra; ver esta_instalado() más abajo.
+# La configuración vive en dos archivos, en este orden:
+#
+#   1) scripts/rclone-sync.conf                 valores por defecto, VERSIONADOS
+#   2) ~/.config/rclone-sync.conf               ajustes de ESTA máquina, sin versionar
+#
+# Lo de los dos archivos no es ceremonia: config_files es el mismo repo en el laptop y
+# en el desktop, así que cualquier valor propio de un equipo (otra carpeta local, otro
+# intervalo) tiene que vivir fuera del repo o el siguiente pull lo pisa.
+#
+# POR QUÉ 'bisync' Y NO 'sync'
+# 'rclone sync A B' deja B idéntico a A: borra en el remoto todo lo que no esté en la
+# carpeta local. Con dos computadores apuntando a la MISMA carpeta remota eso es
+# pérdida de datos garantizada -- el último en correr borra lo que subió el otro.
+# 'bisync' mantiene un listado del estado anterior de cada lado, así distingue "este
+# archivo es nuevo allá" de "este archivo lo borré yo acá", y propaga en ambos sentidos.
+#
+# POR QUÉ UN DEMONIO CON 'sleep' Y NO UN TIMER DE SYSTEMD
+# Para que $INTERVALO sea una variable de verdad. Con un .timer el intervalo vive en el
+# unit (OnUnitActiveSec=), y cambiarlo obliga a editar el unit + daemon-reload. Acá el
+# bucle RELEE la configuración en cada vuelta: editás el .conf y la próxima vuelta ya
+# usa el valor nuevo, sin reiniciar nada.
+#
+# RESYNC
+# bisync necesita una "línea base": el listado de cómo estaban ambos lados la última
+# vez. La primera vez no existe, y ciertos errores la invalidan. En esos casos rclone
+# aborta pidiendo --resync, que reconstruye la línea base SIN borrar nada de ningún
+# lado (los conflictos los gana el archivo más nuevo, ver $MODO_RESYNC). Este script
+# detecta ese pedido y hace el resync solo. Para que eso no degenere en un bucle de
+# resyncs contra un error permanente, el freno no es de tiempo sino de progreso: un
+# resync nuevo se permite siempre que el anterior haya conseguido sincronizar; si no lo
+# consiguió, hay que esperar $ESPERA_RESYNC. Ver resync_permitido().
+
+set -u
+
+# ---------------------------------------------------------------------------
+# Configuración: valores por defecto, luego los .conf los pisan.
+# ---------------------------------------------------------------------------
+DIR_LOCAL="$HOME/home-laptop"
+REMOTO="gdrive:/home-laptop"
+
+# Segundos entre sincronizaciones. Se relee en cada vuelta del demonio.
+INTERVALO=60
+
+# Reintentos DENTRO de una misma vuelta antes de dar la vuelta por fallida. La espera
+# entre intentos crece: ESPERA_REINTENTO, x2, x3...
+REINTENTOS=3
+ESPERA_REINTENTO=10
+
+# Enfriamiento mínimo entre dos --resync automáticos (segundos).
+ESPERA_RESYNC=300
+
+# Al resincronizar, qué versión gana cuando el archivo existe distinto en ambos lados:
+# newer | older | larger | smaller | path1 | path2. 'newer' es lo razonable entre dos
+# equipos propios donde el reloj está en hora.
+MODO_RESYNC=newer
+
+# Idem para los conflictos de una sincronización normal. Con 'newer' el perdedor NO se
+# borra: queda al lado como archivo.conflict1, así que nunca se pierde una versión.
+MODO_CONFLICTO=newer
+
+# Aviso de escritorio (mako) cuando el estado PASA a error, y cuando se recupera.
+NOTIFICAR=1
+
+# Señal de waybar para refrescar el módulo al instante: SIGRTMIN+$SENAL_WAYBAR.
+# Tiene que coincidir con el "signal" del módulo custom/rclone en config.jsonc.
+SENAL_WAYBAR=8
+
+# Archivo de filtros de rclone (rutas a excluir). Vacío = sin filtros.
+FILTROS="$HOME/config_files/scripts/rclone-sync-filtros.txt"
+
+CONF_REPO="$HOME/config_files/scripts/rclone-sync.conf"
+CONF_LOCAL="${XDG_CONFIG_HOME:-$HOME/.config}/rclone-sync.conf"
+
+cargar_config() {
+    # shellcheck source=/dev/null
+    [ -r "$CONF_REPO" ]  && . "$CONF_REPO"
+    # shellcheck source=/dev/null
+    [ -r "$CONF_LOCAL" ] && . "$CONF_LOCAL"
+    # Un intervalo de 0 o basura convertiría el bucle en un busy-loop que se come la
+    # cuota de la API de Drive en minutos.
+    case "$INTERVALO" in
+        ''|*[!0-9]*) INTERVALO=60 ;;
+    esac
+    [ "$INTERVALO" -lt 5 ] && INTERVALO=5
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Rutas de estado
+#
+# El estado vivo va a XDG_RUNTIME_DIR (tmpfs): es estado de esta sesión y tiene que
+# desaparecer al reiniciar, si no waybar arrancaría mostrando el "sincronizado" de la
+# sesión anterior como si fuera de ahora. El log sí sobrevive, en ~/.cache.
+# ---------------------------------------------------------------------------
+DIR_RUN="${XDG_RUNTIME_DIR:-/tmp/$(id -u)}/rclone-sync"
+ARCHIVO_ESTADO="$DIR_RUN/estado"
+LOCK="$DIR_RUN/lock"
+
+DIR_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/rclone-sync"
+LOG="$DIR_CACHE/rclone-sync.log"
+SALIDA="$DIR_CACHE/ultima-salida.log"
+MARCA_RESYNC="$DIR_CACHE/ultimo-resync"
+
+# Lo que crea install-rclone-sync.sh y borra su desinstalación. Es la MARCA de instalado
+# (ver esta_instalado), no sólo una comodidad para el PATH.
+ENLACE_BIN="$HOME/.local/bin/rclone-sync"
+
+mkdir -p "$DIR_RUN" "$DIR_CACHE" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Utilidades
+# ---------------------------------------------------------------------------
+ahora() { date +%s; }
+
+registrar() {
+    printf '%s  %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$LOG"
+    # Recorte barato del log: sin esto crece para siempre a razón de una línea por
+    # minuto. Se hace sólo cuando ya está grande, no en cada escritura.
+    if [ "$(stat -c %s "$LOG" 2>/dev/null || echo 0)" -gt 1000000 ]; then
+        tail -n 2000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+    fi
+}
+
+avisar() {
+    # $1 = urgencia, $2 = título, $3 = cuerpo
+    [ "$NOTIFICAR" = "1" ] || return 0
+    command -v notify-send >/dev/null 2>&1 || return 0
+    # Bajo systemd --user el bus de sesión puede no estar en el entorno (depende de si
+    # el compositor hizo dbus-update-activation-environment al arrancar). La ruta del
+    # socket es fija, así que se completa a mano antes de rendirse.
+    if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+        export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+    fi
+    notify-send -a "rclone-sync" -u "$1" "$2" "$3" 2>/dev/null || true
+}
+
+# Estado guardado como pares clave=valor. Se escribe a un temporal y se mueve encima:
+# 'status' puede leerlo justo mientras el demonio lo escribe, y un mv es atómico.
+escribir_estado() {
+    estado="$1"; detalle="$2"
+    ts_ok_previo=$(leer_campo TS_OK)
+    [ "$estado" = "ok" ] && ts_ok_previo=$(ahora)
+    # El PID que se guarda es SIEMPRE el del demonio: 'rclone-sync once' (el clic en
+    # waybar) también escribe estado, y si pisara este campo con el suyo, 'status'
+    # vería un proceso ya muerto y reportaría "detenido" con el demonio andando.
+    pid_guardado="${PID_DEMONIO:-$(leer_campo PID)}"
+    {
+        printf 'ESTADO=%s\n' "$estado"
+        printf 'DETALLE=%s\n' "$detalle"
+        printf 'TS=%s\n'      "$(ahora)"
+        printf 'TS_OK=%s\n'   "${ts_ok_previo:-}"
+        printf 'PID=%s\n'     "$pid_guardado"
+        printf 'INTERVALO=%s\n' "$INTERVALO"
+        printf 'REMOTO=%s\n'  "$REMOTO"
+        printf 'LOCAL=%s\n'   "$DIR_LOCAL"
+    } >"$ARCHIVO_ESTADO.tmp" && mv "$ARCHIVO_ESTADO.tmp" "$ARCHIVO_ESTADO"
+    refrescar_waybar
+}
+
+leer_campo() {
+    [ -r "$ARCHIVO_ESTADO" ] || return 0
+    sed -n "s/^$1=//p" "$ARCHIVO_ESTADO" | head -1
+}
+
+# Deja constancia del pid del demonio APENAS arranca, sin tocar el resto del estado.
+#
+# Hace falta porque 'status' da por detenido al servicio cuando el pid guardado no
+# corresponde a un proceso vivo, y hasta acá el pid sólo se escribía al terminar la
+# primera vuelta. Entre medio hay una ventana en la que la barra dice "detenido" con el
+# servicio corriendo -- y se agranda justo cuando el demonio arranca y no puede
+# sincronizar todavía (por ejemplo si un 'rclone-sync resync' a mano tiene el lock).
+#
+# Se reescribe SÓLO la línea del pid en vez de llamar a escribir_estado() porque esa
+# función, con estado 'ok', pone TS_OK en el instante actual: registrar un pid pasaría a
+# afirmar que se acaba de sincronizar, que es falso.
+# El 'detenido' se trata aparte porque lo dejó escrito el trap del demonio anterior al
+# apagarse: parchearle sólo el pid lo dejaría diciendo "detenido" con el servicio ya
+# arriba hasta que termine la primera vuelta.
+registrar_pid() {
+    if [ -f "$ARCHIVO_ESTADO" ] && [ "$(leer_campo ESTADO)" != "detenido" ]; then
+        sed "s/^PID=.*/PID=$PID_DEMONIO/" "$ARCHIVO_ESTADO" >"$ARCHIVO_ESTADO.tmp" \
+            && mv "$ARCHIVO_ESTADO.tmp" "$ARCHIVO_ESTADO"
+        refrescar_waybar
+    else
+        escribir_estado sync "servicio recién arrancado, todavía sin sincronizar"
+    fi
+}
+
+# ¿Está instalado rclone-sync EN ESTA MÁQUINA?
+#
+# Hace falta porque config_files es el mismo repo en todos los equipos y ~/.config/waybar
+# es un symlink a dotconfig/waybar: el módulo custom/rclone del config VERSIONADO existe
+# en todas las máquinas, se instale o no acá la sincronización. Que la desinstalación
+# editara ese archivo para sacar el módulo sería la solución equivocada -- ensuciaría el
+# repo y el siguiente pull le borraría el icono también al otro computador.
+#
+# Así que el módulo se queda quieto en el config y es el propio 'status' el que se
+# esconde: waybar oculta un módulo custom cuyo "text" viene vacío. Un solo archivo
+# versionado, dos comportamientos, cero divergencia entre equipos.
+esta_instalado() {
+    command -v rclone >/dev/null 2>&1 && [ -e "$ENLACE_BIN" ]
+}
+
+refrescar_waybar() {
+    # Sin esto el módulo tardaría hasta su "interval" en enterarse. Con la señal, el
+    # icono cambia en el mismo instante en que arranca o termina un sync.
+    pkill -x -RTMIN+"$SENAL_WAYBAR" waybar 2>/dev/null || true
+}
+
+hay_red() {
+    # nm-online consulta el estado que NetworkManager ya tiene: no genera tráfico ni
+    # espera timeouts de red. Es sólo un primer filtro -- que la interfaz esté arriba no
+    # garantiza que Drive responda; de eso se entera el propio rclone.
+    if command -v nm-online >/dev/null 2>&1; then
+        nm-online -q -t 1 >/dev/null 2>&1 && return 0
+        return 1
+    fi
+    ip route get 1.1.1.1 >/dev/null 2>&1
+}
+
+# ---------------------------------------------------------------------------
+# La sincronización
+# ---------------------------------------------------------------------------
+flags_bisync() {
+    # --resilient + --recover: que un error pasajero (o un corte a mitad de camino) se
+    #   arregle solo en la vuelta siguiente en vez de exigir un --resync.
+    # --max-lock 2m: bisync deja un lock en el workdir; si un equipo se apaga a mitad de
+    #   sync, sin esto el lock queda para siempre y el otro no puede correr nunca.
+    # --conflict-loser num: el perdedor de un conflicto se conserva como .conflict1.
+    # --drive-skip-gdocs: los Google Docs no son archivos descargables; sin esto cada
+    #   vuelta reintenta bajarlos y falla.
+    # --retries 1: los reintentos los maneja este script (ver ciclo()), con su propio
+    #   backoff y actualizando el estado de la barra entre uno y otro.
+    # --color NEVER: rclone colorea aunque la salida sea un archivo, y esos códigos ANSI
+    #   terminaban crudos en el tooltip de waybar y en el log.
+    # --tpslimit: EL FLAG QUE MÁS IMPORTA ACÁ, y no es una optimización sino una
+    #   protección. Google Drive corta con 403 rateLimitExceeded si le llueven llamadas,
+    #   y un 403 a mitad de bisync es un error CRÍTICO: borra la línea base y obliga a un
+    #   --resync completo. Verificado en este equipo: sin límite, sincronizando cada 60s
+    #   mientras se toqueteaba la carpeta, se perdió la línea base en la segunda vuelta.
+    #   8 transacciones/s con ráfagas de 20 va sobrado para una carpeta personal.
+    printf '%s\n' \
+        --create-empty-src-dirs \
+        --resilient --recover \
+        --max-lock 2m \
+        --conflict-resolve "$MODO_CONFLICTO" \
+        --conflict-loser num \
+        --drive-skip-gdocs \
+        --transfers 4 --checkers 8 \
+        --tpslimit 8 --tpslimit-burst 20 \
+        --contimeout 15s --timeout 60s \
+        --retries 1 --low-level-retries 3 \
+        --color NEVER --log-level INFO
+}
+
+ejecutar_bisync() {
+    # $1 = resync (reconstruir línea base) | force (aceptar borrados masivos) | vacío
+    extra=""
+    case "${1:-}" in
+        resync) extra="--resync --resync-mode $MODO_RESYNC" ;;
+        force)  extra="--force" ;;
+    esac
+
+    filtro=""
+    [ -n "$FILTROS" ] && [ -r "$FILTROS" ] && filtro="--filters-file $FILTROS"
+
+    # Con una terminal delante se muestra --progress (que es para lo que existe) y la
+    # salida pasa por tee para quedar TAMBIÉN en $SALIDA, que es lo que después lee
+    # motivo_error(). Sin el tee habría que elegir entre ver el progreso o poder
+    # diagnosticar el fallo. pipefail es lo que hace que el código de salida siga siendo
+    # el de rclone y no el de tee, que siempre devuelve 0.
+    if [ -t 1 ]; then
+        set -o pipefail
+        # shellcheck disable=SC2046,SC2086
+        rclone bisync "$DIR_LOCAL" "$REMOTO" \
+            $(flags_bisync) $filtro $extra --progress 2>&1 | tee "$SALIDA"
+        rc=$?
+        set +o pipefail
+        return $rc
+    fi
+
+    # shellcheck disable=SC2046,SC2086
+    rclone bisync "$DIR_LOCAL" "$REMOTO" \
+        $(flags_bisync) $filtro $extra \
+        >"$SALIDA" 2>&1
+}
+
+# Traduce la salida de rclone a un motivo corto y legible para el tooltip.
+#
+# El orden de las ramas importa: se va de lo más específico a lo más genérico. Y los
+# patrones son deliberadamente estrechos -- un "429" suelto, por ejemplo, matcheaba el
+# recuento de bytes transferidos y reportaba "cuota superada" en errores que no tenían
+# nada que ver.
+motivo_error() {
+    if grep -qE "cannot find prior|Bisync critical error|must run --resync" "$SALIDA"; then
+        echo "bisync perdió la línea base; se reconstruye sola"
+    elif grep -qiE "couldn't connect|no such host|network is unreachable|connection refused|i/o timeout|context deadline exceeded|dial tcp" "$SALIDA"; then
+        echo "sin conexión con el remoto"
+    elif grep -qiE "token expired|invalid_grant|oauth2:|401 Unauthorized" "$SALIDA"; then
+        echo "credenciales vencidas: rclone config reconnect $(printf '%s' "$REMOTO" | cut -d: -f1):"
+    elif grep -qE "Quota exceeded|rateLimitExceeded|userRateLimitExceeded|quotaExceeded|HTTP 429|Too Many Requests" "$SALIDA"; then
+        # Se distingue la cuota COMPARTIDA de la propia porque el remedio es distinto y
+        # nada intuitivo: si el client_id es el genérico de rclone, la cuota que se agotó
+        # no es la tuya sino la de todos los usuarios de rclone del mundo juntos. Bajar
+        # el intervalo no arregla nada ahí; hay que crearse un client_id propio.
+        if grep -q "shared Google Drive client_id" "$SALIDA"; then
+            echo "cuota del client_id COMPARTIDO de rclone agotada: creá el tuyo (rclone.org/drive/#making-your-own-client-id)"
+        else
+            echo "Drive está limitando las llamadas; bajá la frecuencia (INTERVALO)"
+        fi
+    elif grep -qiE "max delete|too many deletes|Safety abort" "$SALIDA"; then
+        # Esto NO se auto-resuelve a propósito: bisync frena cuando una vuelta borraría
+        # más del 50% de los archivos, que es la firma de "se desmontó el disco" o "borré
+        # la carpeta sin querer". Forzarlo solo convertiría la única red de seguridad
+        # contra la pérdida masiva de datos en un trámite. Lo aprueba una persona.
+        echo "frenado: la pasada borraría >50% de los archivos. Si es a propósito: rclone-sync forzar"
+    elif grep -qiE "no space left" "$SALIDA"; then
+        echo "sin espacio en disco"
+    else
+        # La PRIMERA línea de error, no la última: rclone remata con un resumen genérico
+        # ("Errors: 1 (fatal error encountered)") que no dice absolutamente nada. El
+        # error de verdad es el que aparece antes. Se le saca la fecha del principio,
+        # que en el tooltip sólo ocupa lugar.
+        m=$(grep -aE "ERROR|CRITICAL|FATAL" "$SALIDA" \
+            | grep -avE "^Errors:|fatal error encountered" \
+            | head -1 \
+            | sed -E 's/^[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9:]+ (ERROR|CRITICAL|FATAL) *: *//' \
+            | cut -c1-160)
+        [ -z "$m" ] && m=$(tail -1 "$SALIDA" | cut -c1-160)
+        [ -z "$m" ] && m="error desconocido"
+        printf '%s' "$m"
+    fi
+}
+
+# ¿rclone está pidiendo un --resync?
+pide_resync() {
+    grep -qiE "must run --resync|cannot find prior|prior listing|--resync is required|filters file has changed|Bisync critical error" "$SALIDA"
+}
+
+# Bandera: hubo un --resync que TODAVÍA no fue seguido de una sincronización correcta.
+FLAG_RESYNC_SIN_EXITO="$DIR_CACHE/resync-sin-exito"
+
+resync_permitido() {
+    # Un --resync es caro (relista los dos lados enteros) y repetirlo cada minuto contra
+    # un error permanente sólo suma castigo de cuota de la API. De ahí el enfriamiento.
+    #
+    # PERO el enfriamiento a secas estaba mal, y se vio en la práctica: cuando bisync
+    # pierde la línea base, el resync es el ÚNICO remedio posible, así que bloquearlo
+    # media hora garantizaba media hora de vueltas fallando y la barra en rojo por algo
+    # que se arreglaba en dos segundos.
+    #
+    # La regla correcta no es de tiempo sino de progreso: si desde el último resync hubo
+    # al menos UNA sincronización buena, este es un problema nuevo y se ataca ya. Si no
+    # la hubo, el resync anterior no sirvió y ahí sí corresponde esperar, que es lo que
+    # corta el bucle resync -> falla -> resync.
+    [ -f "$FLAG_RESYNC_SIN_EXITO" ] || return 0
+
+    ultimo=$(cat "$MARCA_RESYNC" 2>/dev/null || echo 0)
+    [ $(( $(ahora) - ultimo )) -ge "$ESPERA_RESYNC" ]
+}
+
+# Marca de que ESTE par (carpeta local, remoto) ya tiene línea base. Se guarda por par
+# y no como un simple "ya corrí una vez": el workdir de bisync es compartido entre todos
+# los pares, así que mirar si hay algún .lst ahí adentro daría un falso positivo en
+# cuanto exista una segunda sincronización configurada.
+marca_base() {
+    printf '%s/base-%s' "$DIR_CACHE" \
+        "$(printf '%s|%s' "$DIR_LOCAL" "$REMOTO" | md5sum | cut -c1-12)"
+}
+
+primera_vez() {
+    # Sin línea base, una pasada normal falla seguro. Detectarlo acá evita gastar un
+    # intento (y un parpadeo rojo en la barra) en algo que ya sabemos que va a fallar.
+    [ ! -f "$(marca_base)" ]
+}
+
+# Una pasada completa, con reintentos. Deja el estado escrito y devuelve 0/1.
+ciclo() {
+    if [ ! -d "$DIR_LOCAL" ]; then
+        escribir_estado error "no existe la carpeta local $DIR_LOCAL"
+        registrar "ERROR: no existe $DIR_LOCAL"
+        return 1
+    fi
+
+    if ! hay_red; then
+        escribir_estado offline "sin red"
+        return 1
+    fi
+
+    escribir_estado sync "sincronizando..."
+
+    intento=1
+    motivo="error desconocido"
+    while [ "$intento" -le "$REINTENTOS" ]; do
+        modo=""
+        if primera_vez; then
+            modo=resync
+            registrar "primera sincronización de este par: creando línea base con --resync"
+            ahora >"$MARCA_RESYNC"
+            : >"$FLAG_RESYNC_SIN_EXITO"
+        fi
+
+        if ejecutar_bisync "$modo"; then
+            ahora >"$(marca_base)"
+            rm -f "$FLAG_RESYNC_SIN_EXITO"
+            cambios=$(grep -cE "(Copied|Deleted|Renamed|Updated)" "$SALIDA" 2>/dev/null) || cambios=0
+            escribir_estado ok "$cambios cambio(s) en la última pasada"
+            registrar "ok ($cambios cambio(s))"
+            return 0
+        fi
+
+        # bisync perdió la línea base (o cambió el archivo de filtros): reconstruirla es
+        # LA respuesta correcta, y es lo que rclone te diría que hicieras a mano.
+        if pide_resync && [ "$modo" != resync ]; then
+            if resync_permitido; then
+                registrar "rclone pide --resync; reconstruyendo línea base"
+                escribir_estado sync "reconstruyendo línea base..."
+                ahora >"$MARCA_RESYNC"
+                : >"$FLAG_RESYNC_SIN_EXITO"
+                if ejecutar_bisync resync; then
+                    ahora >"$(marca_base)"
+                    rm -f "$FLAG_RESYNC_SIN_EXITO"
+                    escribir_estado ok "línea base reconstruida"
+                    registrar "ok tras --resync"
+                    return 0
+                fi
+            else
+                registrar "rclone pide --resync pero está en enfriamiento; se salta"
+            fi
+        fi
+
+        motivo=$(motivo_error)
+        registrar "intento $intento/$REINTENTOS falló: $motivo"
+
+        if [ "$intento" -lt "$REINTENTOS" ]; then
+            escribir_estado sync "reintentando ($intento/$REINTENTOS): $motivo"
+            dormir $(( ESPERA_REINTENTO * intento ))
+        fi
+        intento=$(( intento + 1 ))
+    done
+
+    # Un fallo por falta de conexión no es lo mismo que uno de verdad: no tiene sentido
+    # pintar la barra de rojo ni notificar porque te fuiste del alcance del wifi.
+    if printf '%s' "$motivo" | grep -qi "sin conexión"; then
+        escribir_estado offline "$motivo"
+    else
+        escribir_estado error "$motivo"
+    fi
+    return 1
+}
+
+# sleep interrumpible: en primer plano, un 'systemctl stop' tendría que esperar hasta
+# el final del sleep para que el trap corra. Con & + wait la señal llega enseguida.
+dormir() {
+    sleep "$1" &
+    PID_SLEEP=$!
+    wait "$PID_SLEEP" 2>/dev/null || true
+    PID_SLEEP=""
+}
+
+# ---------------------------------------------------------------------------
+# Subcomandos
+# ---------------------------------------------------------------------------
+con_lock() {
+    # -n (no bloqueante) a propósito: si ya hay un sync en curso, el clic en waybar o la
+    # vuelta siguiente del demonio NO tienen que encolarse. Dos bisync a la vez sobre el
+    # mismo par de rutas es exactamente lo que el lock del propio rclone prohíbe.
+    exec 9>"$LOCK"
+    if ! flock -n 9; then
+        exec 9>&-
+        echo "ya hay una sincronización en curso" >&2
+        return 1
+    fi
+    "$@"
+    rc=$?
+    # CERRAR EL DESCRIPTOR ES OBLIGATORIO, no higiene. El lock lo suelta el kernel al
+    # cerrarse el fd, y como 'exec' actúa sobre el shell entero (no sobre la función),
+    # sin esto el demonio se quedaría el lock tomado para siempre después de su primera
+    # vuelta: todo clic en waybar respondería "ya hay una sincronización en curso".
+    exec 9>&-
+    return $rc
+}
+
+cmd_once() {
+    cargar_config
+    con_lock ciclo
+}
+
+cmd_daemon() {
+    PID_DEMONIO=$$
+    PID_SLEEP=""
+    trap 'escribir_estado detenido "demonio detenido"; [ -n "$PID_SLEEP" ] && kill "$PID_SLEEP" 2>/dev/null; exit 0' TERM INT
+
+    cargar_config
+    registrar "demonio arrancado (pid $$, intervalo ${INTERVALO}s, $DIR_LOCAL <-> $REMOTO)"
+    registrar_pid
+
+    estado_previo=""
+    while :; do
+        # Releer acá y no fuera del bucle es lo que hace que $INTERVALO sea editable en
+        # caliente: cambiás el .conf y la próxima vuelta ya usa el valor nuevo.
+        cargar_config
+
+        con_lock ciclo
+        estado_actual=$(leer_campo ESTADO)
+
+        # Notificar sólo en los CAMBIOS de estado. Avisar en cada vuelta fallida sería
+        # una notificación por minuto hasta que alguien la arregle.
+        if [ "$estado_actual" != "$estado_previo" ]; then
+            case "$estado_actual" in
+                error)
+                    avisar critical "Sincronización con Drive fallando" \
+                        "$(leer_campo DETALLE)" ;;
+                ok)
+                    [ "$estado_previo" = "error" ] && \
+                        avisar low "Sincronización con Drive restablecida" \
+                            "$DIR_LOCAL está al día" ;;
+            esac
+            estado_previo="$estado_actual"
+        fi
+
+        dormir "$INTERVALO"
+    done
+}
+
+cmd_resync() {
+    cargar_config
+    echo "Reconstruyendo la línea base de bisync ($DIR_LOCAL <-> $REMOTO)..."
+    echo "No se borra nada: en los conflictos gana la versión '$MODO_RESYNC'."
+    ahora >"$MARCA_RESYNC"
+    : >"$FLAG_RESYNC_SIN_EXITO"
+    if con_lock ejecutar_bisync resync; then
+        ahora >"$(marca_base)"
+        rm -f "$FLAG_RESYNC_SIN_EXITO"
+        escribir_estado ok "línea base reconstruida a mano"
+        echo "Listo."
+    else
+        # Con una terminal delante la salida ya se vio (ejecutar_bisync la pasa por tee);
+        # volcarla de nuevo sería mostrarla dos veces.
+        [ -t 1 ] || cat "$SALIDA"
+        echo "FALLÓ: $(motivo_error)" >&2
+        escribir_estado error "$(motivo_error)"
+        # 'return' y no 'exit': estas funciones también se llaman desde el menú, y un
+        # exit acá cerraría de golpe la ventana flotante ante el primer fallo. El código
+        # de salida del script se mantiene igual porque el dispatcher del final devuelve
+        # el de la función.
+        return 1
+    fi
+}
+
+# Aprobación explícita de un borrado masivo.
+#
+# Existe porque sin esto la protección --max-delete de bisync no tiene salida: cuando
+# salta (borraste de verdad medio directorio), TODAS las vueltas siguientes chocan con
+# la misma pared y la barra se queda en rojo para siempre. El remedio tiene que ser un
+# comando corto y a mano, no un flag que haya que ir a buscar a la documentación.
+cmd_forzar() {
+    cargar_config
+    echo "Los borrados pendientes se van a aplicar en el otro lado, saltando la"
+    echo "protección que frena cuando una pasada borraría más del 50% de los archivos."
+    echo "$DIR_LOCAL  <->  $REMOTO"
+    echo
+    if con_lock ejecutar_bisync force; then
+        ahora >"$(marca_base)"
+        escribir_estado ok "borrados aplicados a mano con --force"
+        registrar "ok tras --force (borrado masivo aprobado por el usuario)"
+        echo "Listo."
+    else
+        [ -t 1 ] || cat "$SALIDA"
+        echo "FALLÓ: $(motivo_error)" >&2
+        escribir_estado error "$(motivo_error)"
+        # 'return' y no 'exit': estas funciones también se llaman desde el menú, y un
+        # exit acá cerraría de golpe la ventana flotante ante el primer fallo. El código
+        # de salida del script se mantiene igual porque el dispatcher del final devuelve
+        # el de la función.
+        return 1
+    fi
+}
+
+# Menú interactivo: lo que abre el clic izquierdo en waybar, dentro de una ghostty
+# flotante (regla 'waybar-tui-flotantes' en hyprland.lua, igual que nmtui/bluetui/btop).
+#
+# El unit se referencia por RUTA ABSOLUTA al activar, y no por nombre. No es un capricho:
+# el servicio se habilitó con 'systemctl --user enable /ruta/al/unit', o sea que systemd
+# creó él mismo el symlink en ~/.config/systemd/user. Un 'disable' borra ESE symlink
+# además del de default.target.wants, así que después el unit ya no existe con ese nombre
+# y un 'enable rclone-sync.service' fallaría con "unit not found". Con la ruta absoluta
+# el ciclo activar/desactivar se puede repetir infinitas veces.
+UNIT_SERVICIO="$HOME/config_files/scripts/rclone-sync.service"
+
+cmd_menu() {
+    cargar_config
+    while :; do
+        resolver_estado
+        ts_ok=$(leer_campo TS_OK)
+
+        case "$ESTADO_R" in
+            ok)        rotulo="Sincronizado" ;;
+            sync)      rotulo="Sincronizando ahora mismo" ;;
+            offline)   rotulo="Sin conexión" ;;
+            error)     rotulo="CON ERRORES" ;;
+            detenido)  rotulo="CAÍDA (debería estar corriendo)" ;;
+            pausado)   rotulo="Desactivada" ;;
+            *)         rotulo="Sin datos todavía" ;;
+        esac
+
+        if [ "$ESTADO_R" = pausado ]; then
+            accion=activar
+            texto_accion="Activar        -- sincroniza ahora y en cada arranque del equipo"
+        else
+            accion=desactivar
+            texto_accion="Desactivar     -- para ahora y NO vuelve sola al reiniciar"
+        fi
+
+        clear
+        cat <<EOF
+  Sincronización con Drive
+  ─────────────────────────────────────────────────────────────
+
+    Estado    $rotulo
+              $DETALLE_R
+    Al día    $(hace "$ts_ok")
+
+    Carpeta   $DIR_LOCAL
+    Remoto    $REMOTO
+    Cada      ${INTERVALO}s
+
+  ─────────────────────────────────────────────────────────────
+
+    Esos tres valores (y los reintentos, filtros y avisos) salen de:
+      $CONF_LOCAL
+        sólo este equipo; pisa al de abajo
+      $CONF_REPO
+        todas las máquinas que usen el repo, va en git
+
+    El intervalo se relee en cada vuelta, no hay que hacer nada más.
+    Si cambiás la carpeta, el remoto o los filtros: opción 5.
+
+  ─────────────────────────────────────────────────────────────
+
+    1) $texto_accion
+    2) Sincronizar ahora
+    3) Ver el log
+    4) Reconstruir la línea base (resync, no borra nada)
+EOF
+        # Reiniciar NO se ofrece con la sincronización desactivada, y el motivo es que
+        # 'systemctl restart' ARRANCA un servicio parado: apretarlo estando en pausa lo
+        # dejaría corriendo pero deshabilitado -- sincronizando ahora y no al próximo
+        # arranque, con la barra en verde y el equipo sin sincronizar mañana. Estando en
+        # pausa, la opción que corresponde es 1) Activar, que además ya relee todo.
+        ofrece_reiniciar=0
+        if [ "$accion" = desactivar ]; then
+            ofrece_reiniciar=1
+            echo "    5) Reiniciar el servicio (aplica los cambios del .conf)"
+        fi
+
+        # La aprobación de un borrado masivo sólo aparece cuando hay uno frenado de
+        # verdad. Tenerla siempre a la vista sería invitar a apretarla por curiosidad, y
+        # es justo la opción que desarma la última protección contra perder archivos.
+        ofrece_forzar=0
+        if printf '%s' "$DETALLE_R" | grep -q "frenado"; then
+            ofrece_forzar=1
+            echo "    6) Aplicar el borrado masivo que quedó frenado"
+        fi
+        cat <<EOF
+
+    q) Salir
+
+EOF
+        printf '  Opción: '
+        read -r opcion || break
+
+        case "$opcion" in
+            1)
+                echo
+                if [ "$accion" = activar ]; then
+                    systemctl --user enable --now "$UNIT_SERVICIO"
+                    echo "  Activada."
+                else
+                    systemctl --user disable --now rclone-sync.service
+                    echo "  Desactivada. La barra queda en gris, sin alarma."
+                fi
+                # systemctl vuelve apenas systemd acepta la orden, antes de que el
+                # demonio llegue a anotar su pid. Sin esta pausa el menú se redibuja en
+                # ese hueco y muestra "CAÍDA" durante un parpadeo justo después de que
+                # apretaste "Activar", que es exactamente lo contrario de lo que pasó.
+                sleep 1
+                refrescar_waybar
+                pausa ;;
+            2)
+                echo
+                # Sin lock propio: 'once' ya lo toma, y si el demonio está sincronizando
+                # avisa en vez de encimarse.
+                cmd_once || true
+                pausa ;;
+            3)
+                # Sin -f acá: el 'tail -f' de cmd_log se queda colgado y habría que
+                # matarlo con Ctrl-C para volver al menú.
+                clear
+                tail -n 200 "$LOG" 2>/dev/null || echo "  todavía no hay log"
+                pausa ;;
+            4)
+                echo
+                cmd_resync || true
+                pausa ;;
+            5)
+                [ "$ofrece_reiniciar" = 1 ] || continue
+                echo
+                echo "  Reiniciando el servicio..."
+                # Si hay un sync en curso, systemd le manda TERM y espera: el trap del
+                # demonio deja el estado escrito y suelta el lock antes de morir, y
+                # TimeoutStopSec=30 pone el techo. Por eso esto puede tardar unos
+                # segundos en vez de volver al instante, y está bien que así sea.
+                if systemctl --user restart rclone-sync.service; then
+                    # Releer también ACÁ: el demonio nuevo ya tomó la configuración
+                    # nueva, pero el panel de arriba lo dibuja este proceso, que cargó la
+                    # suya al abrir el menú. Sin esto acabás de aplicar los cambios y el
+                    # menú te sigue mostrando la carpeta y el remoto viejos.
+                    cargar_config
+                    echo "  Reiniciado. Configuración releída:"
+                    echo "    Carpeta   $DIR_LOCAL"
+                    echo "    Remoto    $REMOTO"
+                    echo "    Cada      ${INTERVALO}s"
+                else
+                    echo "  ERROR: el servicio no arrancó. Mirá:"
+                    echo "    systemctl --user status rclone-sync.service"
+                fi
+                # Mismo motivo que en la opción 1: systemd vuelve antes de que el demonio
+                # alcance a anotar su pid, y sin la pausa el menú se redibuja en ese hueco
+                # mostrando "CAÍDA" justo después de un reinicio correcto.
+                sleep 1
+                refrescar_waybar
+                pausa ;;
+            6)
+                [ "$ofrece_forzar" = 1 ] || continue
+                echo
+                cmd_forzar || true
+                pausa ;;
+            q|Q|"") exit 0 ;;
+        esac
+    done
+}
+
+pausa() {
+    printf '\n  Enter para volver al menú... '
+    read -r _ || true
+}
+
+cmd_log() {
+    [ -f "$LOG" ] || { echo "todavía no hay log en $LOG"; exit 0; }
+    if [ -t 1 ]; then
+        tail -n 50 -f "$LOG"
+    else
+        tail -n 50 "$LOG"
+    fi
+}
+
+# --- status: la línea JSON de waybar -------------------------------------------------
+escapar_json() {
+    printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | sed -z 's/\n/\\n/g'
+}
+
+hace() {
+    [ -z "${1:-}" ] && { printf 'nunca'; return; }
+    d=$(( $(ahora) - $1 ))
+    [ "$d" -lt 0 ] && d=0
+    if   [ "$d" -lt 60 ];    then printf 'hace %ss' "$d"
+    elif [ "$d" -lt 3600 ];  then printf 'hace %sm' "$(( d / 60 ))"
+    elif [ "$d" -lt 86400 ]; then printf 'hace %sh %sm' "$(( d / 3600 ))" "$(( d % 3600 / 60 ))"
+    else                          printf 'hace %sd' "$(( d / 86400 ))"
+    fi
+}
+
+demonio_vivo() {
+    p="$1"
+    [ -n "$p" ] || return 1
+    [ -r "/proc/$p/cmdline" ] || return 1
+    # Se mira el cmdline y no sólo que el pid exista: los pid se reciclan, y uno
+    # reutilizado por cualquier otro proceso haría que la barra diera por vivo un
+    # demonio que hace rato murió -- justo el fallo silencioso que hay que evitar.
+    tr '\0' ' ' <"/proc/$p/cmdline" 2>/dev/null | grep -q "rclone-sync"
+}
+
+# ¿El servicio está habilitado, o sea, se supone que tiene que estar corriendo?
+#
+# Es lo que separa "se murió" de "lo apagué yo", que en la barra tienen que verse
+# distinto: lo primero es un fallo (coral) y lo segundo una decisión tuya (gris). Sin
+# esta distinción, desactivar la sincronización a propósito dejaría la barra gritando un
+# error que no existe, y a los dos días ya no le creerías el color a nada.
+servicio_habilitado() {
+    systemctl --user is-enabled --quiet rclone-sync.service 2>/dev/null
+}
+
+# Combina lo que dejó escrito el demonio con la realidad del sistema (¿vive el proceso?,
+# ¿está habilitado el servicio?). Deja el resultado en $ESTADO_R y $DETALLE_R.
+resolver_estado() {
+    ESTADO_R=$(leer_campo ESTADO)
+    DETALLE_R=$(leer_campo DETALLE)
+
+    # El demonio caído es el fallo que MÁS importa detectar: sin él la barra se quedaría
+    # congelada en el último "sincronizado" y parecería que todo va bien. Se comprueba el
+    # pid guardado y no systemd, así también vale si lo lanzaste a mano.
+    if demonio_vivo "$(leer_campo PID)"; then
+        if [ -z "$ESTADO_R" ]; then
+            ESTADO_R=desconocido
+            DETALLE_R="todavía no corrió ninguna sincronización"
+        fi
+    elif servicio_habilitado; then
+        ESTADO_R=detenido
+        DETALLE_R="el servicio debería estar corriendo y no está"
+    else
+        ESTADO_R=pausado
+        DETALLE_R="desactivado a mano; no se sincroniza ni al arrancar el equipo"
+    fi
+}
+
+cmd_status() {
+    # Sin instalar no hay icono. Texto vacío = módulo oculto para waybar; el bloque
+    # custom/rclone puede seguir en el config versionado sin molestar en los equipos
+    # donde no corrés la sincronización. Ver esta_instalado().
+    if ! esta_instalado; then
+        printf '{"text":""}\n'
+        return 0
+    fi
+
+    cargar_config
+    ts=$(leer_campo TS)
+    ts_ok=$(leer_campo TS_OK)
+    remoto=$(leer_campo REMOTO); [ -z "$remoto" ] && remoto="$REMOTO"
+    local_dir=$(leer_campo LOCAL); [ -z "$local_dir" ] && local_dir="$DIR_LOCAL"
+
+    resolver_estado
+    estado="$ESTADO_R"; detalle="$DETALLE_R"
+
+    case "$estado" in
+        ok)          texto="󰅠";        clase=ok;          titulo="Sincronizado" ;;
+        sync)        texto="󰘿";        clase=sync;        titulo="Sincronizando" ;;
+        offline)     texto="󰅤";        clase=offline;     titulo="Sin conexión" ;;
+        error)       texto="󰧠 error"; clase=error;       titulo="SIN SINCRONIZAR" ;;
+        detenido)    texto="󰧠 off";   clase=detenido;    titulo="Sincronización caída" ;;
+        # Pausado NO lleva palabra al lado: no hay nada que avisar, lo apagaste vos.
+        pausado)     texto="󰅣";        clase=pausado;     titulo="Sincronización desactivada" ;;
+        *)           texto="󰨹";        clase=desconocido; titulo="Estado desconocido" ;;
+    esac
+
+    tooltip="$titulo
+$local_dir  <->  $remoto
+
+Última sincronización correcta: $(hace "$ts_ok")
+Último intento: $(hace "$ts")
+$detalle
+
+Cada ${INTERVALO}s · clic: menú · clic derecho: ver log"
+
+    printf '{"text":"%s","alt":"%s","class":"%s","tooltip":"%s"}\n' \
+        "$(escapar_json "$texto")" \
+        "$(escapar_json "$estado")" \
+        "$(escapar_json "$clase")" \
+        "$(escapar_json "$tooltip")"
+}
+
+# ---------------------------------------------------------------------------
+case "${1:-status}" in
+    daemon)  cmd_daemon ;;
+    once|now) cmd_once ;;
+    status)  cmd_status ;;
+    menu)    cmd_menu ;;
+    resync)  cmd_resync ;;
+    forzar|force) cmd_forzar ;;
+    log)     cmd_log ;;
+    *)
+        cat <<EOF
+uso: rclone-sync {daemon|once|status|menu|resync|forzar|log}
+
+  daemon  bucle de sincronización (lo lanza systemd, no lo corras a mano)
+  once    sincroniza una vez, ahora
+  status  línea JSON para waybar
+  menu    menú interactivo (activar/desactivar y demás); lo abre el clic en la barra
+  resync  reconstruye la línea base de bisync (no borra nada)
+  forzar  aplica un borrado masivo que la protección de bisync frenó
+  log     muestra el log de sincronización
+
+configuración: $CONF_REPO
+               $CONF_LOCAL  (pisa a la anterior, propia de esta máquina)
+EOF
+        exit 1 ;;
+esac

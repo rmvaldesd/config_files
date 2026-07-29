@@ -93,6 +93,7 @@ window#waybar {
 #battery,
 #power-profiles-daemon,
 #bluetooth,
+#custom-rclone,
 #network,
 #cpu,
 #memory {
@@ -135,6 +136,41 @@ window#waybar {
 #network.disconnected,
 #bluetooth.disabled {
   color: @dark-5;
+}
+
+/* --------------------------------------------------------------------------
+   SINCRONIZACIÓN CON DRIVE (rclone-sync)
+   Cuatro estados, cuatro colores, sin texto salvo cuando algo está mal:
+     sincronizado -> zinc-300, el color normal de la barra. No llama la atención
+                     PORQUE no pasa nada; es el 99% del tiempo.
+     sincronizando -> cyan, el acento de progreso del tema (mismo que el slider).
+     sin red      -> zinc-500, apagado igual que #network.disconnected: no es un
+                     fallo, es que no hay wifi. No tiene por qué alarmar.
+     pausado      -> zinc-500 también. Lo desactivaste vos desde el menú (clic en
+                     el icono): no hay nada que avisar, sólo que recuerdes que
+                     está apagado. Pintarlo de rojo sería alarmar por una decisión
+                     tuya, y a los dos días ya no le creerías el color a nada.
+     error        -> coral + negrita. Es el único caso en que hay que hacer algo,
+                     y además el módulo agrega la palabra "error" al icono.
+     caída        -> coral también: el servicio TENDRÍA que estar corriendo y no
+                     está, así que la barra no puede saber si estás sincronizado.
+                     Eso es tan malo como saber que no lo estás. Es distinto de
+                     'pausado', y por eso son dos clases y no una.
+   -------------------------------------------------------------------------- */
+#custom-rclone.sync {
+  color: @highlight;
+}
+
+#custom-rclone.offline,
+#custom-rclone.pausado,
+#custom-rclone.desconocido {
+  color: @dark-5;
+}
+
+#custom-rclone.error,
+#custom-rclone.detenido {
+  color: @urgent;
+  font-weight: 700;
 }
 
 /* --------------------------------------------------------------------------
