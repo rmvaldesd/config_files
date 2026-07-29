@@ -184,6 +184,7 @@ paquetes_utilidades=(
     ueberzugpp        # Dibuja imágenes dentro de la terminal. Lo usa la función 'imgs' de zshrc.local para previsualizar imágenes en fzf.
     ripgrep           # Grep ultrarrápido; Telescope de nvim lo necesita para live_grep.
     fd                # Alternativa moderna a find; Telescope de nvim lo usa para find_files.
+    bat               # 'cat' con resaltado de sintaxis y numeración; lo usa el preview del widget Ctrl-G (grep en vivo) de zshrc.local. Si falta, ese preview cae a 'sed' sin resaltado.
     unzip             # Descompresor ZIP; Mason (nvim) lo necesita para extraer los LSPs que descarga.
     nodejs            # Runtime de JavaScript; requerido por varios LSPs que instala Mason (ts_ls, pyright, etc.).
     npm               # Gestor de paquetes de Node; Mason lo usa para instalar LSPs basados en Node.
@@ -386,6 +387,69 @@ if [ -e "$HOME/.config/spotify-launcher.conf" ] && [ ! -L "$HOME/.config/spotify
 fi
 ln -sfn "$HOME/config_files/spotify-launcher.conf" "$HOME/.config/spotify-launcher.conf"
 echo "-> Enlazado: ~/.config/spotify-launcher.conf -> ~/config_files/spotify-launcher.conf"
+
+# Enlaza la config de teams-for-linux, que hace que la X CIERRE la app en vez de
+# esconderla a la bandeja del sistema. Esta barra (waybar) no tiene módulo 'tray',
+# así que sin esto la ventana se esconde a una bandeja que no existe: queda invisible
+# y sin forma de recuperarla, con los procesos vivos. El porqué está en docs/linux/teams.md.
+#
+# Va enlazado archivo por archivo y NO como directorio, a diferencia del loop de más
+# arriba: ~/.config/teams-for-linux es también el user-data-dir de Electron (Cache,
+# Cookies, Session Storage). Enlazar el directorio completo al repo metería la sesión
+# y los cachés adentro del control de versiones.
+#
+# El mkdir es necesario porque ese directorio recién existe después de la primera
+# corrida de la app, y en un equipo nuevo el instalador va antes.
+mkdir -p "$HOME/.config/teams-for-linux"
+if [ -e "$HOME/.config/teams-for-linux/config.json" ] && [ ! -L "$HOME/.config/teams-for-linux/config.json" ]; then
+    respaldo="$HOME/.config/teams-for-linux/config.json.bak.$(date +%Y%m%d%H%M%S)"
+    mv "$HOME/.config/teams-for-linux/config.json" "$respaldo"
+    echo "-> config.json de teams-for-linux ya existía; respaldado como $respaldo"
+fi
+ln -sfn "$HOME/config_files/teams-for-linux.config.json" "$HOME/.config/teams-for-linux/config.json"
+echo "-> Enlazado: ~/.config/teams-for-linux/config.json -> ~/config_files/teams-for-linux.config.json"
+
+# Enlaza el .desktop de teams-for-linux, que lo arranca en Wayland NATIVO. El del
+# paquete trae '--ozone-platform=x11', y con eDP-1 a escala 2 XWayland se renderiza a
+# 1x estirado a 2x: todo borroso. Mismo problema y misma clase de arreglo que Spotify
+# (docs/linux/spotify.md); el porqué de este vive en docs/linux/teams.md.
+#
+# applications/ del repo mapea a ~/.local/share/applications, que tiene prioridad sobre
+# /usr/share/applications cuando el archivo se llama igual. Así el override sobrevive a
+# los upgrades del paquete, que reescriben el de /usr/share.
+if [ -e "$HOME/.local/share/applications/teams-for-linux.desktop" ] && [ ! -L "$HOME/.local/share/applications/teams-for-linux.desktop" ]; then
+    respaldo="$HOME/.local/share/applications/teams-for-linux.desktop.bak.$(date +%Y%m%d%H%M%S)"
+    mv "$HOME/.local/share/applications/teams-for-linux.desktop" "$respaldo"
+    echo "-> El .desktop de teams-for-linux ya existía; respaldado como $respaldo"
+fi
+mkdir -p "$HOME/.local/share/applications"
+ln -sfn "$HOME/config_files/applications/teams-for-linux.desktop" \
+    "$HOME/.local/share/applications/teams-for-linux.desktop"
+echo "-> Enlazado: ~/.local/share/applications/teams-for-linux.desktop -> ~/config_files/applications/teams-for-linux.desktop"
+
+# El override es una copia COMPLETA del .desktop del paquete con una sola línea
+# cambiada (el Exec), así que también congela los demás campos: Icon, StartupWMClass,
+# el handler de x-scheme-handler/msteams y Categories. Si un upgrade de teams-for-linux
+# cambia alguno de esos, nuestra copia lo pisaría en silencio y nadie se enteraría.
+# Este chequeo compara todo MENOS el Exec (la línea que cambiamos a propósito) y avisa.
+# El '!' delante del diff lo pone en contexto de condición, así que el 'set -e' de arriba
+# no aborta el instalador cuando hay diferencias.
+desktop_paquete="/usr/share/applications/teams-for-linux.desktop"
+if [ -f "$desktop_paquete" ]; then
+    if ! diff -q <(grep -v '^Exec=' "$desktop_paquete") \
+                 <(grep -v '^Exec=' "$HOME/config_files/applications/teams-for-linux.desktop") > /dev/null; then
+        echo "!! OJO: el .desktop del paquete teams-for-linux cambió más allá del Exec."
+        echo "   Compará y actualizá nuestra copia:"
+        echo "   diff $desktop_paquete ~/config_files/applications/teams-for-linux.desktop"
+    fi
+fi
+
+# Refresca mimeinfo.cache para que quede registrado el handler de los links 'msteams:'
+# (los 'Join meeting' de Outlook). Sin esto el .desktop igual sirve para el lanzador,
+# pero xdg-open no sabría qué app abre ese esquema.
+if command -v update-desktop-database > /dev/null; then
+    update-desktop-database "$HOME/.local/share/applications"
+fi
 
 # Enlaza la configuración de tmux directamente en el home
 if [ -e "$HOME/.tmux.conf" ] && [ ! -L "$HOME/.tmux.conf" ]; then

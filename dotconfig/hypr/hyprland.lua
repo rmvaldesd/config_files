@@ -301,7 +301,7 @@ hl.config({
     kb_options   = "grp:alt_shift_toggle",
     kb_rules     = "",
 
-    left_handed  = false,
+    left_handed  = true,
     follow_mouse = 1,
 
     sensitivity  = 0, -- -1.0 - 1.0, 0 means no modification.

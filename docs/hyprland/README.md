@@ -466,6 +466,8 @@ solo: `xdg-mime` escribe a través del symlink.
 | fzf y función `imgs` | `zshrc.local` |
 | Asociaciones de archivos | `mimeapps.list` |
 | Ignore global de git | `dotconfig/git/ignore` |
+| Teams: la X cierra la app | `teams-for-linux.config.json` (ver [`../linux/teams.md`](../linux/teams.md)) |
+| Teams: arranque en Wayland | `applications/teams-for-linux.desktop` |
 | Perfiles de energía | `etc/systemd/system/`, `etc/udev/rules.d/`, `etc/polkit-1/rules.d/`, `bin_configs/power-profile-sync` |
 | Asistente de impresión | `bin_configs/add-printer` (enlazado en `/usr/local/bin`) |
 | Limpieza de huérfanos | `bin_configs/clean-orphans` (enlazado en `/usr/local/bin`) |
@@ -475,6 +477,8 @@ solo: `xdg-mime` escribe a través del symlink.
 
 Todo lo de `dotconfig/` se enlaza con symlinks a `~/.config/`; lo de `etc/` se
 **copia** a `/etc` (lo lee root o udev antes de que se monte `/home`).
+`applications/` se enlaza a `~/.local/share/applications/`, que tiene prioridad
+sobre `/usr/share/applications` y así sobrevive a los upgrades del paquete.
 
 ## Paleta
 

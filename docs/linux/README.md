@@ -35,3 +35,8 @@ link them below.
   XWayland para que deje de verse borroso, por qué
   `ELECTRON_OZONE_PLATFORM_HINT` no le aplica y por qué no hay que forzar la
   escala a mano.
+- [Teams for Linux: la X y la bandeja que no existe](./teams.md) — por qué la
+  ventana desaparecía sin dejar rastro (se escondía a una bandeja inexistente,
+  porque waybar no tiene módulo `tray`), el `closeAppOnCross` que lo arregla, el
+  bug de `Waiting for network...`, cómo rescatar una ventana ya escondida y el
+  `.desktop` override que lo arranca en Wayland nativo.
