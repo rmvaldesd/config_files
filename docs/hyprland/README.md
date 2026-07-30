@@ -74,6 +74,33 @@ con `Return` o `Escape`.
 | `SUPER + rueda del mouse` | Cambiar de workspace |
 | `SUPER + S` | Mostrar/ocultar el workspace especial *magic* |
 | `SUPER + SHIFT + S` | Mandar la ventana al workspace *magic* |
+| `SUPER + M` | Entrar al **modo monitor** (ver abajo) |
+
+### Modo monitor
+
+`SUPER + M` entra a un submodo para mover el **workspace activo entero** de una
+pantalla a otra. Se sale con `Return` o `Escape`. *M* de monitor.
+
+| Tecla | Acción |
+|---|---|
+| `H` o `←` | Mover el workspace a la pantalla de la izquierda |
+| `L` o `→` | … a la derecha |
+| `I` o `↑` | … arriba |
+| `K` o `↓` | … abajo |
+| `Return` o `Escape` | Salir del modo |
+
+Las flechas hacen exactamente lo mismo que las letras. Acá arriba/abajo son
+`I`/`K`, igual que para mover el foco — no como en el modo redimensionar.
+
+Es un modo y no un atajo directo por dos razones: las tres combinaciones
+direccionales ya están tomadas (`SUPER` foco, `SUPER + SHIFT` ventana,
+`SUPER + CONTROL` workspace), y el caso real no es mover un workspace suelto
+sino enchufar el monitor y reacomodar dos o tres seguidos sin salir del modo.
+
+Empujar contra el borde no hace nada: si no hay pantalla de ese lado, Hyprland
+avisa *"Monitor not found"* y el workspace se queda donde está. No da la vuelta.
+
+Mientras estés adentro, waybar lo muestra (módulo `hyprland/submap`).
 
 ## Aplicaciones y sesión
 

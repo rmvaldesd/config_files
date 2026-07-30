@@ -412,6 +412,49 @@ hl.define_submap("resize", function()
   hl.bind("escape", hl.dsp.submap("reset"))
 end)
 
+
+-- Mover el WORKSPACE ACTIVO de una pantalla a otra. 'M' de monitor: SUPER + M
+-- estaba libre (SUPER + SHIFT + M es apagar, esa no se toca).
+--
+-- Va en un submapa y no en un acorde por dos razones. La primera es que las
+-- combinaciones direccionales ya estan las tres tomadas: SUPER mueve el foco,
+-- SUPER + SHIFT mueve la ventana dentro del tiling y SUPER + CONTROL cambia de
+-- workspace; lo que quedaba libre era SUPER + CONTROL + SHIFT, tres
+-- modificadores para algo que se usa poco. La segunda es que el caso real no
+-- es mover UN workspace: es enchufar el monitor y reacomodar dos o tres
+-- seguidos. En el submapa se entra una vez y se sale con Esc.
+--
+-- Waybar ya muestra el submapa activo (modulo hyprland/submap), asi que no
+-- hace falta ninguna notificacion extra para saber que uno esta adentro.
+hl.bind(mainMod .. " + M", hl.dsp.submap("monitor"))
+
+hl.define_submap("monitor", function()
+  -- Las direcciones son las mismas que en el resto de la config: H/L para
+  -- izquierda/derecha, I/K para arriba/abajo. Las flechas hacen exactamente lo
+  -- mismo, asi no hay que acordarse de que aca "arriba" es I y no J.
+  --
+  -- El monitor se elige por DIRECCION (l/r/u/d) y no por indice relativo
+  -- (+1/-1) porque el indice da la vuelta: en dos pantallas, empujar a la
+  -- derecha desde la de la derecha te devolveria a la izquierda. Con la
+  -- direccion no pasa nada y Hyprland avisa "Monitor not found", que es lo que
+  -- uno espera al empujar contra el borde.
+  --
+  -- Sin 'workspace' en la tabla, el dispatcher usa el workspace activo.
+  hl.bind("H", hl.dsp.workspace.move({ monitor = "l" }))
+  hl.bind("L", hl.dsp.workspace.move({ monitor = "r" }))
+  hl.bind("I", hl.dsp.workspace.move({ monitor = "u" }))
+  hl.bind("K", hl.dsp.workspace.move({ monitor = "d" }))
+
+  hl.bind("Left", hl.dsp.workspace.move({ monitor = "l" }))
+  hl.bind("Right", hl.dsp.workspace.move({ monitor = "r" }))
+  hl.bind("Up", hl.dsp.workspace.move({ monitor = "u" }))
+  hl.bind("Down", hl.dsp.workspace.move({ monitor = "d" }))
+
+  -- Salir del submapa al presionar Enter o Escape
+  hl.bind("Return", hl.dsp.submap("reset"))
+  hl.bind("escape", hl.dsp.submap("reset"))
+end)
+
 -- Switch workspaces with mainMod + [0-9]
 -- Move active window to a workspace with mainMod + SHIFT + [0-9]
 for i = 1, 10 do
