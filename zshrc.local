@@ -37,19 +37,65 @@ if command -v fzf > /dev/null 2>&1; then
     source <(fzf --zsh)
 
     # Atajos que quedan disponibles:
-    #   Ctrl+T  insertar un archivo/directorio en la linea de comandos
-    #   Ctrl+G  buscar por contenido (ripgrep) e insertar "+linea archivo"
+    #   Ctrl+F  buscar RUTAS e insertarlas en la linea de comandos
+    #   Ctrl+G  buscar CONTENIDO (ripgrep) e insertar "+linea archivo"
+    #   Ctrl+T  archivos del directorio actual (el que trae fzf de fabrica)
     #   Ctrl+R  buscar en el historial
     #   Alt+C   cd a un subdirectorio
     # Y el autocompletado con **<TAB>, por ejemplo: vim **<TAB>
+    #
+    # Adentro de Ctrl+F y Ctrl+G, para no tener que salir y volver a entrar:
+    #   Ctrl+H / Ctrl+L  scope: ~ / directorio actual   (en los dos)
+    #   Ctrl+F / Ctrl+D  archivos / directorios         (solo en Ctrl+F; en
+    #                    grep no aplica, los resultados son siempre lineas)
+    #
+    # Es el patron que documenta fzf en ADVANCED.md ("Toggling between data
+    # sources"), con las mismas teclas que usa el ejemplo oficial: una tecla
+    # global para entrar y letras adentro para cambiar de modo, en vez de un
+    # atajo global por cada combinacion. El prompt dice siempre donde estas
+    # parado ("files ~>", "dirs .>", "grep ~>"), y de paso Ctrl+D sigue siendo
+    # el EOF que cierra la shell.
+    #
+    # Lo que se pisa: Ctrl+F era forward-char en zsh (quedan las flechas y
+    # Alt+F). Adentro de fzf se pisan cuatro defaults, todos con reemplazo:
+    # ctrl-f forward-char (queda ->), ctrl-d delete-char (queda Supr), ctrl-h
+    # backward-delete-char (queda Backspace) y ctrl-l clear-screen.
 
-    # fd respeta .gitignore y salta los ocultos, asi que las busquedas son mas
-    # rapidas y limpias que con el 'find' por defecto.
+    # fd respeta .gitignore, asi que las busquedas son mas rapidas y limpias
+    # que con el 'find' por defecto. Los ocultos SI se incluyen (--hidden):
+    # sin eso no aparecerian ni .config ni el resto de los dotfiles, que es
+    # justo lo que uno busca en este repo.
     if command -v fd > /dev/null 2>&1; then
         export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
         export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
         export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
     fi
+
+    # Excludes para cuando la busqueda se amplia a ~ (Ctrl+H). Sin filtrar, ~
+    # da 64.000 archivos y la enorme mayoria es cache; con estos quedan 6.100 y
+    # se conserva .config, que es el motivo de ampliar a ~ en primer lugar. Se
+    # sacan .local/share y .local/state en vez de .local entero para no perder
+    # .local/bin. .claude son 33 MB de JSONL en una sola linea: un match ahi
+    # llena la pantalla con una linea gigante.
+    #
+    # Ojo con la sintaxis, fd y rg NO se comportan igual:
+    #
+    #   fd  --exclude=.local/share    ancla desde la raiz de busqueda, anda.
+    #   rg  --glob=!.local/share      NO anda: rg necesita **/ para que matchee
+    #                                 a cualquier profundidad. Sin eso el
+    #                                 exclude se ignora en silencio (6.218
+    #                                 archivos en vez de 1.578) y encima rg
+    #                                 saltea los ocultos salvo que se le pase
+    #                                 --hidden, con lo cual buscar en ~ ni
+    #                                 siquiera tocaria .config.
+    #
+    # Las comillas: los patrones con ** van entre comillas DOBLES porque el
+    # comando lo termina corriendo una shell ('$SHELL -c'), y ahi un ** suelto
+    # lo expande zsh como glob y aborta con "no matches found". Dobles y no
+    # simples porque estas cadenas van anidadas dentro de un echo '...' en los
+    # 'transform' de mas abajo, y una comilla simple lo cortaria en dos.
+    _fzf_home_ex_fd='--exclude=.git --exclude=.cache --exclude=.cargo --exclude=.claude --exclude=.local/share --exclude=.local/state'
+    _fzf_home_ex_rg='--glob=!.cache --glob=!.cargo --glob=!.claude --glob="!**/.local/share/**" --glob="!**/.local/state/**"'
 
     # Colores alineados con el resto del entorno (waybar, mako, rofi, ghostty):
     # acento cyan #75f1fa sobre la escala zinc. No se fija 'bg' a proposito, para
@@ -60,6 +106,71 @@ if command -v fzf > /dev/null 2>&1; then
         --color=info:#a1a1aa,prompt:#75f1fa,pointer:#75f1fa
         --color=marker:#75f1fa,spinner:#75f1fa,header:#71717a
         --color=border:#3f3f46"
+
+    # Ctrl-F: buscar rutas e insertarlas en la linea de comandos. Un solo
+    # widget para los cuatro estados posibles -- {archivos,directorios} x
+    # {aqui,~} -- en vez de un atajo global por combinacion.
+    if (( $+commands[fd] )); then
+        fzf-path-widget() {
+            emulate -L zsh
+
+            local f_here="fd --type f --hidden --follow --exclude=.git"
+            local d_here="fd --type d --hidden --follow --exclude=.git"
+            local f_home="fd --type f --hidden --follow $_fzf_home_ex_fd . ~"
+            local d_home="fd --type d --hidden --follow $_fzf_home_ex_fd . ~"
+
+            # El prompt hace de estado y los 'transform' lo leen: asi Ctrl+F
+            # sabe en que scope estaba parado, y Ctrl+H sabe si venia de
+            # archivos o de directorios. Sin eso cada tecla tendria que
+            # asumir la mitad del estado y pisaria la otra.
+            #
+            # El \$ va escapado para que lo expanda fzf al apretar la tecla y
+            # no zsh al definir la funcion. El '~' del patron va entre
+            # comillas porque suelto es un operador de glob en zsh.
+            local -a binds=(
+                --bind "ctrl-f:transform:[[ \$FZF_PROMPT == *'~'* ]] && echo 'change-prompt(files ~> )+reload($f_home)' || echo 'change-prompt(files .> )+reload($f_here)'"
+                --bind "ctrl-d:transform:[[ \$FZF_PROMPT == *'~'* ]] && echo 'change-prompt(dirs ~> )+reload($d_home)' || echo 'change-prompt(dirs .> )+reload($d_here)'"
+                --bind "ctrl-h:transform:[[ \$FZF_PROMPT == dirs* ]] && echo 'change-prompt(dirs ~> )+reload($d_home)' || echo 'change-prompt(files ~> )+reload($f_home)'"
+                --bind "ctrl-l:transform:[[ \$FZF_PROMPT == dirs* ]] && echo 'change-prompt(dirs .> )+reload($d_here)' || echo 'change-prompt(files .> )+reload($f_here)'"
+            )
+
+            # Un solo preview para los dos modos: si es directorio muestra que
+            # hay adentro, si es archivo el contenido. eza/bat si estan, ls y
+            # head si no (mismo patron 'fd -> find' de la funcion imgs).
+            local preview_cmd='if [ -d {} ]; then
+                    (eza -1 --icons --color=always -- {} 2>/dev/null || ls -1 -- {}) | head -n 200
+                else
+                    bat --style=numbers --color=always -- {} 2>/dev/null || head -n 200 -- {}
+                fi'
+
+            local -a sel
+            sel=("${(@f)$( eval "$f_here" 2>/dev/null |
+                fzf --multi --prompt 'files .> ' \
+                    --header 'Ctrl+F archivos   Ctrl+D directorios   Ctrl+H en ~   Ctrl+L aqui' \
+                    --preview "$preview_cmd" "${binds[@]}" )}")
+
+            # El (@f) siempre devuelve al menos un elemento vacio, asi que el
+            # guard mira el contenido y no la cantidad.
+            [[ -n ${sel[1]} ]] || { zle redisplay; return }
+
+            # (q-): citar solo si hace falta, para que una ruta con espacios o
+            # parentesis -- frecuente en el vault de Obsidian -- no se re-parta
+            # en varios argumentos al apretar Enter.
+            LBUFFER+="${(j: :)${(@q-)sel}}"
+
+            # Espacio final solo si lo ultimo elegido es un archivo. Si es
+            # directorio, fd ya lo emite terminado en '/' y el cursor queda
+            # listo para seguir tipeando adentro (cp algo ~/dir/<sigue aca>).
+            [[ -d ${sel[-1]} ]] || LBUFFER+=' '
+            zle redisplay
+        }
+        zle -N fzf-path-widget
+        bindkey '^F' fzf-path-widget
+    else
+        # Sin fd no hay modos ni scope; queda el widget de fabrica, que busca
+        # archivos en el directorio actual y ya cita las rutas por su cuenta.
+        bindkey '^F' fzf-file-widget
+    fi
 
     # Ctrl-G: buscar por CONTENIDO con ripgrep, independiente de **<TAB> (nombres
     # de archivo) y Ctrl-T (tambien nombres). Inserta "+linea archivo" en la
@@ -77,7 +188,11 @@ if command -v fzf > /dev/null 2>&1; then
         fzf-live-grep-widget() {
             emulate -L zsh
 
-            local rg_cmd='rg --column --line-number --no-heading --color=always --smart-case'
+            # --hidden porque rg saltea los ocultos por defecto, y sin eso ni
+            # .config ni los dotfiles aparecerian nunca -- que es justo lo que
+            # uno busca. Al prenderlo hay que excluir .git a mano, porque deja
+            # de estar cubierto por el salteo de ocultos.
+            local rg_cmd='rg --column --line-number --no-heading --color=always --smart-case --hidden --glob="!.git"'
             local selected file line
 
             # bat con resaltado de sintaxis y la linea marcada; si no esta
@@ -88,14 +203,27 @@ if command -v fzf > /dev/null 2>&1; then
                 (bat --style=numbers --color=always --highlight-line {2} -- {1} 2>/dev/null) ||
                 sed -n "$(( {2}>5 ? {2}-5 : 1 )),$(( {2}+15 ))p" {1}'
 
+            # Ctrl+H / Ctrl+L: mismo scope que en Ctrl+F. rg recibe el path
+            # como argumento y los binds de fzf son cadenas fijas, asi que el
+            # scope tambien vive en el prompt y cada recarga lo lee con
+            # 'transform'. La diferencia con el widget de rutas es que aca el
+            # 'change' de cada tecla tambien tiene que consultarlo: si no, al
+            # segundo caracter tipeado la busqueda volveria sola al directorio
+            # actual.
+            local rg_here="$rg_cmd -- {q} || true"
+            local rg_home="$rg_cmd $_fzf_home_ex_rg -- {q} ~ || true"
+
             selected=$(
                 FZF_DEFAULT_COMMAND="$rg_cmd ''" \
                 fzf --ansi --disabled \
-                    --bind "change:reload:$rg_cmd {q} || true" \
+                    --bind "change:transform:[[ \$FZF_PROMPT == *'~'* ]] && echo 'reload($rg_home)' || echo 'reload($rg_here)'" \
+                    --bind "ctrl-h:change-prompt(grep ~> )+reload($rg_home)" \
+                    --bind "ctrl-l:change-prompt(grep .> )+reload($rg_here)" \
+                    --header 'Ctrl+H buscar en ~   Ctrl+L aqui' \
                     --delimiter : \
                     --preview "$preview_cmd" \
                     --preview-window 'down:60%:+{2}-5' \
-                    --prompt 'grep> '
+                    --prompt 'grep .> '
             )
 
             [[ -n $selected ]] || { zle redisplay; return }

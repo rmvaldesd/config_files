@@ -128,14 +128,46 @@ Funcionan también con la pantalla bloqueada.
 
 ## Terminal: fzf
 
+Dos puntos de entrada: uno busca **rutas** y el otro **contenido**.
+
 | Atajo | Acción |
 |---|---|
+| `Ctrl + F` | Buscar rutas e insertarlas en la línea actual |
+| `Ctrl + G` | Buscar contenido (ripgrep) e insertar `+línea archivo` |
 | `Ctrl + R` | Buscar en el historial de comandos |
-| `Ctrl + T` | Insertar la ruta de un archivo en la línea actual |
+| `Ctrl + T` | Archivos del directorio actual (el que trae fzf de fábrica) |
 | `Alt + C` | `cd` a un subdirectorio |
 | `**` + `Tab` | Autocompletado difuso, ej: `vim **<TAB>` |
 
-Las búsquedas usan `fd`, así que respetan `.gitignore` y saltan los ocultos.
+Dentro de `Ctrl + F` y `Ctrl + G` se cambia de modo sin tener que salir y
+volver a entrar:
+
+| Tecla | Acción | Dónde |
+|---|---|---|
+| `Ctrl + H` | Ampliar la búsqueda a `~` | En los dos |
+| `Ctrl + L` | Volver al directorio actual | En los dos |
+| `Ctrl + F` | Modo archivos | Solo en `Ctrl + F` |
+| `Ctrl + D` | Modo directorios | Solo en `Ctrl + F` |
+
+En grep no hay modo archivos/directorios: los resultados son siempre líneas.
+
+El prompt dice siempre dónde estás parado — `files ~>`, `dirs .>`, `grep ~>` — y
+cambiar de modo conserva lo que ya tipeaste. Cada tecla fija su mitad del estado
+y deja la otra como estaba: desde `dirs ~>`, `Ctrl + F` te lleva a `files ~>`.
+
+`Ctrl + F` permite elegir varios con `Tab`. Si lo último que elegís es un
+directorio no agrega espacio al final, así seguís tipeando un nombre adentro
+(`cp algo ~/dir/…`).
+
+Las búsquedas usan `fd` y `ripgrep`, incluyen los archivos ocultos y respetan
+`.gitignore`. Al ampliar a `~` se saltean `.cache`, `.cargo`, `.claude`,
+`.local/share` y `.local/state`: sin filtrar son 64.000 archivos y la enorme
+mayoría es caché.
+
+Adentro de fzf estas teclas pisan atajos propios de fzf, todos con reemplazo:
+`Ctrl + F` (queda `→`), `Ctrl + D` (queda `Supr`), `Ctrl + H` (queda
+`Backspace`) y `Ctrl + L` (limpiar pantalla). En la shell, `Ctrl + F` era
+`forward-char`; quedan las flechas y `Alt + F`.
 
 ## Terminal: función `imgs`
 
