@@ -79,30 +79,56 @@ if command -v fzf > /dev/null 2>&1; then
     fi
 
     # Excludes para cuando la busqueda se amplia a ~ (Ctrl+H). Sin filtrar, ~
-    # da 64.000 archivos y la enorme mayoria es cache; con estos quedan 6.100 y
-    # se conserva .config, que es el motivo de ampliar a ~ en primer lugar. Se
-    # sacan .local/share y .local/state en vez de .local entero para no perder
-    # .local/bin. .claude son 33 MB de JSONL en una sola linea: un match ahi
-    # llena la pantalla con una linea gigante.
+    # da 102.592 archivos y la enorme mayoria es cache; con estos quedan 4.724
+    # y se conserva .config, que es el motivo de ampliar a ~ en primer lugar.
     #
-    # Ojo con la sintaxis, fd y rg NO se comportan igual:
+    # Van en dos bloques:
     #
-    #   fd  --exclude=.local/share    ancla desde la raiz de busqueda, anda.
-    #   rg  --glob=!.local/share      NO anda: rg necesita **/ para que matchee
-    #                                 a cualquier profundidad. Sin eso el
-    #                                 exclude se ignora en silencio (6.218
-    #                                 archivos en vez de 1.578) y encima rg
-    #                                 saltea los ocultos salvo que se le pase
-    #                                 --hidden, con lo cual buscar en ~ ni
-    #                                 siquiera tocaria .config.
+    #   1. Cache y estado de las apps. Se sacan .local/share y .local/state en
+    #      vez de .local entero para no perder .local/bin. .claude son 33 MB de
+    #      JSONL en una sola linea: un match ahi llena la pantalla con una
+    #      linea gigante.
+    #
+    #   2. Caches de dependencias: codigo descargado que uno lee de rebote pero
+    #      no edita ni abre a proposito. go/pkg es el que mas pesa de lejos --
+    #      27.216 archivos, el 79% de lo que quedaba con solo el primer bloque
+    #      -- y aparecio recien al instalar go, por eso el conteo de arriba
+    #      cambio tanto respecto del que decia este comentario antes.
+    #
+    # Los mismos dos bloques usa bin_configs/find-file (el lanzador de SUPER+F,
+    # ver docs/hyprland/README.md), a proposito: que buscar desde la terminal y
+    # buscar desde el escritorio no devuelvan universos distintos.
+    #
+    # Ojo con la sintaxis, fd y rg NO se comportan igual con los patrones que
+    # llevan BARRA:
+    #
+    #   fd  --exclude=go/pkg      ancla desde la raiz de la busqueda, asi que
+    #                             anda igual desde cualquier directorio.
+    #   rg  --glob=!go/pkg        NO anda: rg lo ancla al directorio ACTUAL, y
+    #                             estos widgets se llaman desde cualquiera. Se
+    #                             ignora en silencio (31.877 archivos en vez de
+    #                             4.661). Con **/ adelante y /** atras matchea
+    #                             a cualquier profundidad y ahi si.
+    #   rg  --glob=!.npm          los patrones de UN solo componente, sin
+    #                             barra, si matchean a cualquier profundidad:
+    #                             esos van tal cual en las dos herramientas.
+    #
+    # Y rg saltea los ocultos salvo que se le pase --hidden, con lo cual buscar
+    # en ~ ni siquiera tocaria .config. Eso lo resuelve rg_cmd, mas abajo.
     #
     # Las comillas: los patrones con ** van entre comillas DOBLES porque el
     # comando lo termina corriendo una shell ('$SHELL -c'), y ahi un ** suelto
     # lo expande zsh como glob y aborta con "no matches found". Dobles y no
     # simples porque estas cadenas van anidadas dentro de un echo '...' en los
     # 'transform' de mas abajo, y una comilla simple lo cortaria en dos.
+    #
+    # El '+=' de la segunda linea es solo para no tener una linea de 300
+    # caracteres; el valor final es una sola cadena, sin saltos adentro (un
+    # salto de linea aca rompe los 'reload(...)' de los binds).
     _fzf_home_ex_fd='--exclude=.git --exclude=.cache --exclude=.cargo --exclude=.claude --exclude=.local/share --exclude=.local/state'
+    _fzf_home_ex_fd+=' --exclude=go/pkg --exclude=.npm --exclude=node_modules --exclude=.oh-my-zsh'
     _fzf_home_ex_rg='--glob=!.cache --glob=!.cargo --glob=!.claude --glob="!**/.local/share/**" --glob="!**/.local/state/**"'
+    _fzf_home_ex_rg+=' --glob="!**/go/pkg/**" --glob=!.npm --glob=!node_modules --glob=!.oh-my-zsh'
 
     # Colores alineados con el resto del entorno (waybar, mako, rofi, ghostty):
     # acento cyan #75f1fa sobre la escala zinc. No se fija 'bg' a proposito, para

@@ -23,6 +23,7 @@ correspondiente en el mismo commit.
 - [Terminal: función `imgs`](#terminal-función-imgs)
 - [Portapapeles](#portapapeles)
 - [Selector de ventanas: `pick-window`](#selector-de-ventanas-pick-window)
+- [Buscador de archivos: `find-file`](#buscador-de-archivos-find-file)
 - [Impresión: `add-printer`](#impresión-add-printer)
 - [Mantenimiento](#mantenimiento)
 - [Waybar: clics](#waybar-clics)
@@ -109,6 +110,7 @@ Mientras estés adentro, waybar lo muestra (módulo `hyprland/submap`).
 | `SUPER + T` | Terminal (ghostty) |
 | `SUPER + B` | Navegador (firefox) |
 | `SUPER + E` | Gestor de archivos (thunar) |
+| `SUPER + F` | Buscar un archivo en todo `~` y abrirlo con su aplicación por defecto |
 | `SUPER + Space` | Lanzador de apps (`rofi -show drun`, con iconos) |
 | `SUPER + SHIFT + Space` | Ejecutar comando (`rofi -show run`) |
 | `SUPER + SHIFT + V` | Historial del portapapeles (cliphist en rofi) |
@@ -283,6 +285,87 @@ actualiza el estado de modificadores en vez de mandarlo por el matcher de binds,
 así que el bind nunca dispara. Ni siquiera con `release` (el `bindr`, que
 engancha el soltar y suele rescatar estos casos). Con cualquier tecla normal
 anda a la primera.
+
+## Buscador de archivos: `find-file`
+
+`SUPER + F` (de *find* / *file*) busca un archivo en cualquier lugar de `~` y lo
+abre con la aplicación que le corresponda según `mimeapps.list` (un PDF en
+zathura, un PNG en imv, texto en Sublime). Es el equivalente gráfico del `Ctrl+F`
+de la terminal, y por eso comparte la letra.
+
+El menú muestra dos columnas: el nombre a la izquierda y la carpeta a la
+derecha. El nombre es lo que uno recuerda; la carpeta es lo que desempata entre
+los diez `README.md` del disco.
+
+```
+informe-2026.pdf        ~/Documents/trabajo
+notas.md                ~/obsidian/diario
+config.rasi             ~/.config/rofi
+```
+
+Se filtra escribiendo, y el filtro corre sobre las dos columnas: `pdf trab` deja
+sólo los PDF que estén bajo una carpeta de trabajo.
+
+### El mismo comando en la terminal
+
+Corrido a mano, `find-file` cambia de cara: usa **fzf** con un panel de preview
+al costado, y con `Tab` se marcan varios para abrirlos todos juntos.
+
+```sh
+find-file          # elige solo el frontend
+find-file --rofi   # fuerza el menú de rofi
+find-file --fzf    # fuerza fzf, incluso desde el bind
+```
+
+La detección es por TTY: Hyprland lanza los binds sin terminal, así que ahí sale
+rofi; en una terminal interactiva sale fzf. Es el único dato confiable para
+distinguir los dos casos — `WAYLAND_DISPLAY`, por ejemplo, está puesto en los
+dos, porque la terminal también es un cliente de Wayland.
+
+El preview mira primero si el archivo es binario. Sin ese chequeo, previsualizar
+un PDF o una imagen — que son justo los que uno abre con este lanzador — volcaría
+bytes crudos al panel y dejaría la terminal desconfigurada. Para esos muestra qué
+son y cuánto pesan.
+
+### Qué queda afuera de la búsqueda
+
+Se listan los archivos ocultos (si no, `~/.config` sería invisible), pero se
+excluyen a mano los directorios que son caché o código descargado:
+
+| Excluido | Por qué |
+|---|---|
+| `.git`, `.cache`, `.cargo`, `.claude`, `.local/share`, `.local/state` | Caché y estado de las apps |
+| `go/pkg`, `.npm`, `node_modules` | Cachés de dependencias, de sólo lectura |
+| `.oh-my-zsh` | Código del framework, no configuración propia |
+
+El segundo bloque es el que más cambia las cosas: sin él el menú pasa de **4.724
+entradas a 34.336**, porque el caché de módulos de Go solo aporta 27.216 — el 79%
+del total.
+
+Es la **misma** lista que usan los widgets de `Ctrl+F` y `Ctrl+G` de la terminal,
+para que buscar desde el escritorio y buscar desde la shell no devuelvan
+universos distintos. Vive duplicada en dos lugares y hay que tocar los dos:
+
+| Dónde | Variable |
+|---|---|
+| `bin_configs/find-file` | arreglo `excluir` |
+| `zshrc.local` | `_fzf_home_ex_fd` y `_fzf_home_ex_rg` |
+
+Ojo con la sintaxis de la tercera: `fd` y `rg` **no** tratan igual a los patrones
+con barra. `fd --exclude=go/pkg` ancla desde la raíz de la búsqueda y anda desde
+cualquier directorio; `rg --glob=!go/pkg` lo ancla al directorio *actual*, así
+que desde otro directorio se ignora en silencio (31.877 archivos en vez de
+4.661). En `rg` esos patrones van como `--glob="!**/go/pkg/**"`. Los de un solo
+componente, sin barra (`.npm`, `node_modules`, `.oh-my-zsh`), andan tal cual en
+las dos.
+
+### Por qué no alcanza con `rofi -show recursivebrowser`
+
+Ese modo existe en rofi 2.0 y hasta abre con `xdg-open` por su cuenta, así que a
+primera vista haría el trabajo sin script. El problema es que usa su propio
+escáner y no tiene forma de excluir nada: lista las decenas de miles de archivos
+de caché y sepulta bajo ellos a los que uno busca. Con `fd` esos se filtran y el
+menú se genera igual en menos de 100 ms.
 
 ## Impresión: `add-printer`
 
@@ -531,6 +614,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Asistente de impresión | `bin_configs/add-printer` (enlazado en `/usr/local/bin`) |
 | Limpieza de huérfanos | `bin_configs/clean-orphans` (enlazado en `/usr/local/bin`) |
 | Selector de ventanas | `bin_configs/pick-window` (enlazado en `/usr/local/bin`) |
+| Buscador de archivos | `bin_configs/find-file` (enlazado en `/usr/local/bin`) |
 | Enlazar los scripts propios | `scripts/link-bins.sh` |
 | Instalación completa | `archdesktopinstall.sh` |
 

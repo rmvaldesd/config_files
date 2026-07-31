@@ -396,6 +396,14 @@ hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("pick-window"))
 -- las hace el dispatcher de foco de Hyprland solo, el script no las programa.
 hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("pick-window --all"))
 
+-- Buscar un archivo en cualquier lugar de ~ y abrirlo con su aplicación por defecto.
+-- F de 'find' / 'file', y queda al lado del Ctrl+F de zsh, que hace lo mismo dentro de
+-- la terminal. SUPER + F estaba libre; SUPER + SHIFT + F (pantalla completa) no se toca.
+--
+-- El script (bin_configs/find-file) elige frontend solo: desde acá no hay terminal, así
+-- que saca el menú de rofi; corrido a mano en una terminal saca fzf con preview.
+hl.bind(mainMod .. " + F", hl.dsp.exec_cmd("find-file"))
+
 
 -- Activar el submapa al pulsar Mod + R
 hl.bind("SUPER + R", hl.dsp.submap("resize"))

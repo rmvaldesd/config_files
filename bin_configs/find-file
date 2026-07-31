@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# Busca un archivo en cualquier lugar de ~ y lo abre con su aplicación por defecto.
+# Un solo script con dos caras, según desde dónde se lo llame:
+#
+#   find-file          elige solo: rofi si lo lanzó el bind (SUPER + F), fzf si lo
+#                      corriste en una terminal
+#   find-file --rofi   fuerza el menú de rofi
+#   find-file --fzf    fuerza fzf con preview (permite elegir varios con Tab)
+#
+# La detección es por TTY y no por variables de entorno: Hyprland lanza los binds sin
+# terminal, así que ahí stdin no es un tty y sale rofi; en una terminal interactiva sí
+# lo es y sale fzf. Es el único dato confiable -- WAYLAND_DISPLAY, por ejemplo, está
+# puesto en las DOS situaciones, porque la terminal también es un cliente de Wayland.
+#
+# Por qué un script y no 'rofi -show recursivebrowser' (que existe en rofi 2.0 y abre
+# con xdg-open por su cuenta): ese modo usa su propio escáner, sin forma de excluir
+# nada. Termina listando las decenas de miles de archivos de caché de este disco, que
+# no son cosas que uno quiera abrir, y sepultando bajo ellos a los que sí. Con fd los
+# excluimos y quedan ~4.700 entradas reales, que se generan en menos de 100 ms.
+
+set -euo pipefail
+
+frontend=auto
+case "${1:-}" in
+    --rofi) frontend=rofi ;;
+    --fzf)  frontend=fzf ;;
+    "")     ;;
+    *)      printf 'uso: %s [--rofi|--fzf]\n' "$0" >&2; exit 1 ;;
+esac
+
+if [ "$frontend" = auto ]; then
+    if [ -t 0 ] && [ -t 1 ]; then frontend=fzf; else frontend=rofi; fi
+fi
+
+# --hidden es necesario: fd salta los ocultos de fábrica y sin esto ~/.config, que sí
+# se edita a mano, quedaría invisible. Justamente por eso hay que sacar a mano los
+# directorios ocultos que son caché o estado de las apps.
+#
+# Esta lista es la MISMA que la de los widgets de fzf de zshrc.local (_fzf_home_ex_fd),
+# a propósito: que buscar desde la terminal y buscar desde el escritorio no devuelvan
+# universos distintos. Si tocás una, tocá la otra.
+#
+# El segundo bloque son cachés de dependencias, y es el que más cambia las cosas: sin
+# él, el caché de módulos de Go solo aporta 27.216 de las 34.336 entradas -- el 79% del
+# menú -- y sepulta a lo que uno busca. Medido acá: 34.336 entradas contra 4.724.
+excluir=(
+    --exclude=.git
+    --exclude=.cache
+    --exclude=.cargo
+    --exclude=.claude
+    --exclude=.local/share
+    --exclude=.local/state
+
+    --exclude=go/pkg      # caché de módulos de Go, de sólo lectura
+    --exclude=.npm        # caché de npm
+    --exclude=node_modules
+    --exclude=.oh-my-zsh  # código del framework, no configuración propia
+)
+
+# fd corre DESDE ~ para que emita rutas relativas: son las que se ven mejor en los dos
+# menús ('Documents/informe.pdf' y no '/home/rodrigo/Documents/informe.pdf') y además
+# hacen que el preview de fzf funcione sin reconstruir nada, porque fzf hereda este
+# mismo directorio. La ruta absoluta la repone abrir().
+cd "$HOME"
+
+abrir() {
+    local relativa=$1 absoluta="$HOME/$1"
+
+    # setsid -f desprende el visor del script. Sin eso el proceso queda colgado de la
+    # vida de xdg-open: en el caso del bind, Hyprland tendría un hijo por cada archivo
+    # abierto; en el de la terminal, la shell quedaría bloqueada hasta cerrar el visor.
+    #
+    # El desprendimiento tiene un costo: los errores del visor ya no vuelven acá (el
+    # fallo ocurre después del fork). Lo que sí se detecta antes es el caso frecuente
+    # -- que el tipo de archivo no tenga aplicación asociada en mimeapps.list -- y de
+    # ese sí se avisa, porque si no el atajo parece no hacer nada.
+    local tipo
+    tipo=$(xdg-mime query filetype "$absoluta" 2> /dev/null || true)
+    if [ -n "$tipo" ] && [ -z "$(xdg-mime query default "$tipo" 2> /dev/null)" ]; then
+        local aviso="Sin aplicación por defecto para $tipo"
+        notify-send "Abrir archivo" "$aviso" 2> /dev/null || printf '%s\n' "$aviso" >&2
+        return 1
+    fi
+
+    setsid -f xdg-open "$absoluta" > /dev/null 2>&1
+}
+
+if [ "$frontend" = rofi ]; then
+    # Dos columnas: nombre a la izquierda, carpeta a la derecha. El nombre es lo que uno
+    # recuerda y la carpeta lo que desempata entre los diez 'README.md' del disco.
+    #
+    # La ruta completa viaja como PRIMERA columna y no se muestra: rofi dibuja sólo las
+    # columnas de -display-columns pero DEVUELVE la línea entera, así que la ruta llega
+    # de vuelta sin ensuciar el menú. Es el mismo truco que usa pick-window con la
+    # dirección de la ventana.
+    lista=$(fd --type f --hidden --follow "${excluir[@]}" . | awk -F/ '
+        {
+            nombre  = $NF
+            # -1 para comerse también la barra que separa carpeta de nombre. Si el
+            # archivo está suelto en ~ no hay carpeta y queda "~" pelado.
+            carpeta = (length($0) > length(nombre)) \
+                ? "~/" substr($0, 1, length($0) - length(nombre) - 1) \
+                : "~"
+            printf "%s\t%s\t%s\n", $0, nombre, carpeta
+        }')
+
+    # Sin resultados no tiene sentido abrir el menú: 'printf' de una cadena vacía le
+    # daría a rofi una línea en blanco y el menú saldría con una entrada fantasma.
+    if [ -z "$lista" ]; then
+        notify-send "Archivos" "No se encontró ningún archivo en ~" 2> /dev/null || true
+        exit 0
+    fi
+
+    seleccion=$(printf '%s\n' "$lista" | rofi -dmenu -i \
+        -p "Archivos" \
+        -display-columns 2,3 \
+        -theme-str 'window {width: 900px;}') || exit 0
+
+    [ -n "$seleccion" ] || exit 0
+    abrir "${seleccion%%$'\t'*}"
+else
+    # El preview mira primero si el archivo es binario. Sin ese guard, previsualizar un
+    # PDF o una imagen -- que son justo los que uno abre con este lanzador -- vuelca
+    # bytes crudos al panel y desconfigura la terminal. Para esos se muestra qué son y
+    # cuánto pesan, que es la única información útil que tienen antes de abrirlos.
+    #
+    # bat va con fallback a head porque no está instalado en todas las máquinas donde
+    # se clona este repo; mismo patrón que los widgets de zshrc.local.
+    preview='
+        if file -bL --mime -- {} | grep -q charset=binary; then
+            file -bL -- {}
+            printf "Tamaño: "; du -h -- {} | cut -f1
+        else
+            bat --style=numbers --color=always -- {} 2>/dev/null || head -n 200 -- {}
+        fi'
+
+    # --multi para abrir varias de una (Tab marca). Sin --height: acá el menú es toda
+    # la razón de ser del comando, no un accesorio de la línea de edición como en los
+    # widgets de zsh, así que se queda con la pantalla entera y el preview se ve.
+    seleccion=$(fd --type f --hidden --follow "${excluir[@]}" . |
+        fzf --multi --height=100% \
+            --prompt 'abrir ~> ' \
+            --header 'Enter abre con la app por defecto   Tab marca varios' \
+            --preview "$preview") || exit 0
+
+    [ -n "$seleccion" ] || exit 0
+
+    # Una llamada a abrir() por línea. El IFS vacío y el -r evitan que un nombre con
+    # espacios o con barras invertidas llegue partido o alterado.
+    while IFS= read -r archivo; do
+        [ -n "$archivo" ] && abrir "$archivo"
+    done <<< "$seleccion"
+fi
