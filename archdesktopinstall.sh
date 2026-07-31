@@ -188,6 +188,7 @@ paquetes_utilidades=(
     unzip             # Descompresor ZIP; Mason (nvim) lo necesita para extraer los LSPs que descarga.
     nodejs            # Runtime de JavaScript; requerido por varios LSPs que instala Mason (ts_ls, pyright, etc.).
     npm               # Gestor de paquetes de Node; Mason lo usa para instalar LSPs basados en Node.
+    go                # Compilador de Go. Hace falta para 'nvim-dap-go' (debugging de Go) y porque el handler de gopls está DESHABILITADO a propósito en dotconfig/nvim/lua/plugins/init.lua, o sea que Mason no lo instala: gopls se pone a mano con 'go install golang.org/x/tools/gopls@latest' y queda en ~/go/bin, que la sección 9 agrega al PATH vía zshrc.local. Lo mismo vale para cualquier binario de Go instalado así (templ, air, etc.).
     tree-sitter-cli   # Compilador de parsers de Tree-sitter; nvim-treesitter lo necesita para instalar gramáticas.
     zsh               # Shell principal del usuario (se configura como shell por defecto en la sección 11).
     gvfs              # Capa de montaje virtual; permite a Thunar montar USBs, ver la papelera y unidades de red.

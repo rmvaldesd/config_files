@@ -6,9 +6,16 @@
 # pelearse con el repo. Lo único que el script le agrega es un source de este
 # archivo al final. Todo lo propio va acá.
 
-# Binarios de usuario instalados fuera de pacman (entre ellos 'claude', que el
-# instalador oficial deja en ~/.local/bin).
-export PATH="$HOME/.local/bin:$PATH"
+# Binarios de usuario instalados fuera de pacman:
+#   ~/.local/bin  entre otros 'claude', que su instalador oficial deja ahi.
+#   ~/go/bin      lo que instala 'go install' (gopls, templ, air...). El handler
+#                 de gopls esta deshabilitado a proposito en la config de nvim,
+#                 asi que Mason NO lo instala y tiene que venir de aca.
+#
+# Se pone la ruta fija y no "$(go env GOPATH)/bin": eso obligaria a ejecutar go
+# en cada arranque de shell, y dejaria el PATH roto el dia que Go no este.
+# GOPATH ya apunta a ~/go, que es el default.
+export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"
 
 # ---------------------------------------------------------------------------
 # claude
