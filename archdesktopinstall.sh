@@ -188,7 +188,8 @@ paquetes_utilidades=(
     unzip             # Descompresor ZIP; Mason (nvim) lo necesita para extraer los LSPs que descarga.
     nodejs            # Runtime de JavaScript; requerido por varios LSPs que instala Mason (ts_ls, pyright, etc.).
     npm               # Gestor de paquetes de Node; Mason lo usa para instalar LSPs basados en Node.
-    go                # Compilador de Go. Hace falta para 'nvim-dap-go' (debugging de Go) y porque el handler de gopls está DESHABILITADO a propósito en dotconfig/nvim/lua/plugins/init.lua, o sea que Mason no lo instala: gopls se pone a mano con 'go install golang.org/x/tools/gopls@latest' y queda en ~/go/bin, que la sección 9 agrega al PATH vía zshrc.local. Lo mismo vale para cualquier binario de Go instalado así (templ, air, etc.).
+    go                # Compilador de Go. Hace falta para 'nvim-dap-go' (debugging de Go) y porque el handler de gopls está DESHABILITADO a propósito en dotconfig/nvim/lua/plugins/init.lua, o sea que Mason no lo instala: gopls se pone a mano en la sección 14 y queda en ~/go/bin, que zshrc.local agrega al PATH. Lo mismo vale para cualquier binario de Go instalado así (templ, air, etc.).
+    delve             # Debugger de Go; provee 'dlv', que es el backend que arranca 'nvim-dap-go' (dotconfig/nvim/lua/plugins/dap.lua). Viene de pacman y no de 'go install' porque está en los repos oficiales: así se actualiza con el resto del sistema en vez de quedar congelado en la versión que uno bajó a mano. Sin él, poner un breakpoint en un archivo .go falla al lanzar la sesión.
     tree-sitter-cli   # Compilador de parsers de Tree-sitter; nvim-treesitter lo necesita para instalar gramáticas.
     zsh               # Shell principal del usuario (se configura como shell por defecto en la sección 11).
     gvfs              # Capa de montaje virtual; permite a Thunar montar USBs, ver la papelera y unidades de red.
@@ -607,6 +608,30 @@ elif curl -fsSL https://claude.ai/install.sh | bash; then
     echo "-> Claude Code instalado. Ejecuta 'claude' tras reiniciar la shell para iniciar sesión."
 else
     echo "AVISO: falló la instalación de Claude Code. Reintenta luego con: curl -fsSL https://claude.ai/install.sh | bash"
+fi
+
+# ==========================================
+# 14. GOPLS (LSP DE GO)
+# ==========================================
+# El LSP de Go NO lo instala Mason: su handler está deshabilitado a propósito en
+# dotconfig/nvim/lua/plugins/init.lua ('gopls = function() end'), así que hay que
+# ponerlo a mano. 'go install' lo deja en ~/go/bin, que zshrc.local agrega al PATH.
+#
+# Va al final y con el error tolerado, igual que AUR y Claude Code: descarga de la
+# red y un fallo acá no debe abortar una instalación que ya está completa.
+#
+# El guard mira la RUTA y no 'command -v gopls': en este punto del script la shell
+# todavía no cargó el zshrc nuevo, así que ~/go/bin aún no está en el PATH y un
+# 'command -v' fallaría siempre, reinstalando gopls en cada corrida.
+#
+# El debugger (delve/dlv) no va acá: viene de pacman en la sección 5.
+echo "-> Instalando gopls (LSP de Go)..."
+if [[ -x "$HOME/go/bin/gopls" ]]; then
+    echo "-> gopls ya está instalado; se omite."
+elif go install golang.org/x/tools/gopls@latest; then
+    echo "-> gopls instalado en ~/go/bin/gopls."
+else
+    echo "AVISO: falló la instalación de gopls. Reintenta luego con: go install golang.org/x/tools/gopls@latest"
 fi
 
 echo "---"
