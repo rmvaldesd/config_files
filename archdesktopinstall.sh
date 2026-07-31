@@ -194,6 +194,25 @@ paquetes_utilidades=(
     python-pip        # Provee el comando 'pip' fuera de un virtualenv. OJO con PEP 668: en Arch, tanto 'pip install' como 'pip install --user' fallan a propósito con "externally-managed-environment", para que pip no le pise archivos a pacman; hay que pasar --break-system-packages (desaconsejado) o usar un venv. Adentro de un venv NO hace falta este paquete: 'python -m venv' ya trae su propio pip vía ensurepip, que es el flujo que documenta dotconfig/nvim/GUIDE.md para debugpy.
     python-pipx       # Instala APLICACIONES de Python (no librerías) cada una en su propio virtualenv, y linkea el ejecutable en ~/.local/bin, que ya está en el PATH vía zshrc.local. Es la salida al PEP 668 de arriba para una herramienta de línea de comandos: 'pipx install diff-cover' anda donde 'pip install diff-cover' se niega. Antes de recurrir a pipx conviene buscar el paquete en los repos ('pacman -Ss python-<nombre>'): si está, ese se actualiza con el sistema. pipx queda para lo que no está empaquetado.
     tree-sitter-cli   # Compilador de parsers de Tree-sitter; nvim-treesitter lo necesita para instalar gramáticas.
+    # --- Formateadores que declara conform.nvim (dotconfig/nvim/lua/plugins/format.lua) ---
+    # Nadie los instalaba: mason-lspconfig sólo baja LSPs y no hay mason-tool-installer.
+    # Como format_on_save usa lsp_format = "fallback", la falta no da error: simplemente
+    # no se formatea, o se formatea distinto de lo declarado. El caso peor es Python,
+    # donde pyright no formatea nada y el fallback no aporta.
+    go-tools          # Provee 'goimports' (el paquete trae además stringer, callgraph, etc.). Es el primer formateador de Go en conform. gopls formatea igual vía el fallback LSP, pero eso NO agrega ni saca imports, que es justo lo que aporta goimports.
+    gofumpt           # Segundo formateador de Go en conform. gopls lo trae embebido (gofumpt = true en lsp-settings.lua), pero conform invoca el BINARIO, así que hace falta igual.
+    staticcheck       # Linter extra de Go, listado como prerequisito en dotconfig/nvim/GUIDE.md. Dentro de nvim no cambia nada -- gopls ya usa sus analizadores embebidos con staticcheck = true --; esto es para correrlo a mano desde la terminal.
+    python-black      # Formateador de Python de conform. Sin él, guardar un .py no formatea NADA: pyright no tiene formateador, así que el fallback a LSP no cubre este caso.
+    python-isort      # Ordena los imports de Python; corre antes que black en conform.
+    stylua            # Formateador de Lua de conform (o sea, para editar esta misma config de nvim).
+    prettier          # Formateador de conform para TS/JS/CSS/HTML/JSON/YAML/Markdown/GraphQL. En TS/JS el fallback a ts_ls tapa parte del hueco; en CSS, YAML y Markdown no hay nada detrás.
+    # --- Herramientas de desarrollo ---
+    man-db            # El comando 'man'. NO viene con base ni con base-devel: sin esto 'man ls' falla y uno se entera en el peor momento.
+    man-pages         # Las páginas de manual de Linux propiamente dichas (secciones 2, 3, 7...). man-db es el lector; sin este paquete hay lector pero casi nada que leer.
+    github-cli        # Provee 'gh': PRs, issues y reviews desde la terminal. Autenticar una vez con 'gh auth login'.
+    direnv            # Carga y descarga variables de entorno al entrar y salir de un directorio (.envrc). Encaja con el flujo de virtualenv por proyecto que documenta GUIDE.md: un '.envrc' con 'layout python' activa el venv solo al hacer cd. OJO: sin el hook en la shell no hace absolutamente nada; ese hook está en zshrc.local.
+    python-debugpy    # Debugger de Python. OJO: para que los breakpoints funcionen, debugpy tiene que estar en el MISMO intérprete que corre la app, o sea dentro del venv del proyecto ('python -m pip install debugpy' con el venv activado). Este paquete del sistema sólo cubre el camino de respaldo de dap.lua, cuando no hay venv y cae a 'python3'.
+    python-pytest     # Corredor de tests de Python; dap.lua fija test_runner = "pytest". Aplica la misma advertencia que debugpy: en un proyecto con venv, el pytest que vale es el del venv.
     zsh               # Shell principal del usuario (se configura como shell por defecto en la sección 11).
     gvfs              # Capa de montaje virtual; permite a Thunar montar USBs, ver la papelera y unidades de red.
     gvfs-mtp          # Soporte MTP para gvfs; permite a Thunar acceder a celulares Android.

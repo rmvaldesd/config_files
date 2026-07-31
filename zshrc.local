@@ -327,3 +327,26 @@ imgs() {
     # &! lo desacopla de la shell: cerrar la terminal no cierra el visor.
     xdg-open $sel >/dev/null 2>&1 &!
 }
+
+# ---------------------------------------------------------------------------
+# direnv
+# ---------------------------------------------------------------------------
+# Carga y descarga variables de entorno al entrar y salir de un directorio que
+# tenga un .envrc. El uso concreto acá es el virtualenv por proyecto que
+# documenta dotconfig/nvim/GUIDE.md: un .envrc con una sola linea
+#
+#     layout python
+#
+# activa el venv al hacer cd y lo desactiva al salir, sin 'source .venv/bin/activate'
+# a mano. La primera vez hay que autorizarlo con 'direnv allow' -- un .envrc es
+# codigo ejecutable, asi que direnv se niega a correr uno que no aprobaste.
+#
+# Este hook es OBLIGATORIO: sin el, direnv queda instalado pero no se dispara
+# nunca y el .envrc se ignora en silencio. Va al final del archivo a proposito:
+# direnv se engancha a precmd y su documentacion pide que sea el ultimo de la
+# cadena, para que pueda ver los cambios que hicieron los demas.
+#
+# El guard evita que la shell falle si direnv no esta instalado.
+if command -v direnv > /dev/null 2>&1; then
+    eval "$(direnv hook zsh)"
+fi

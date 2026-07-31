@@ -522,7 +522,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Notificaciones | `dotconfig/mako/config` |
 | Lanzador | `dotconfig/rofi/config.rasi` y `dark.rasi` |
 | Terminal | `dotconfig/ghostty/config.ghostty` |
-| fzf y función `imgs` | `zshrc.local` |
+| fzf, función `imgs`, `PATH` y hook de direnv | `zshrc.local` |
 | Asociaciones de archivos | `mimeapps.list` |
 | Ignore global de git | `dotconfig/git/ignore` |
 | Teams: la X cierra la app | `teams-for-linux.config.json` (ver [`../linux/teams.md`](../linux/teams.md)) |
