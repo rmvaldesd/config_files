@@ -608,8 +608,10 @@ solo: `xdg-mime` escribe a través del symlink.
 | fzf, función `imgs`, `PATH` y hook de direnv | `zshrc.local` |
 | Asociaciones de archivos | `mimeapps.list` |
 | Ignore global de git | `dotconfig/git/ignore` |
-| Teams: la X cierra la app | `teams-for-linux.config.json` (ver [`../linux/teams.md`](../linux/teams.md)) |
+| Teams: la X cierra la app | `launchers/teams-for-linux.config.json` (ver [`../linux/teams.md`](../linux/teams.md)) |
 | Teams: arranque en Wayland | `applications/teams-for-linux.desktop` |
+| Spotify: arranque en Wayland | `launchers/spotify-launcher.conf` (ver [`../linux/spotify.md`](../linux/spotify.md)) |
+| Zoom: arranque en Wayland | `~/.config/zoomus.conf` (no versionado, ver [`../linux/zoom.md`](../linux/zoom.md)) |
 | Perfiles de energía | `etc/systemd/system/`, `etc/udev/rules.d/`, `etc/polkit-1/rules.d/`, `bin_configs/power-profile-sync` |
 | Asistente de impresión | `bin_configs/add-printer` (enlazado en `/usr/local/bin`) |
 | Limpieza de huérfanos | `bin_configs/clean-orphans` (enlazado en `/usr/local/bin`) |

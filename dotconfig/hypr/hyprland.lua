@@ -22,11 +22,24 @@
 
 -- See https://wiki.hypr.land/Configuring/Basics/Monitors/
 hl.monitor({
-  output   = "",
-  mode     = "preferred",
-  position = "auto",
-  scale    = "auto",
-})
+    output   = "",
+    mode     = "preferred",
+    position = "auto",
+    scale    = "auto",
+  },
+  {
+    output = "DP-1",
+    mode = "2560x1080@60",
+    position = "auto-right",
+    scale = "auto",
+  }
+-- {
+--   output = "HDMI-A-1",
+--   mode = "3840x2160@60",
+--   position = "auto-right",
+--   scale = "auto",
+-- }
+)
 
 
 ---------------------
@@ -301,7 +314,7 @@ hl.config({
     kb_options   = "grp:alt_shift_toggle",
     kb_rules     = "",
 
-    left_handed  = true,
+    left_handed  = false,
     follow_mouse = 1,
 
     sensitivity  = 0, -- -1.0 - 1.0, 0 means no modification.

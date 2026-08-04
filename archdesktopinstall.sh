@@ -400,6 +400,11 @@ fi
 ln -sfn "$HOME/config_files/mimeapps.list" "$HOME/.config/mimeapps.list"
 echo "-> Enlazado: ~/.config/mimeapps.list -> ~/config_files/mimeapps.list"
 
+# A partir de acá, los archivos fuente viven en launchers/ (raíz del repo): son
+# arreglos de lanzadores de apps de terceros (Spotify, teams-for-linux) que por lo
+# demás no tienen nada en común con dotconfig/ ni con bin_configs/, así que se
+# agruparon en su propia carpeta en vez de quedar sueltos en la raíz del repo.
+#
 # Enlaza la config de spotify-launcher, que le pasa a Spotify los flags de Ozone
 # para que arranque en Wayland nativo en vez de XWayland (si no, con el monitor a
 # escala 2 se ve borroso). Otro archivo suelto en ~/.config, igual que el de arriba.
@@ -409,8 +414,8 @@ if [ -e "$HOME/.config/spotify-launcher.conf" ] && [ ! -L "$HOME/.config/spotify
     mv "$HOME/.config/spotify-launcher.conf" "$respaldo"
     echo "-> ~/.config/spotify-launcher.conf ya existía; respaldado como $respaldo"
 fi
-ln -sfn "$HOME/config_files/spotify-launcher.conf" "$HOME/.config/spotify-launcher.conf"
-echo "-> Enlazado: ~/.config/spotify-launcher.conf -> ~/config_files/spotify-launcher.conf"
+ln -sfn "$HOME/config_files/launchers/spotify-launcher.conf" "$HOME/.config/spotify-launcher.conf"
+echo "-> Enlazado: ~/.config/spotify-launcher.conf -> ~/config_files/launchers/spotify-launcher.conf"
 
 # Enlaza la config de teams-for-linux, que hace que la X CIERRE la app en vez de
 # esconderla a la bandeja del sistema. Esta barra (waybar) no tiene módulo 'tray',
@@ -430,8 +435,8 @@ if [ -e "$HOME/.config/teams-for-linux/config.json" ] && [ ! -L "$HOME/.config/t
     mv "$HOME/.config/teams-for-linux/config.json" "$respaldo"
     echo "-> config.json de teams-for-linux ya existía; respaldado como $respaldo"
 fi
-ln -sfn "$HOME/config_files/teams-for-linux.config.json" "$HOME/.config/teams-for-linux/config.json"
-echo "-> Enlazado: ~/.config/teams-for-linux/config.json -> ~/config_files/teams-for-linux.config.json"
+ln -sfn "$HOME/config_files/launchers/teams-for-linux.config.json" "$HOME/.config/teams-for-linux/config.json"
+echo "-> Enlazado: ~/.config/teams-for-linux/config.json -> ~/config_files/launchers/teams-for-linux.config.json"
 
 # Enlaza el .desktop de teams-for-linux, que lo arranca en Wayland NATIVO. El del
 # paquete trae '--ozone-platform=x11', y con eDP-1 a escala 2 XWayland se renderiza a
@@ -473,6 +478,29 @@ fi
 # pero xdg-open no sabría qué app abre ese esquema.
 if command -v update-desktop-database > /dev/null; then
     update-desktop-database "$HOME/.local/share/applications"
+fi
+
+# Fuerza a Zoom a Wayland nativo (mismo síntoma que Spotify y teams-for-linux:
+# a escala 2 XWayland se ve borroso), pero con un arreglo distinto porque Zoom es
+# Qt6 y no Electron/CEF: decide el backend con la clave 'xwayland' de
+# ~/.config/zoomus.conf, no con un flag ni con QT_QPA_PLATFORM. El porqué está en
+# docs/linux/zoom.md.
+#
+# A diferencia de spotify-launcher.conf y teams-for-linux/config.json, este archivo
+# NO se enlaza con 'ln -sfn': es el estado propio de Zoom (deviceID/MAC,
+# currentMeetingId, email) y lo reescribe entero en cada corrida, así que un symlink
+# metería esos datos al repo y Zoom pisaría el contenido de todos modos. Por eso el
+# ajuste va con sed sobre el archivo real (o creándolo mínimo si todavía no existe,
+# porque recién se genera al primer arranque de la app). Es idempotente.
+if [ -e "$HOME/.config/zoomus.conf" ]; then
+    if grep -q '^xwayland=true' "$HOME/.config/zoomus.conf"; then
+        sed -i 's/^xwayland=true/xwayland=false/' "$HOME/.config/zoomus.conf"
+        echo "-> ~/.config/zoomus.conf: xwayland puesto en false (Zoom pasa a Wayland nativo)."
+    fi
+else
+    mkdir -p "$HOME/.config"
+    printf '[General]\nxwayland=false\n' > "$HOME/.config/zoomus.conf"
+    echo "-> Creado ~/.config/zoomus.conf con xwayland=false."
 fi
 
 # Enlaza la configuración de tmux directamente en el home
@@ -614,6 +642,7 @@ fi
 echo "-> Instalando paquetes desde AUR..."
 paquetes_aur=(
     sublime-text-4   # Editor gráfico. No está en repos oficiales: el paquete de AUR descarga el binario oficial de sublimehq. Queda asociado a los archivos de texto y código vía mimeapps.list; neovim sigue siendo el editor de terminal.
+    zoom             # Cliente oficial de videollamadas. El arreglo para que arranque en Wayland nativo (no XWayland) va aparte en la sección 9, sobre ~/.config/zoomus.conf; ver docs/linux/zoom.md.
 )
 yay -S --needed --noconfirm "${paquetes_aur[@]}" || \
     echo "AVISO: falló la instalación desde AUR; el resto del entorno quedó completo. Reintenta luego con: yay -S ${paquetes_aur[*]}"

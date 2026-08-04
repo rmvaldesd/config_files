@@ -40,3 +40,7 @@ link them below.
   porque waybar no tiene módulo `tray`), el `closeAppOnCross` que lo arregla, el
   bug de `Waiting for network...`, cómo rescatar una ventana ya escondida y el
   `.desktop` override que lo arranca en Wayland nativo.
+- [Zoom en Wayland](./zoom.md) — la clave `xwayland` de `~/.config/zoomus.conf`
+  que lo saca de XWayland (Zoom es Qt6, no Electron: nada de flags ni de
+  `.desktop`), y por qué ese archivo se ajusta con `sed` en vez de enlazarlo al
+  repo como a Spotify o Teams.

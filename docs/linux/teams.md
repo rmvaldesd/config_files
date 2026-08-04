@@ -21,8 +21,8 @@ esconde a una bandeja que no existe: desaparece de Hyprland, no hay icono en el 
 hacer clic, y los ~8 procesos de Electron siguen vivos consumiendo ~250 MB. Parece
 que la app se murió.
 
-El arreglo vive en **`teams-for-linux.config.json`** (raíz del repo, la sección 9 del
-instalador lo enlaza a `~/.config/teams-for-linux/config.json`):
+El arreglo vive en **`launchers/teams-for-linux.config.json`** (raíz del repo,
+la sección 9 del instalador lo enlaza a `~/.config/teams-for-linux/config.json`):
 
 ```json
 {

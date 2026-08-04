@@ -1,4 +1,3 @@
-
 [Default Applications]
 x-scheme-handler/claude-cli=claude-code-url-handler.desktop
 image/x-farbfeld=imv-dir.desktop
@@ -166,11 +165,11 @@ text/csv=libreoffice-calc.desktop
 text/x-makefile=sublime_text.desktop
 text/x-patch=sublime_text.desktop
 image/x-xcf=gimp.desktop
-text/html=firefox.desktop
-x-scheme-handler/http=firefox.desktop
-x-scheme-handler/https=firefox.desktop
-x-scheme-handler/about=firefox.desktop
-x-scheme-handler/unknown=firefox.desktop
+text/html=google-chrome.desktop
+x-scheme-handler/http=google-chrome.desktop
+x-scheme-handler/https=google-chrome.desktop
+x-scheme-handler/about=google-chrome.desktop
+x-scheme-handler/unknown=google-chrome.desktop
 application/vnd.oasis.opendocument.base=libreoffice-base.desktop
 application/vnd.sun.xml.base=libreoffice-base.desktop
 application/clarisworks=libreoffice-writer.desktop
@@ -304,3 +303,13 @@ application/x-starwriter=libreoffice-writer.desktop
 application/x-starwriter-global=libreoffice-writer.desktop
 application/x-t602=libreoffice-writer.desktop
 text/rtf=libreoffice-writer.desktop
+x-scheme-handler/mailto=userapp-Thunderbird-82AZS3.desktop
+x-scheme-handler/mid=userapp-Thunderbird-82AZS3.desktop
+message/rfc822=userapp-Thunderbird-82AZS3.desktop
+x-scheme-handler/net.thunderbird=userapp-Thunderbird-0UIUS3.desktop
+
+[Added Associations]
+x-scheme-handler/mailto=userapp-Thunderbird-82AZS3.desktop;
+x-scheme-handler/mid=userapp-Thunderbird-82AZS3.desktop;
+message/rfc822=userapp-Thunderbird-82AZS3.desktop;
+x-scheme-handler/net.thunderbird=userapp-Thunderbird-0UIUS3.desktop;

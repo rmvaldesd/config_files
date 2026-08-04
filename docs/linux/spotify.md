@@ -16,8 +16,8 @@ El cliente oficial de Spotify (vía `spotify-launcher`) arrancaba en **XWayland*
 Con `eDP-1` a escala 2, Hyprland renderiza las apps de XWayland a 1x y las estira
 a 2x: texto y carátulas borrosos.
 
-El arreglo vive en **`spotify-launcher.conf`** (raíz del repo, la sección 9 del
-instalador lo enlaza a `~/.config/spotify-launcher.conf`):
+El arreglo vive en **`launchers/spotify-launcher.conf`** (raíz del repo, la
+sección 9 del instalador lo enlaza a `~/.config/spotify-launcher.conf`):
 
 ```ini
 [spotify]
