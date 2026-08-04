@@ -16,7 +16,9 @@
 # en cada arranque de shell, y dejaria el PATH roto el dia que Go no este.
 # GOPATH ya apunta a ~/go, que es el default.
 export PATH="$HOME/.local/bin:$HOME/go/bin:$PATH"
-
+# Force Firefox to run natively on Wayland instead of XWayland to enable
+# optimal VA-API hardware video acceleration
+export MOZ_ENABLE_WAYLAND=1
 # ---------------------------------------------------------------------------
 # claude
 # ---------------------------------------------------------------------------

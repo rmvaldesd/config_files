@@ -113,6 +113,8 @@ paquetes_sistema=(
     alsa-utils         # Herramientas de línea de comandos de ALSA (alsamixer, aplay, speaker-test) para diagnosticar el audio.
     linux-firmware     # Blobs de firmware para el kernel (Wi-Fi, gráficos, bluetooth y otros dispositivos).
     mesa               # Controladores de código abierto para aceleración gráfica 3D (Intel/AMD).
+    intel-media-driver # Driver VA-API para GPUs Intel modernas (Broadwell en adelante); habilita la aceleración por hardware de video (decodificación/codificación) para mpv, Firefox, etc.
+    libva-utils        # Herramientas de diagnóstico de VA-API (vainfo) para verificar que la aceleración de video por hardware esté activa.
     networkmanager     # Demonio encargado de gestionar las conexiones a internet (Ethernet y Wi-Fi).
     bluez              # Pila oficial del protocolo Bluetooth en Linux.
     bluez-utils        # Herramientas de línea de comandos para emparejar y gestionar dispositivos Bluetooth.
