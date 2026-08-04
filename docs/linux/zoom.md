@@ -8,6 +8,7 @@ de línea de comandos, a diferencia de [Spotify](./spotify.md) y
 - [Resumen](#resumen)
 - [El diagnóstico](#el-diagnóstico)
 - [Por qué zoomus.conf no se enlaza al repo](#por-qué-zoomusconf-no-se-enlaza-al-repo)
+- [Por qué los flags de VA-API no aplican acá](#por-qué-los-flags-de-va-api-no-aplican-acá)
 - [Diagnóstico](#diagnóstico)
 
 ## Resumen
@@ -86,6 +87,34 @@ Por eso el instalador no usa `ln -sfn` para este archivo: aplica el ajuste con
 `sed` (o crea el archivo mínimo si todavía no existe, porque se genera recién
 al primer arranque de Zoom) y deja que Zoom siga administrando el resto del
 archivo. Es idempotente — si `xwayland` ya está en `false`, no toca nada.
+
+## Por qué los flags de VA-API no aplican acá
+
+[Spotify](./spotify.md), [Teams for Linux](./teams.md) y Chromium reciben los
+flags de VA-API (ver [docs/linux/vaapi.md](./vaapi.md)) porque los tres son un
+proceso Chromium/CEF/Electron arrancado directamente desde un archivo que
+controlamos (`extra_arguments`, `Exec=`, `on-click`). Zoom no encaja en ese
+molde:
+
+- `strings` sobre `zoom`, `ZoomLauncher` y `ZoomWebviewHost` (el proceso CEF que
+  Zoom levanta aparte para el webview de SSO/sala de espera) no muestra
+  NINGUNO de los switches `--enable-features`, `--ignore-gpu-blocklist`,
+  `--enable-gpu-rasterization` ni `--enable-zero-copy`. El parser de argumentos
+  de Zoom sólo reconoce su propio set (`--ipc-server`, `--no-dns`, `--path`,
+  `--share`, etc.), así que aunque se los pasáramos, Zoom los ignoraría.
+- El `ZoomWebviewHost` es un proceso *hijo* que Zoom decide cuándo y cómo
+  lanzar; no hay `.desktop` ni launcher nuestro en el medio para inyectarle
+  flags, a diferencia del `Exec=` de teams-for-linux.
+- La aceleración de hardware para el video de la llamada en sí (no el webview)
+  es un ajuste nativo de Zoom — "Use hardware acceleration for sending/
+  receiving video" en Settings → Video → Advanced —, pero esa preferencia vive
+  en `~/.zoom/data/zoomus.enc.v2.db`, que está **cifrado**. A diferencia de
+  `xwayland` en `zoomus.conf` (texto plano, ajustable con `sed`), esta clave no
+  se puede automatizar desde el instalador: hay que activarla a mano dentro de
+  la app, una sola vez.
+- De paso: `zoomus.conf` ya trae `enableCefGpu=false`, pero esa clave sólo
+  gobierna el GPU del webview CEF auxiliar, no la ruta de video de la reunión —
+  no es un sustituto de la casilla de Settings.
 
 ## Diagnóstico
 

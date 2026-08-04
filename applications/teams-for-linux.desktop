@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Teams for Linux
-Exec=/opt/teams-for-linux/teams-for-linux --ozone-platform=wayland %U
+Exec=/opt/teams-for-linux/teams-for-linux --ozone-platform=wayland --enable-features=AcceleratedVideoDecodeLinuxGL,AcceleratedVideoEncoder --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy %U
 Terminal=false
 Type=Application
 Icon=teams-for-linux

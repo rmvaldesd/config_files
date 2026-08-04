@@ -21,11 +21,15 @@ sección 9 del instalador lo enlaza a `~/.config/spotify-launcher.conf`):
 
 ```ini
 [spotify]
-extra_arguments = ["--enable-features=UseOzonePlatform", "--ozone-platform=wayland"]
+extra_arguments = ["--enable-features=UseOzonePlatform,AcceleratedVideoDecodeLinuxGL,AcceleratedVideoEncoder", "--ozone-platform=wayland", "--ignore-gpu-blocklist", "--enable-gpu-rasterization", "--enable-zero-copy"]
 ```
 
 Con eso Spotify pasa a Wayland nativo, lee el scale del `wl_output` y rasteriza a
 2x real. Los cambios toman efecto reiniciando Spotify, no hace falta relogear.
+
+Los tres flags después de `--ozone-platform` no son para el blur: activan la
+decodificación/codificación de video por hardware (VA-API). Detalles en
+[VA-API](./vaapi.md).
 
 ## El diagnóstico
 

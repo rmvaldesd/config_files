@@ -182,8 +182,12 @@ El paquete instala `/usr/share/applications/teams-for-linux.desktop` con
 Es una copia completa del `.desktop` del paquete con **una sola línea cambiada**:
 
 ```ini
-Exec=/opt/teams-for-linux/teams-for-linux --ozone-platform=wayland %U
+Exec=/opt/teams-for-linux/teams-for-linux --ozone-platform=wayland --enable-features=AcceleratedVideoDecodeLinuxGL,AcceleratedVideoEncoder --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy %U
 ```
+
+Los cuatro flags entre `--ozone-platform` y `%U` no son por el blur: activan la
+decodificación/codificación de video por hardware (VA-API) para las
+videollamadas. Detalles en [VA-API](./vaapi.md).
 
 Eso tiene una consecuencia que hay que tener presente: al ser copia completa, también
 **congela los demás campos** (`Icon`, `StartupWMClass`, `MimeType`, `Categories`). Si

@@ -109,7 +109,11 @@
         "today": "<span color='#75f1fa'><b>{}</b></span>"
       }
     },
-    "on-click": "exec chromium --app=https://calendar.google.com"
+    // Los cuatro flags de después de la URL habilitan la aceleración de video por
+    // hardware (VA-API vía intel-media-driver, ver docs/linux/vaapi.md): sin ellos
+    // Chromium decodifica/codifica el video de Calendar por CPU aunque el driver
+    // ya esté instalado.
+    "on-click": "exec chromium --app=https://calendar.google.com --enable-features=AcceleratedVideoDecodeLinuxGL,AcceleratedVideoEncoder --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy"
   },
   "pulseaudio": {
     "format": "{icon} {volume}%",

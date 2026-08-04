@@ -44,3 +44,7 @@ link them below.
   que lo saca de XWayland (Zoom es Qt6, no Electron: nada de flags ni de
   `.desktop`), y por qué ese archivo se ajusta con `sed` en vez de enlazarlo al
   repo como a Spotify o Teams.
+- [Aceleración de video por hardware (VA-API)](./vaapi.md) — los flags de
+  `--enable-features` que activan VA-API en Spotify, Teams for Linux y
+  Chromium, por qué `intel-media-driver` solo no alcanza, y cómo verificar los
+  nombres de flag contra el binario real en vez de asumirlos.
