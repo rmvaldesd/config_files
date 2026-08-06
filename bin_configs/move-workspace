@@ -75,13 +75,28 @@ fi
 workspaces_json() { if [ -n "${WS_MOVE_WORKSPACES:-}" ]; then cat "$WS_MOVE_WORKSPACES"; else hyprctl workspaces -j;      fi; }
 activo_json()     { if [ -n "${WS_MOVE_ACTIVO:-}"     ]; then cat "$WS_MOVE_ACTIVO";     else hyprctl activeworkspace -j; fi; }
 
-cambiar_id() {
-    local de="$1" a="$2"
-    if [ "$DRY" -eq 1 ]; then
-        printf '   %s -> %s\n' "$de" "$a"
-        return 0
-    fi
-    hyprctl dispatch "hl.dsp.workspace.change_id({ workspace = $de, id = $a })" >/dev/null
+# Los cambios se ACUMULAN y se mandan todos juntos al final, en un solo 'hyprctl --batch'.
+# No es micro-optimización: cada 'hyprctl' suelto es un proceso más una ida y vuelta por el
+# socket, y entre uno y otro el estado intermedio es visible. Como el módulo de waybar se
+# actualiza en vivo, esa ventana se veía: durante el movimiento aparecían workspaces
+# numerados 109, 110... -- el rango temporal -- como si hubiera de más. En un lote, todo
+# ocurre en un solo viaje.
+pasos=()
+apilar() { pasos+=("$1 $2"); }
+
+aplicar() {
+    local lote="" paso de a
+    for paso in "${pasos[@]}"; do
+        de=${paso%% *}; a=${paso##* }
+        if [ "$DRY" -eq 1 ]; then
+            printf '   %s -> %s\n' "$de" "$a"
+            continue
+        fi
+        lote+="dispatch hl.dsp.workspace.change_id({ workspace = $de, id = $a }) ; "
+    done
+    [ "$DRY" -eq 1 ] && return 0
+    [ -n "$lote" ] && hyprctl --batch "${lote% ; }" >/dev/null
+    return 0
 }
 
 
@@ -159,7 +174,7 @@ if [ "$DRY" -eq 1 ]; then
         [ "$id" = "$activo" ] && marca="$marca  (activo)"
         printf '  %3s -> %-3s%s\n' "$id" "${nuevo_de[$id]}" "$marca"
     done
-    echo "--- pasada 1: al rango temporal"
+    echo "--- pasos (el temporal sólo aparece si hay un ciclo):"
 fi
 
 # --- 5. renumerar ----------------------------------------------------------------------
@@ -171,16 +186,53 @@ while IFS= read -r id; do
 done < <(workspaces_json | jq -r '.[] | select(.id > 0) | .id')
 TMP=$(( max + 100 ))
 
+# Se emiten los pasos de forma que NUNCA se pise una etiqueta ocupada:
+#   1. Mientras alguno tenga su destino LIBRE, se mueve directo. Eso resuelve las cadenas
+#      (5 -> 3 cuando el 3 ya se fue, etc.) sin gastar ningún número temporal.
+#   2. Cuando nadie puede avanzar, lo que queda son ciclos puros (el 2 quiere el 1 y el 1
+#      quiere el 2). Se rompe UNO estacionándolo en el temporal, y se vuelve al paso 1.
+#
+# Por qué así y no la versión obvia: mandar TODOS al rango temporal y después todos al
+# definitivo funciona, pero son el doble de pasos y deja varios números temporales visibles
+# a la vez -- que es lo que se veía como workspaces fantasma al mover uno. Con esto, en el
+# caso típico no aparece NINGUNO.
+#
+# El paso 1 no alcanza solo: sin el 2 se colgaría para siempre en un ciclo. Y el 2 no
+# alcanza solo: estacionar sin mirar deja parados en el temporal a los que en realidad
+# eran una cadena. Hacen falta los dos, y un test aleatorio de permutaciones lo confirma.
+declare -A pend
 for id in "${orden[@]}"; do
     [ "${nuevo_de[$id]}" -ne "$id" ] || continue
-    cambiar_id "$id" $(( TMP + nuevo_de[$id] ))
+    pend["$id"]="${nuevo_de[$id]}"
 done
 
-[ "$DRY" -eq 1 ] && echo "--- pasada 2: al número definitivo"
-for id in "${orden[@]}"; do
-    [ "${nuevo_de[$id]}" -ne "$id" ] || continue
-    cambiar_id $(( TMP + nuevo_de[$id] )) "${nuevo_de[$id]}"
+# Las etiquetas EN USO son las de todos los workspaces, no sólo las de los que cambian: una
+# que no se mueve igual bloquea su número.
+declare -A ocupada
+for id in "${ids[@]}"; do ocupada["$id"]=1; done
+
+while [ "${#pend[@]}" -gt 0 ]; do
+    progreso=0
+    for de in "${!pend[@]}"; do
+        a=${pend[$de]}
+        [ -n "${ocupada[$a]:-}" ] && continue
+        apilar "$de" "$a"
+        unset 'ocupada[$de]'; ocupada["$a"]=1
+        unset 'pend[$de]'
+        progreso=1
+    done
+    if [ "$progreso" -eq 0 ]; then
+        for de in "${!pend[@]}"; do
+            apilar "$de" "$TMP"
+            unset 'ocupada[$de]'; ocupada["$TMP"]=1
+            pend["$TMP"]=${pend[$de]}
+            unset 'pend[$de]'
+            break
+        done
+    fi
 done
+
+aplicar
 
 # --- 6. la barra se entera sola -----------------------------------------------------------
 # No hay que avisarle NADA a waybar, y eso es a proposito: el modulo de workspaces es
