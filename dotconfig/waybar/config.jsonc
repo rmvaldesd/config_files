@@ -258,8 +258,17 @@
       //"pulseaudio/slider"
     ]
   },
+  // En la barra sólo "LA" o "ES" -- el único módulo sin icono, y el script explica por
+  // qué: los dos layouts son el mismo idioma y ningún glifo los distingue. El nombre
+  // completo ("Spanish (Latin American)") va en el tooltip, que es lo que esas dos
+  // letras no pueden decir.
+  //
+  // 'return-type: json' es lo que habilita ese tooltip: sin él waybar trata la salida
+  // como texto plano y mostraría el JSON crudo en la barra. Es el mismo par que usan
+  // custom/swap y custom/disk.
   "custom/language": {
     "exec": "~/.config/waybar/scripts/kb_layout.sh",
+    "return-type": "json",
     "interval": 1,
     "format": "{}",
     "on-click": "hyprctl switchxkblayout all next"
