@@ -96,6 +96,7 @@ window#waybar {
 #custom-rclone,
 #network,
 #cpu,
+#custom-swap,
 #memory {
   padding: 0 11px;
   margin: 0;
@@ -136,6 +137,19 @@ window#waybar {
 #network.disconnected,
 #bluetooth.disabled {
   color: @dark-5;
+}
+
+/* Swap: dos escalones antes del coral, porque el número solo no dice si hay un problema.
+   El aviso es sólo texto en blanco -- se nota si lo mirás, no interrumpe si no. El coral
+   queda para cuando de verdad hay que hacer algo. Los umbrales de cada clase los decide
+   swap.sh, que sabe si abajo hay zram (llenarlo es barato) o disco (no lo es). */
+#custom-swap.warning {
+  color: @dark-0;
+}
+
+#custom-swap.critical {
+  color: @urgent;
+  font-weight: 700;
 }
 
 /* --------------------------------------------------------------------------

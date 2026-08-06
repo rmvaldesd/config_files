@@ -24,6 +24,7 @@
     "custom/rclone",
     "network",
     "cpu",
+    "custom/swap",
     "memory"
   ],
   "hyprland/window": {
@@ -80,6 +81,24 @@
     "interval": 30,
     "format": " {percentage}%",
     "tooltip-format": "{used:0.1f}G/{total:0.1f}G used",
+    "on-click": "exec ghostty --title=htop -e htop"
+  },
+  // Swap en uso. Va pegado a memoria porque se leen juntos: la memoria dice cuánto entra
+  // y este cuánto se está desbordando.
+  //
+  // Es un módulo custom y no uno estándar porque waybar sólo sabe darte el porcentaje, y
+  // ese número solo no significa nada: 90% de zram (RAM comprimida) es normal, 90% de una
+  // partición de disco es un equipo arrastrándose. El script mira /proc/swaps y /sys y
+  // arma el tooltip con lo que hay debajo -- zram, partición, archivo, y si hay zswap
+  // delante. Ver dotconfig/waybar/scripts/swap.sh.
+  //
+  // El bloque queda acá SIEMPRE, igual que custom/rclone: en un equipo sin swap el script
+  // devuelve {"text":""} y waybar esconde el módulo, sin tocar este archivo versionado.
+  "custom/swap": {
+    "exec": "~/.config/waybar/scripts/swap.sh",
+    "return-type": "json",
+    "interval": 30,
+    "format": "{}",
     "on-click": "exec ghostty --title=htop -e htop"
   },
   "network": {

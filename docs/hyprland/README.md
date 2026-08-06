@@ -27,6 +27,7 @@ correspondiente en el mismo commit.
 - [Impresión: `add-printer`](#impresión-add-printer)
 - [Mantenimiento](#mantenimiento)
 - [Waybar: clics](#waybar-clics)
+- [Swap en la barra](#swap-en-la-barra)
 - [Visores](#visores)
 - [Comportamiento automático](#comportamiento-automático)
 - [Dónde vive cada configuración](#dónde-vive-cada-configuración)
@@ -463,8 +464,38 @@ zsh: `rehash`.
 | Bluetooth | bluetui, en una terminal |
 | Red | nmtui, en una terminal |
 | CPU | btop, en una terminal |
+| Swap | htop, en una terminal |
 | Memoria | htop, en una terminal |
 | Idioma del teclado | Cambia al siguiente layout |
+
+## Swap en la barra
+
+Entre CPU y memoria hay un módulo propio (`dotconfig/waybar/scripts/swap.sh`) que
+muestra el porcentaje de swap ocupado con el icono ⇄. Es un script y no el módulo
+estándar de waybar porque **ese porcentaje solo no significa nada**: depende de qué
+haya debajo, y eso cambia de un equipo a otro.
+
+| Debajo hay | Qué es | Un 90% significa |
+|---|---|---|
+| **zram** | Un disco comprimido en RAM. Los GiB que anuncia son virtuales: 4 GiB de zram llenos pueden ocupar 900 MiB reales | Normal. No se tocó el disco |
+| **Partición** | Swap de verdad, en el disco | El equipo está arrastrándose |
+| **Archivo** | Igual que la partición, pero sobre el filesystem | Lo mismo |
+| **zswap** | No es un swap: es una caché comprimida en RAM **delante** del swap real. No aparece en `/proc/swaps` ni suma tamaño | — (se informa aparte) |
+
+Por eso el tooltip dice la configuración real y no sólo el número: tipo de cada
+dispositivo, tamaño, cuánto está en uso, la prioridad, y con zram además cuánta RAM
+está ocupando de verdad y el ratio de compresión que está logrando. Si hay varios
+swaps a la vez, el tooltip los lista todos y el porcentaje de la barra es el
+agregado.
+
+Los umbrales de color se ajustan a eso: con swap en disco el módulo avisa (texto
+blanco) al 50% y se pone coral al 80%; si el swap es sólo zram, recién al 70% y al
+90%. Sin swap configurado el módulo no aparece.
+
+Los datos salen de `/proc/swaps` y `/sys`, sin `zramctl` y sin root. La ocupación de
+zswap es la única excepción: sus contadores viven en debugfs y sólo los lee root, así
+que de zswap se informa la configuración (activo, compresor) y no cuánto tiene
+guardado.
 
 ## Visores
 
@@ -602,6 +633,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Fondo de pantalla | `dotconfig/hypr/hyprpaper.conf` |
 | Barra: módulos | `dotconfig/waybar/config.jsonc` |
 | Barra: estilo | `dotconfig/waybar/style.css` |
+| Barra: módulo de swap | `dotconfig/waybar/scripts/swap.sh` (ver [Swap en la barra](#swap-en-la-barra)) |
 | Notificaciones | `dotconfig/mako/config` |
 | Lanzador | `dotconfig/rofi/config.rasi` y `dark.rasi` |
 | Terminal | `dotconfig/ghostty/config.ghostty` |
