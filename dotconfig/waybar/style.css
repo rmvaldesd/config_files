@@ -97,7 +97,8 @@ window#waybar {
 #network,
 #cpu,
 #custom-swap,
-#memory {
+#memory,
+#custom-disk {
   padding: 0 11px;
   margin: 0;
   background-color: transparent;
@@ -117,8 +118,10 @@ window#waybar {
   background-position: left center;
 }
 
-/* Aire al borde derecho de la pantalla, que si no el último módulo queda pegado. */
-#memory {
+/* Aire al borde derecho de la pantalla, que si no el último módulo queda pegado.
+   Va en el ÚLTIMO de 'modules-right': si algún día se agrega uno después, este
+   padding se muda con él. */
+#custom-disk {
   padding-right: 14px;
 }
 
@@ -148,6 +151,21 @@ window#waybar {
 }
 
 #custom-swap.critical {
+  color: @urgent;
+  font-weight: 700;
+}
+
+/* Disco: los mismos dos escalones que el swap, y por el mismo motivo -- el aviso en
+   blanco se nota si lo mirás y no interrumpe si no; el coral queda para cuando hay
+   que borrar algo hoy. Ojo: el color lo decide el filesystem INTERNO más lleno, que
+   no siempre es el que muestra la barra (en un equipo con /home aparte suele no
+   serlo). Cuando no coinciden, el tooltip dice cuál es. Un pendrive al 99% no pinta
+   nada: no es tu disco y desenchufarlo no debería apagar una alarma. */
+#custom-disk.warning {
+  color: @dark-0;
+}
+
+#custom-disk.critical {
   color: @urgent;
   font-weight: 700;
 }

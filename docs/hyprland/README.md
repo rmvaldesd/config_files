@@ -28,6 +28,7 @@ correspondiente en el mismo commit.
 - [Mantenimiento](#mantenimiento)
 - [Waybar: clics](#waybar-clics)
 - [Swap en la barra](#swap-en-la-barra)
+- [Disco en la barra](#disco-en-la-barra)
 - [Visores](#visores)
 - [Archivos comprimidos](#archivos-comprimidos)
 - [Comportamiento automático](#comportamiento-automático)
@@ -492,6 +493,7 @@ zsh: `rehash`.
 | CPU | btop, en una terminal |
 | Swap | htop, en una terminal |
 | Memoria | htop, en una terminal |
+| Disco | btop, en una terminal |
 | Idioma del teclado | Cambia al siguiente layout |
 
 ## Swap en la barra
@@ -522,6 +524,45 @@ Los datos salen de `/proc/swaps` y `/sys`, sin `zramctl` y sin root. La ocupaci�
 zswap es la única excepción: sus contadores viven en debugfs y sólo los lee root, así
 que de zswap se informa la configuración (activo, compresor) y no cuánto tiene
 guardado.
+
+## Disco en la barra
+
+El último módulo de la derecha (`dotconfig/waybar/scripts/disk.sh`) muestra cuánto
+hay ocupado y cuánto entra en el disco donde vive `/`: **`17/953G`**. La unidad va
+una sola vez, al final, para que el par se lea como una fracción.
+
+Es un script y no el módulo `disk` estándar de waybar porque **ése mira un único
+path**, escrito a mano en el config (`"path": "/"`). En un equipo con `/home` o
+`/var` en particiones aparte muestra una y calla las otras — y la que se llena es
+siempre la otra. Como `config.jsonc` es el mismo archivo en todas las máquinas y el
+particionado no lo es, el script descubre en cada refresco lo que hay montado: no
+hay nada que configurar por equipo.
+
+**El tooltip lista todos los sistemas de archivos montados**, uno por dispositivo:
+tipo, tamaño, ocupado, libre y en qué puntos está montado.
+
+| Detalle | Por qué |
+|---|---|
+| Un filesystem se cuenta **una vez**, no una por punto de montaje | En btrfs `/`, `/home` y `/var/log` son subvolúmenes de la **misma** partición y comparten los mismos GiB. Listarlos por separado sumaría discos imaginarios. Los bind mounts, igual |
+| El **swap no aparece**, ni con partición propia | El swap no se monta como filesystem, así que no está en la lista de la que sale esto. No hay forma de que se duplique con el módulo de al lado. Un swap*file* sí ocupa lugar en su filesystem y sí se cuenta: ese espacio no lo tenés |
+| Sin tmpfs, `/proc`, `/sys`, cgroups, ni los loops de snap/appimage | Son RAM o inventos del kernel, no disco. Los squashfs además están siempre al 100% y llenarían el tooltip de ruido |
+| Los externos van al final, marcados `(removable)`; los de red, `(network)` | Son visitas. Y un disco giratorio se marca `(HDD)`: explica por qué una carpeta abre lento |
+
+El porcentaje se calcula `usado / (usado + disponible)`, igual que `df`, y no contra
+el tamaño total. La diferencia son los bloques reservados para root — en ext4, el 5%
+del disco: contra el total, un filesystem que ya **no** admite escrituras marcaría un
+tranquilísimo 95% justo cuando dejó de andar.
+
+Los colores avisan (texto blanco) al 80% y se ponen coral al 90%, pero **miran el
+filesystem interno más lleno, no el de la barra**: en un equipo con `/home` aparte,
+el que se llena es justamente el que no se ve. Cuando el que manda el color no es
+`/`, el tooltip lo dice con nombre y apellido — si no, sería un módulo rojo mostrando
+un 12%. Los extraíbles y los de red nunca pintan: un pendrive al 99% es un pendrive
+lleno, no una alarma, y desenchufarlo no debería apagar un aviso.
+
+Todo sale de `findmnt` (viene en util-linux) y de `/sys`, sin root. El refresco es
+cada 5 minutos: el disco no cambia de tamaño en un minuto y, a diferencia de la RAM,
+no hay nada que mirar en tiempo real.
 
 ## Visores
 
@@ -700,6 +741,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Barra: módulos | `dotconfig/waybar/config.jsonc` |
 | Barra: estilo | `dotconfig/waybar/style.css` |
 | Barra: módulo de swap | `dotconfig/waybar/scripts/swap.sh` (ver [Swap en la barra](#swap-en-la-barra)) |
+| Barra: módulo de disco | `dotconfig/waybar/scripts/disk.sh` (ver [Disco en la barra](#disco-en-la-barra)) |
 | Notificaciones | `dotconfig/mako/config` |
 | Lanzador | `dotconfig/rofi/config.rasi` y `dark.rasi` |
 | Terminal | `dotconfig/ghostty/config.ghostty` |

@@ -25,7 +25,8 @@
     "network",
     "cpu",
     "custom/swap",
-    "memory"
+    "memory",
+    "custom/disk"
   ],
   "hyprland/window": {
     "max-length": 50
@@ -100,6 +101,31 @@
     "interval": 30,
     "format": "{}",
     "on-click": "exec ghostty --title=htop -e htop"
+  },
+  // Espacio en disco. Va después de memoria porque cierra la serie de "cuánto queda de
+  // cada cosa": CPU, swap, RAM y, al final, disco.
+  //
+  // En la barra sólo el filesystem de '/', ocupado y total ("17/953G"). En el tooltip
+  // TODOS los sistemas de archivos montados, uno por dispositivo -- que es la parte que
+  // el módulo 'disk' estándar no sabe hacer: ése mira un único path fijado a mano en el
+  // config, y este archivo es el mismo repo en equipos con particionados distintos. El
+  // script descubre lo que hay montado en cada refresco y no hay nada que configurar por
+  // máquina. Ver dotconfig/waybar/scripts/disk.sh.
+  //
+  // El swap no aparece acá aunque tenga su propia partición: no se monta como filesystem,
+  // así que no está en la lista de la que sale esto. No se pisa con custom/swap.
+  //
+  // 'interval' generoso: el disco no cambia de tamaño en un minuto, y a diferencia de la
+  // RAM no hay nada que mirar en tiempo real. 300s es suficiente para enterarse antes de
+  // quedarse sin espacio.
+  "custom/disk": {
+    "exec": "~/.config/waybar/scripts/disk.sh",
+    "return-type": "json",
+    "interval": 300,
+    "format": "{}",
+    // btop, igual que #cpu: su panel de disco es lo más parecido a "y ahora qué borro"
+    // que hay instalado sin sumar un paquete nuevo.
+    "on-click": "exec ghostty --title=btop -e btop"
   },
   "network": {
     "format": "",
