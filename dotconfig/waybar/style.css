@@ -87,7 +87,7 @@ window#waybar {
    último. Los módulos que se ocultan (bluetooth sin dispositivos, submap fuera
    de un submapa) no dejan una regla huérfana: waybar no los renderiza.
    -------------------------------------------------------------------------- */
-#submap,
+#custom-submap,
 #custom-language,
 #volume,
 #battery,
@@ -136,11 +136,40 @@ window#waybar {
   color: @dark-0;
 }
 
-/* El submapa es un estado modal: tiene que cantar. Como ya no hay pastilla,
-   lo hace con el color del texto en vez de con un fondo coral. */
-#submap {
-  color: @urgent;
+/* El submapa es la ÚNICA pastilla que queda en la barra, y es a propósito: no es un
+   indicador más sino un estado modal -- mientras esté, las teclas hacen otra cosa --
+   y tiene que cantar más fuerte que todo lo demás. El resto de la barra no tiene
+   fondos justamente para que este destaque. El color va invertido (fondo pleno,
+   glifo en el color del fondo de la barra) porque a este tamaño un icono suelto en
+   coral se pierde entre los otros iconos: el bloque de color se ve de reojo.
+
+   'background-image: none' es imprescindible y no es cosmético: cancela la regla
+   vertical de 1px que hereda del bloque de módulos de la derecha, que si no se
+   dibujaría ENCIMA de la pastilla (una imagen de fondo se pinta sobre el color de
+   fondo). Como separador ya sobra: la pastilla se separa sola.
+
+   El margin vertical de 4px es lo que hace que la pastilla no ocupe los 30px de alto
+   de la barra; el horizontal la despega de sus vecinos, que perdieron la regla. */
+#custom-submap {
+  color: @dark-9;
   font-weight: 700;
+  background-color: @urgent;
+  background-image: none;
+  border-radius: 4px;
+  margin: 4px 3px;
+  padding: 0 8px;
+}
+
+/* El icono ya distingue los dos modos por sí solo; el color refuerza esa lectura de
+   reojo, sin tener que enfocar un glifo de 12px. Coral para resize -- estás tocando
+   una ventana -- y cyan para monitor, que es el color de "progreso e interacción" de
+   la paleta y el que ya usa el resto de la config para lo que reacomoda cosas.
+
+   La clase sale del campo "class" del JSON que emite submap.sh, o sea el nombre del
+   submapa tal cual. Un submapa nuevo sin regla propia hereda el coral, que es el
+   default razonable: avisa igual, sólo que sin un color propio. */
+#custom-submap.monitor {
+  background-color: @highlight;
 }
 
 #battery.warning,

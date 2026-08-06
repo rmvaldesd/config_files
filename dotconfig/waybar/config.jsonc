@@ -16,7 +16,7 @@
   // no un olvido.
   "modules-center": [],
   "modules-right": [
-    "hyprland/submap",
+    "custom/submap",
     "custom/language",
     "group/volume",
     "battery",
@@ -56,6 +56,36 @@
   //
   // El módulo no necesita bloque de config propio, así que no lo tiene.
   //
+  // Un icono por modo -- una regla para resize, un monitor para monitor -- en vez del
+  // nombre del submapa, que ocupaba mucho para lo poco que aporta: cuando aparece
+  // acabás de apretar la tecla, así que ya sabés en cuál estás. La palabra se muda al
+  // tooltip, junto con las teclas de ese modo, que es lo que uno sí olvida.
+  //
+  // Es un custom y no el 'hyprland/submap' estándar porque ése sólo sabe mostrar UN
+  // texto fijo para todos los submapas: no soporta 'format-icons' (probado -- con
+  // "format": "{icon}" el texto sale vacío y waybar esconde el módulo entero) y su
+  // 'format' admite como único valor variable '{}', el nombre. Con él, lo más lejos
+  // que se llegaba era el mismo icono para los dos y el color de la pastilla como
+  // única distinción.
+  //
+  // El script se cuelga del socket de EVENTOS de Hyprland, así que no hace polling ni
+  // necesita que hyprland.lua le avise nada. Por eso NO lleva 'interval': waybar lo
+  // corre en modo continuo y lee una línea JSON por evento. El porqué de esa decisión
+  // -- y de por qué el socket se lee con python -- está en el encabezado del script.
+  //
+  // 'restart-interval' es la red de seguridad: si Hyprland se reinicia, el socket
+  // muere y el script termina. Sin esto el módulo quedaría mudo hasta el próximo
+  // login. Con esto, waybar lo vuelve a levantar a los 5 segundos.
+  //
+  // Ya no hace falta el 'min-length' que necesitaba el módulo estándar contra el bug
+  // del ellipsizado: los módulos custom no se arman con el ellipsizado prendido, y se
+  // verificó que el icono no se corta.
+  "custom/submap": {
+    "exec": "~/.config/waybar/scripts/submap.py",
+    "return-type": "json",
+    "restart-interval": 5,
+    "format": "{}"
+  },
   "hyprland/window": {
     "max-length": 50
   },
