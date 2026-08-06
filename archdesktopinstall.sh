@@ -235,6 +235,7 @@ paquetes_utilidades=(
     gvfs              # Capa de montaje virtual; permite a Thunar montar USBs, ver la papelera y unidades de red.
     gvfs-mtp          # Soporte MTP para gvfs; permite a Thunar acceder a celulares Android.
     xdg-user-dirs     # Crea los directorios estándar del usuario (~/Descargas, ~/Documentos, etc.).
+    perl-file-mimeinfo # Provee el comando 'mimetype', y con eso alinea el 'xdg-open' de la TERMINAL con el resto del escritorio. Sin él, 'xdg-open archivo.md' abre Sublime aunque mimeapps.list diga glow: bajo Hyprland, xdg-mime no reconoce el entorno y cae a su rama genérica, que detecta el tipo con 'file --mime-type'. Y 'file' mira el CONTENIDO, así que un .md le da text/plain (-> el handler de text/plain, Sublime). Thunar y 'gio' nunca pasan por ahí -- usan GLib, que resuelve por EXTENSIÓN: '*.md' pesa 50 para text/markdown contra 10 de dos globs de ROMs de Sega Genesis que comparten la extensión, así que gana markdown. La rama genérica prefiere 'mimetype' sobre 'file' si existe, y 'mimetype' resuelve por glob igual que GLib. Vale para todos los tipos, no sólo markdown: cualquier formato que sea texto por dentro (.json, .yaml, .lua, .go...) tiene el mismo problema.
     cliphist          # Historial del portapapeles para Wayland; sin él, lo copiado muere al cerrar la app de origen.
     cups              # Servidor de impresión. Arrastra cups-filters (los conversores que traducen el PDF que manda la app al formato que entiende la impresora).
     ghostscript       # Rasteriza el PDF a PWG-Raster/PCLm. Es sólo 'Optional Deps' de cups-filters ("for non-PDF printers"), así que pacman NO lo instala solo, pero hace falta para cualquier impresora que no acepte PDF nativo (la mayoría de las láser baratas: su 'pdl=' lista PCLm/urf pero no application/pdf). Sin él el fallo es silencioso y confuso: CUPS acepta el trabajo, lo encola y recién ahí muere con "universal filter failed".
@@ -491,9 +492,21 @@ if [ -f "$desktop_paquete" ]; then
     fi
 fi
 
-# Refresca mimeinfo.cache para que quede registrado el handler de los links 'msteams:'
-# (los 'Join meeting' de Outlook). Sin esto el .desktop igual sirve para el lanzador,
-# pero xdg-open no sabría qué app abre ese esquema.
+# Enlaza el .desktop de glow. A diferencia del de teams, este NO es un override: el
+# paquete glow no trae ninguno (es un binario de terminal a secas), así que sin este
+# archivo mimeapps.list no tendría a qué apuntar para 'text/markdown'.
+#
+# El Exec envuelve glow en ghostty porque glow es una TUI y el .desktop lo invoca un
+# entorno gráfico (Thunar, xdg-open) que no le da terminal. Es el mismo truco que el
+# atajo SUPER + A de hyprland.lua, sin el fallback a less: acá glow es el punto.
+mkdir -p "$HOME/.local/share/applications"
+ln -sfn "$HOME/config_files/applications/glow.desktop" \
+    "$HOME/.local/share/applications/glow.desktop"
+echo "-> Enlazado: ~/.local/share/applications/glow.desktop -> ~/config_files/applications/glow.desktop"
+
+# Refresca mimeinfo.cache para que queden registrados el handler de los links 'msteams:'
+# (los 'Join meeting' de Outlook) y el de text/markdown. Sin esto los .desktop igual
+# sirven para el lanzador, pero xdg-open no sabría qué app abre ese esquema ni ese tipo.
 if command -v update-desktop-database > /dev/null; then
     update-desktop-database "$HOME/.local/share/applications"
 fi

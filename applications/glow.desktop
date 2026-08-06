@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Glow
+GenericName=Visor de Markdown
+Comment=Renderiza Markdown en la terminal, dentro de una ventana de ghostty
+Exec=ghostty --title=glow-markdown -e glow -p %f
+Icon=text-markdown
+Terminal=false
+Type=Application
+NoDisplay=true
+MimeType=text/markdown;
+Categories=Utility;TextTools;
