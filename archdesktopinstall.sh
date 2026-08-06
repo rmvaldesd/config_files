@@ -155,6 +155,22 @@ paquetes_utilidades=(
     polkit-gnome      # Agente de autenticación gráfica; levanta la ventana flotante para pedir tu clave sudo.
     thunar            # Gestor de archivos gráfico y ligero del entorno XFCE.
     tumbler           # Extensión para Thunar que permite generar miniaturas (thumbnails) de imágenes y videos.
+    # --- Archivos comprimidos desde el menú contextual de Thunar ---
+    # Son TRES capas y hacen falta las tres: el plugin pone las opciones en el menú, el
+    # archivador las ejecuta, y los descompresores de línea de comandos son los que
+    # realmente abren cada formato. Falta cualquiera de las tres y no pasa nada:
+    # sin el plugin no aparece la opción, y sin el binario del formato la opción aparece
+    # pero falla al usarla (xarchiver no avisa qué le falta, sólo no extrae).
+    thunar-archive-plugin # Agrega "Extraer aquí", "Extraer en..." y "Comprimir..." al menú del clic derecho. NO descomprime nada por su cuenta: sólo llama al archivador que encuentre instalado (xarchiver, file-roller, ark, engrampa). Al instalarlo hay que reiniciar Thunar ('thunar -q') para que cargue el plugin; en un equipo nuevo no hace falta porque todavía no está corriendo.
+    xarchiver         # El archivador que usa el plugin. Se elige sobre file-roller porque es GTK puro y no arrastra media biblioteca de GNOME (nautilus/gnome-desktop) en un entorno que no es GNOME. Tampoco descomprime por sí mismo: es un frontend que le pasa el trabajo a los binarios de acá abajo.
+    unrar             # RAR, que es el que no viene con nada de fábrica y el motivo habitual de que "no se puede abrir". OJO: sólo EXTRAE. Crear .rar necesita el binario propietario 'rar', que está en AUR y no se instala acá; para comprimir usá zip o 7z, que no tienen esa restricción.
+    7zip              # 7z, y de paso lector de un montón de formatos más (cab, iso, msi, xz, wim). Es el 7-Zip oficial: reemplazó a p7zip, que ya NO existe en los repos de Arch, así que no vale copiar ese nombre de guías viejas.
+    zip               # Crear y modificar .zip. 'unzip' (más abajo en esta misma lista, lo pide Mason de nvim) sólo extrae, así que sin este paquete la opción "Comprimir" del menú no puede generar zips.
+    # tar, gzip, bzip2, xz, zstd, lz4 y cpio ya están en el sistema base, así que los
+    # .tar.gz / .tar.xz / .tar.zst y los .rpm funcionan sin agregar nada.
+    # Los formatos raros que xarchiver también soporta (lzop, lzip, lrzip, arj, lha, deb)
+    # quedan afuera a propósito; si algún día aparece uno: 'pacman -Si xarchiver' lista en
+    # "Optional Deps" qué paquete instalar para cada uno.
     imv               # Visor de imágenes nativo de Wayland, controlado por teclado (n/p para navegar, +/- zoom, q para salir). Es el habitual en setups de Hyprland/sway por ser mínimo. Queda como predeterminado para imágenes sin pasos extra: las asociaciones vienen dentro del mimeapps.list que enlaza la sección 9.
     zathura           # Visor de documentos minimalista con teclas tipo vim (j/k para desplazar, / para buscar, q para salir). Queda asociado a PDF vía mimeapps.list.
     zathura-pdf-poppler # OBLIGATORIO: zathura por sí solo NO abre ningún archivo, necesita un plugin de backend. Se elige poppler sobre mupdf porque este último arrastra tesseract con sus datos de OCR, innecesario para leer PDFs.

@@ -29,6 +29,7 @@ correspondiente en el mismo commit.
 - [Waybar: clics](#waybar-clics)
 - [Swap en la barra](#swap-en-la-barra)
 - [Visores](#visores)
+- [Archivos comprimidos](#archivos-comprimidos)
 - [Comportamiento automático](#comportamiento-automático)
 - [Dónde vive cada configuración](#dónde-vive-cada-configuración)
 - [Paleta](#paleta)
@@ -532,6 +533,46 @@ porque son las apps asociadas por defecto.
 | `q` | Salir |
 
 **rofi** — `Enter` selecciona, `Esc` cancela, flechas o `Ctrl+J`/`Ctrl+K` navegan.
+
+## Archivos comprimidos
+
+Se manejan desde el **clic derecho en Thunar**, sin abrir ninguna aplicación:
+
+| Opción del menú | Qué hace |
+|---|---|
+| **Extraer aquí** | Descomprime en la carpeta donde está el archivo |
+| **Extraer en…** | Pregunta la carpeta destino |
+| **Comprimir…** | Arma un archivo con lo que tengas seleccionado |
+
+Son tres piezas y hacen falta las tres: `thunar-archive-plugin` pone las opciones
+en el menú, `xarchiver` las ejecuta, y los descompresores de línea de comandos
+son los que realmente abren cada formato. Si falta el binario de un formato la
+opción igual aparece, pero no extrae nada y **xarchiver no dice qué le falta**.
+
+El pegamento entre las dos primeras es
+`/usr/lib/xfce4/thunar-archive-plugin/xarchiver.tap`, y lo aporta el paquete
+**xarchiver**, no el plugin: el plugin sólo trae los `.tap` de file-roller, ark y
+engrampa. Es la razón de que instalar el plugin solo no agregue nada al menú.
+
+**Extraer aquí** no desparrama: si el archivo no viene ya envuelto en una
+carpeta, xarchiver le crea una (`--ensure-directory`). No existe el caso de
+quedar con 200 archivos sueltos encima de la carpeta de descargas.
+
+Con lo que instala `archdesktopinstall.sh` quedan cubiertos zip, rar, 7z, tar y
+todas sus variantes (`.tar.gz`, `.tar.xz`, `.tar.zst`, `.tar.bz2`), más cab, iso
+y rpm de yapa. Doble clic sobre un comprimido lo abre en xarchiver para ver el
+contenido sin extraerlo.
+
+Dos cosas que sorprenden:
+
+- **`.rar` sólo se puede extraer, no crear.** El paquete `unrar` es el
+  descompresor; comprimir en rar necesita el binario propietario `rar`, que está
+  en AUR y no se instala. Para comprimir, usá zip o 7z.
+- Si instalás el plugin en un equipo donde Thunar ya está corriendo, no aparece
+  nada en el menú hasta reiniciarlo: `thunar -q`.
+
+¿Un formato raro que no abre (lzop, lzip, arj, lha, deb)? `pacman -Si xarchiver`
+lista en *Optional Deps* qué paquete instalar para cada uno.
 
 ## Comportamiento automático
 
