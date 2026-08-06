@@ -436,6 +436,30 @@ pacman -Qdt      # huérfanos actuales
 pacman -Qm       # paquetes foráneos (AUR): no son huérfanos, sólo otro origen
 ```
 
+### Poner al día un equipo rezagado: `update-since-*.sh`
+
+`archdesktopinstall.sh` es para instalar de cero. Cuando un equipo **ya
+instalado** se queda atrás de un cambio que necesita más que un `git pull`
+—paquetes nuevos, symlinks que se movieron, procesos que hay que reiniciar—
+ese salto se escribe como un script en `scripts/`:
+
+```sh
+bash ~/config_files/scripts/update-since-comprimidos.sh   # comprimidos en Thunar, módulo de swap, tooltip de rclone
+bash ~/config_files/scripts/update-since-zoom.sh          # zoom + VA-API, y los launchers que se movieron a launchers/
+```
+
+Todos son idempotentes: reejecutarlos en un equipo al día no cambia nada. Cada
+uno arranca con un `git pull --ff-only` que **se saltea solo** si hay cambios sin
+commitear, para no pisarte trabajo local.
+
+Lo que un `git pull` no puede hacer solo, y por eso existen estos scripts:
+instalar paquetes, y **sacudir los procesos que ya están corriendo con la
+versión vieja en memoria**. Thunar sigue de demonio en segundo plano aunque
+cierres todas las ventanas y carga sus plugins sólo al arrancar (`thunar -q`);
+waybar tiene su config en memoria (`SIGUSR2`); y el demonio de rclone-sync es un
+script de bash, que bash lee *a medida* que lo ejecuta — o sea que un `git pull`
+le cambia el archivo abajo de los pies y hay que reiniciarlo sí o sí.
+
 ### Scripts propios: `link-bins.sh`
 
 Los ejecutables del repo (`hyprshutdown`, `add-printer`, `clean-orphans`,
