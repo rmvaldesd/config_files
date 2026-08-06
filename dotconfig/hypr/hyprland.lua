@@ -471,9 +471,20 @@ hl.define_submap("monitor", function()
   hl.bind("Up", hl.dsp.workspace.move({ monitor = "u" }))
   hl.bind("Down", hl.dsp.workspace.move({ monitor = "d" }))
 
-  -- Salir del submapa al presionar Enter o Escape
-  hl.bind("Return", hl.dsp.submap("reset"))
-  hl.bind("escape", hl.dsp.submap("reset"))
+  -- Salir del submapa al presionar Enter o Escape.
+  --
+  -- Al salir se renumeran los workspaces (bin_configs/sort-workspaces): mover uno de
+  -- pantalla NO le cambia el numero, asi que despues de reacomodar dos o tres quedan
+  -- intercalados (izquierda 1,3,5 / derecha 2,4,6) y eso se ve en la barra y se camina
+  -- con la navegacion relativa. Salir del submapa es exactamente el momento en que
+  -- terminaste de acomodar, asi que es donde corresponde ordenar.
+  --
+  -- El separador es ';' y no '&&' a proposito: si sort-workspaces no esta instalado --
+  -- vive en bin_configs y necesita link-bins.sh -- igual tenes que poder salir del
+  -- submapa.
+  local salir = [[sort-workspaces; hyprctl dispatch 'hl.dsp.submap("reset")']]
+  hl.bind("Return", hl.dsp.exec_cmd(salir))
+  hl.bind("escape", hl.dsp.exec_cmd(salir))
 end)
 
 -- Switch workspaces with mainMod + [0-9]
@@ -488,7 +499,20 @@ end
 hl.bind(mainMod .. " + S", hl.dsp.workspace.toggle_special("magic"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
 
--- Scroll through existing workspaces with mainMod + scroll
+-- Scroll through existing workspaces with mainMod + scroll.
+--
+-- "e+-1" recorre TODOS los workspaces que existan, ordenados por ID y sin mirar en que
+-- monitor estan: un solo recorrido 1..N que cruza a la otra pantalla al llegar al final
+-- de la primera.
+--
+-- Eso funciona porque los numeros estan ordenados. Si quedaran intercalados -- izquierda
+-- 1,3,5 y derecha 2,4 -- avanzar desde el 1 te mandaria a la otra pantalla y volveria,
+-- que es justo lo que se siente roto. De que no queden intercalados se encarga
+-- sort-workspaces al salir del modo monitor (bin_configs/sort-workspaces).
+--
+-- La alternativa es "m+-1", que se queda en los workspaces de la pantalla actual y da la
+-- vuelta ahi mismo sin pasar nunca a la otra. Se probo y no es lo que se quiere: obliga a
+-- cambiar de pantalla aparte, con el foco direccional.
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mainMod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
 
@@ -518,6 +542,10 @@ local thirdMod = mainMod .. " + CONTROL"
 -- 1. CAMBIAR DE WORKSPACE (Navegación)
 -- ==========================================
 
+-- El recorrido es "e+-1" (ver el comentario del scroll, mas arriba): un solo 1..N que
+-- atraviesa las dos pantallas, apoyado en que sort-workspaces mantiene los numeros en
+-- orden visual.
+
 -- Moverse al espacio de trabajo ANTERIOR con 'H' (Izquierda)
 hl.bind(thirdMod .. " + H", hl.dsp.focus({ workspace = "e-1" }))
 
@@ -527,6 +555,11 @@ hl.bind(thirdMod .. " + L", hl.dsp.focus({ workspace = "e+1" }))
 -- Opcionales (Vertical)
 hl.bind(thirdMod .. " + K", hl.dsp.focus({ workspace = "e-1" })) -- Arriba / Anterior
 hl.bind(thirdMod .. " + J", hl.dsp.focus({ workspace = "e+1" })) -- Abajo / Siguiente
+
+-- Renumerar los workspaces a mano, sin pasar por el submapa SUPER + M: quedan 1..N en
+-- orden visual, la pantalla de la izquierda primero. 'M' de monitor, con el modificador
+-- de la navegacion entre workspaces, que es de lo que se trata.
+hl.bind(thirdMod .. " + M", hl.dsp.exec_cmd("sort-workspaces"))
 
 
 

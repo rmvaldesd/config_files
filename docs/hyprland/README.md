@@ -73,12 +73,13 @@ con `Return` o `Escape`.
 |---|---|
 | `SUPER + 1` … `9`, `0` | Ir al workspace 1-9 y 10 |
 | `SUPER + SHIFT + 1` … `9`, `0` | Mover la ventana a ese workspace |
-| `SUPER + CONTROL + H` / `K` | Workspace anterior |
-| `SUPER + CONTROL + L` / `J` | Workspace siguiente |
-| `SUPER + rueda del mouse` | Cambiar de workspace |
+| `SUPER + CONTROL + H` / `K` | Workspace anterior (recorrido 1..N, cruza a la otra pantalla en el borde) |
+| `SUPER + CONTROL + L` / `J` | Workspace siguiente (ídem) |
+| `SUPER + rueda del mouse` | Cambiar de workspace, mismo recorrido |
 | `SUPER + S` | Mostrar/ocultar el workspace especial *magic* |
 | `SUPER + SHIFT + S` | Mandar la ventana al workspace *magic* |
 | `SUPER + M` | Entrar al **modo monitor** (ver abajo) |
+| `SUPER + CONTROL + M` | Renumerar los workspaces a 1..N en orden visual (ver abajo) |
 
 ### Modo monitor
 
@@ -91,7 +92,7 @@ pantalla a otra. Se sale con `Return` o `Escape`. *M* de monitor.
 | `L` o `→` | … a la derecha |
 | `I` o `↑` | … arriba |
 | `K` o `↓` | … abajo |
-| `Return` o `Escape` | Salir del modo |
+| `Return` o `Escape` | Salir del modo **y renumerar** (ver abajo) |
 
 Las flechas hacen exactamente lo mismo que las letras. Acá arriba/abajo son
 `I`/`K`, igual que para mover el foco — no como en el modo redimensionar.
@@ -105,6 +106,50 @@ Empujar contra el borde no hace nada: si no hay pantalla de ese lado, Hyprland
 avisa *"Monitor not found"* y el workspace se queda donde está. No da la vuelta.
 
 Mientras estés adentro, waybar lo muestra (módulo `hyprland/submap`).
+
+### Renumerar: los workspaces quedan 1..N en orden visual
+
+Mover un workspace de pantalla **no le cambia el número**: se va con el que tenía.
+Después de reacomodar dos o tres quedan intercalados —
+
+```
+antes:    eDP-1 -> 1, 3, 5        DP-1 -> 2, 4, 6, 7
+después:  eDP-1 -> 1, 2, 3        DP-1 -> 4, 5, 6, 7
+```
+
+— y eso se nota en dos lados: la barra muestra el número (`{id}`) y la navegación
+relativa lo recorre. El reordenamiento lo hace `bin_configs/sort-workspaces`, y se
+dispara solo **al salir del modo monitor**, que es justo cuando terminaste de
+acomodar. `SUPER + CONTROL + M` lo corre a mano.
+
+La pantalla de más a la izquierda se queda con el 1, sin importar cuál sea la
+principal: el criterio es la posición física (`x`), que es lo que el ojo espera.
+Dentro de cada pantalla se respeta el orden que ya tenían.
+
+**No mueve ventanas.** Usa el dispatcher `workspace.change_id` de la API Lua, que
+cambia el número *en el lugar*: las ventanas, el layout, el estado de pantalla
+completa y el workspace activo de cada pantalla quedan intactos. La alternativa —
+mudar las ventanas de un workspace a otro — habría reconstruido el tiling.
+
+Dos detalles que no son obvios y por eso están en el script:
+
+- **Se renumera en dos pasadas**, contra un rango temporal que arranca 100 arriba
+  del ID más alto. Una permutación tiene ciclos: si el 2 va al 3 y el 3 al 2, el
+  primer cambio chocaría contra un número todavía ocupado.
+- **Al final se le manda `SIGUSR2` a waybar.** Sin eso no se ve nada: la barra no
+  se entera de que cambió un ID —no hay evento que escuchar— y encima deja de
+  marcar cuál está activo, porque el activo pasó a tener un número que no conoce.
+
+Para ver qué haría sin tocar nada:
+
+```sh
+sort-workspaces --dry-run
+```
+
+> `sort-workspaces` vive en `bin_configs/`, así que en una máquina ya instalada hay
+> que crearle el symlink con `bash ~/config_files/scripts/link-bins.sh` (ver
+> [Scripts propios](#scripts-propios-link-binssh)). Sin eso el atajo no hace nada,
+> aunque el modo monitor sigue saliendo con `Escape` igual.
 
 ## Aplicaciones y sesión
 
@@ -464,7 +509,8 @@ le cambia el archivo abajo de los pies y hay que reiniciarlo sí o sí.
 ### Scripts propios: `link-bins.sh`
 
 Los ejecutables del repo (`hyprshutdown`, `add-printer`, `clean-orphans`,
-`pick-window`, el wrapper `dbeaver`) viven en `bin_configs/` y se usan desde el
+`pick-window`, `find-file`, `sort-workspaces`, el wrapper `dbeaver`) viven en
+`bin_configs/` y se usan desde el
 PATH gracias a un symlink en `/usr/local/bin`. El instalador los crea, pero al
 **sumar un script nuevo** en una máquina ya instalada hay que reponerlos:
 
@@ -757,6 +803,7 @@ solo: `xdg-mime` escribe a través del symlink.
 | Limpieza de huérfanos | `bin_configs/clean-orphans` (enlazado en `/usr/local/bin`) |
 | Selector de ventanas | `bin_configs/pick-window` (enlazado en `/usr/local/bin`) |
 | Buscador de archivos | `bin_configs/find-file` (enlazado en `/usr/local/bin`) |
+| Renumerar workspaces | `bin_configs/sort-workspaces` (enlazado en `/usr/local/bin`, ver [Renumerar](#renumerar-los-workspaces-quedan-1n-en-orden-visual)) |
 | Enlazar los scripts propios | `scripts/link-bins.sh` |
 | Instalación completa | `archdesktopinstall.sh` |
 
