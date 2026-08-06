@@ -11,9 +11,10 @@
   "modules-left": [
     "hyprland/workspaces"
   ],
-  "modules-center": [
-    "clock"
-  ],
+  // El centro queda vacío a propósito: el reloj se mudó al extremo derecho, con el resto
+  // de los indicadores. La clave se deja declarada para que se vea que es una decisión y
+  // no un olvido.
+  "modules-center": [],
   "modules-right": [
     "hyprland/submap",
     "custom/language",
@@ -26,7 +27,8 @@
     "cpu",
     "custom/swap",
     "memory",
-    "custom/disk"
+    "custom/disk",
+    "clock"
   ],
   "hyprland/window": {
     "max-length": 50
@@ -72,10 +74,19 @@
     "tooltip-format-enumerate-connected": "{device_alias}\t{device_address}",
     "on-click": "exec ghostty --title=bluetui -e bluetui"
   },
+  // Sin 'max-length' -- lo tenía (10) y lo que hacía era CORTAR el módulo: se veía
+  // "0.5…" en vez de "0.5%". Ese valor no son píxeles ni caracteres reales: waybar lo
+  // pasa a GTK como 'max-width-chars', y GTK mide un carácter "promedio" que en esta
+  // fuente, con el icono adelante, sale más ancho que la cuenta -- así que un texto de
+  // 6 caracteres se ellipsiza contra un límite de 10. Como el formato acá tiene largo
+  // fijo (" 100%" es lo más ancho posible), el límite no protegía de nada.
+  //
+  // Se notó al mudar el reloj a la derecha: con el centro vacío GTK reparte el ancho de
+  // otra manera y el recorte, que antes se comía sólo un decimal, se llevó también el
+  // icono del módulo de red (que tenía el mismo 'max-length' heredado de un ejemplo).
   "cpu": {
     "interval": 10,
     "format": " {}%",
-    "max-length": 10,
     "on-click": "exec ghostty --title=btop -e btop"
   },
   "memory": {
@@ -136,7 +147,9 @@
     "tooltip-format-wifi": "{essid} ({signalStrength}%) ",
     "tooltip-format-ethernet": "{ifname} ",
     "tooltip-format-disconnected": "󰖪",
-    "max-length": 50,
+    // Acá también se sacó el 'max-length' (ver el comentario de #cpu): todos los formatos
+    // de este módulo son UN icono, así que no había nada que limitar, y el recorte llegó
+    // a dejarlo en "…" -- un módulo de red que no muestra el estado de la red.
     // nmtui viene dentro del propio networkmanager, así que no suma ningún paquete.
     // Mismo patrón que el módulo de bluetooth con bluetui: una TUI en su terminal.
     "on-click": "exec ghostty --title=nmtui -e nmtui"

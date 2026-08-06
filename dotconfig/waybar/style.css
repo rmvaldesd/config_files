@@ -72,18 +72,12 @@ window#waybar {
 }
 
 /* --------------------------------------------------------------------------
-   RELOJ (centro)
-   -------------------------------------------------------------------------- */
-#clock {
-  padding: 0 12px;
-  color: @dark-0;
-}
-
-/* --------------------------------------------------------------------------
    MÓDULOS DE LA DERECHA
+   El reloj entra en esta lista: dejó de estar en el centro y ahora cierra la
+   fila, después del disco.
    Sin fondo ni bordes redondeados: la única separación es una regla vertical
    de 1px en zinc-700. El borde va a la IZQUIERDA de cada módulo, así el primero
-   de la fila también queda separado del reloj y no hay que tratar aparte al
+   de la fila queda separado del vacío del centro y no hay que tratar aparte al
    último. Los módulos que se ocultan (bluetooth sin dispositivos, submap fuera
    de un submapa) no dejan una regla huérfana: waybar no los renderiza.
    -------------------------------------------------------------------------- */
@@ -98,7 +92,8 @@ window#waybar {
 #cpu,
 #custom-swap,
 #memory,
-#custom-disk {
+#custom-disk,
+#clock {
   padding: 0 11px;
   margin: 0;
   background-color: transparent;
@@ -121,8 +116,13 @@ window#waybar {
 /* Aire al borde derecho de la pantalla, que si no el último módulo queda pegado.
    Va en el ÚLTIMO de 'modules-right': si algún día se agrega uno después, este
    padding se muda con él. */
-#custom-disk {
+#clock {
   padding-right: 14px;
+  /* El reloj es lo único que se lee de la barra sin buscarlo, así que va en el
+     blanco pleno y el resto de los indicadores en zinc-300. Antes lo distinguía
+     estar solo en el centro; ahora que comparte fila con los demás, ese contraste
+     es lo único que lo separa. */
+  color: @dark-0;
 }
 
 /* El submapa es un estado modal: tiene que cantar. Como ya no hay pastilla,
