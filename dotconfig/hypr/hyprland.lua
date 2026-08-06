@@ -576,16 +576,18 @@ hl.bind(thirdMod .. " + M", hl.dsp.exec_cmd("sort-workspaces"))
 -- ventana ahi. Aca, thirdMod + H/L ENFOCA el workspace vecino y agregarle SHIFT MUEVE el
 -- workspace hacia ese lado.
 --
--- SIN 'repeating', y no por prolijidad: con auto-repeticion, mantener la tecla apretada
--- disparaba el script decenas de veces por segundo y CADA corrida le manda un SIGUSR2 a
--- waybar (es la unica forma de que la barra se entere de que cambiaron los IDs). Esa
--- rafaga de recargas mataba la barra con SIGSEGV -- una respuesta D-Bus que llega cuando
--- el modulo que la pidio ya fue destruido. Reproducido: 25 senales en 2 segundos alcanzan.
+-- SIN 'repeating'. Con auto-repeticion, mantener la tecla apretada disparaba el script
+-- decenas de veces por segundo y el workspace volaba 10 o 20 posiciones de un saque, que
+-- para reordenar es puro sobretiro: uno quiere dejarlo en un lugar concreto. Una
+-- pulsacion, una posicion. Si alguna vez se prefiere lo otro, agregarle
+-- '{ repeating = true }' es seguro: el script se protege solo con un flock que descarta
+-- las invocaciones encimadas (dos renumerados entrelazados se pisan los IDs entre si).
 --
--- El script ademas se protege solo (un flock que descarta invocaciones encimadas y un
--- freno que agrupa los avisos a la barra en uno), pero igual conviene no generar la
--- rafaga: una tecla repetida movia el workspace 10 o 20 posiciones de un saque, que para
--- reordenar es puro sobretiro. Una pulsacion, una posicion.
+-- Ojo si alguna vez se vuelve el modulo de waybar a 'hyprland/workspaces': ahi cada
+-- movimiento tiene que mandarle un SIGUSR2 a la barra, y con auto-repeticion esa rafaga
+-- de recargas la mata con SIGSEGV (medido: 25 senales en 2 segundos alcanzan). Con
+-- 'ext/workspaces', que es lo que hay ahora, no se manda ninguna senal y el problema no
+-- existe.
 --
 -- NO cruza de pantalla a proposito: esto renumera, y mandar un workspace a la otra
 -- pantalla es 'moveworkspacetomonitor', que es lo que hace el submapa SUPER + M. Los dos

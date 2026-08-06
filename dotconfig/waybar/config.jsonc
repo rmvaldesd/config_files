@@ -9,7 +9,7 @@
   // regla vertical de 1px definidos en style.css.
   "spacing": 0,
   "modules-left": [
-    "hyprland/workspaces"
+    "ext/workspaces"
   ],
   // El centro queda vacío a propósito: el reloj se mudó al extremo derecho, con el resto
   // de los indicadores. La clave se deja declarada para que se vea que es una decisión y
@@ -30,32 +30,46 @@
     "custom/disk",
     "clock"
   ],
-  // OJO: hacer CLICK en un número no lleva a ese workspace, y no hay nada acá que
-  // lo arregle. Es un bug de waybar, no de esta config: al hacer click manda por el
-  // socket la orden clásica 'dispatch workspace 2', y esta config es Lua, donde esa
-  // forma ya no existe -- Hyprland la envuelve en 'hl.dispatch(workspace 2)', que ni
-  // siquiera es Lua válido, y responde un error de parseo que waybar se traga.
-  // Verificado mandando la orden cruda al socket: devuelve el error y el workspace
-  // no cambia. El módulo no expone ningún 'on-click' con el que redirigirlo.
+  // Es 'ext/workspaces' y NO 'hyprland/workspaces', por tres motivos que se acumulan.
   //
-  // Ya está arreglado upstream (Alexays/Waybar#5008, PR #5013, cerrado el
-  // 2026-07-04) para "la próxima release"; la instalada es la 0.15.0, anterior a
-  // eso. O sea que esto se destraba solo cuando actualice el paquete: NO hay que
-  // tocar nada acá.
+  // 1. NO HAY QUE RECARGAR LA BARRA. Cambiar el ID de un workspace -- lo que hacen
+  //    move-workspace y sort-workspaces -- no genera ningun evento que el modulo de
+  //    Hyprland pueda escuchar: se queda dibujando los numeros viejos y deja de marcar
+  //    cual esta activo. La unica salida era SIGUSR2, que no es un refresco suave sino
+  //    una reconstruccion de TODOS los modulos: la barra entera parpadea en cada
+  //    movimiento, y encadenar esas recargas llego a matarla con SIGSEGV (una respuesta
+  //    D-Bus que llega cuando el modulo que la pidio ya no existe). ext/workspaces habla
+  //    el protocolo ext-workspace del compositor y se entera SOLO. Verificado: se cambia
+  //    un ID sin mandar ninguna senal y la barra lo refleja.
   //
-  // Se probó 'ext/workspaces' + '"on-click": "activate"', que sí hace andar el click
-  // porque habla el protocolo ext-workspace del compositor en vez de la IPC de
-  // Hyprland, y SE DESCARTÓ. El motivo es una regresión que no se ve hasta enchufar
-  // el segundo monitor: ese módulo sólo conoce las clases .active/.urgent/.hidden,
-  // mientras que el de Hyprland distingue .active (el que TIENE el foco) de .visible
-  // (el que se ve en un monitor pero no lo tiene). Como style.css estiliza .active y
-  // no .visible, hoy la barra se apaga entera cuando el foco se va a la otra
-  // pantalla, y eso es justamente la señal de "el foco no está acá". Con
-  // ext/workspaces cada barra marca siempre el suyo y esa señal se pierde.
-  // Comparado en capturas con un monitor headless.
+  // 2. EL CLICK FUNCIONA. Con el modulo de Hyprland, hacer click en un numero no hacia
+  //    NADA, en silencio: manda por el socket la orden clasica 'dispatch workspace 2', y
+  //    esta config es Lua, donde esa forma ya no existe -- Hyprland la envuelve en
+  //    'hl.dispatch(workspace 2)', que ni siquiera es Lua valido. Es un bug de waybar
+  //    (Alexays/Waybar#5008, PR #5013), ya arreglado upstream para "la proxima release";
+  //    la instalada es la 0.15.0. ext/workspaces lo esquiva porque no usa esa IPC.
   //
-  // El módulo no necesita bloque de config propio, así que no lo tiene.
+  // 3. Y de paso, sin senales no hace falta ningun freno ni hay riesgo de tirar la barra.
   //
+  // LO QUE SE PIERDE, que no es gratis: este modulo solo conoce las clases
+  // .active/.urgent/.hidden, mientras que el de Hyprland distingue .active (el que TIENE
+  // el foco) de .visible (el que se ve en un monitor pero no lo tiene). Como style.css
+  // estiliza .active y no .visible, con el modulo viejo la barra se apagaba entera cuando
+  // el foco se iba a la otra pantalla, y eso era una senal util: "el foco no esta aca".
+  // Ahora cada barra marca siempre el suyo. Solo aplica con el monitor externo enchufado.
+  //
+  // 'on-click' NO es un comando aca sino una accion del modulo, y sin el los clicks se
+  // siguen ignorando: es el paso que falta en la mitad de los reportes del issue de
+  // arriba, donde cambian de modulo y sigue sin andar.
+  //
+  // 'sort-by-name' es el default, pero va explicito porque el orden es justamente lo que
+  // se rompe si alguien lo toca: con 'sort-by-id' los numeros salen en el orden interno
+  // del protocolo (probado: 1 4 5 3 2) y no en el 1..N que dejan sort-workspaces y
+  // move-workspace. Ordena numericamente, no alfabeticamente (verificado con 11 y 14).
+  "ext/workspaces": {
+    "on-click": "activate",
+    "sort-by-name": true
+  },
   // Un icono por modo -- una regla para resize, un monitor para monitor -- en vez del
   // nombre del submapa, que ocupaba mucho para lo poco que aporta: cuando aparece
   // acabás de apretar la tecla, así que ya sabés en cuál estás. La palabra se muda al

@@ -84,23 +84,6 @@ cambiar_id() {
     hyprctl dispatch "hl.dsp.workspace.change_id({ workspace = $de, id = $a })" >/dev/null
 }
 
-# waybar-refresh vive AL LADO de este script; se lo busca por ruta y no por PATH para que
-# funcione igual por su symlink de /usr/local/bin o directamente desde el repo. Mismo
-# criterio (y misma función) que sort-workspaces.
-avisar_barra() {
-    local aqui refresh
-    aqui=$(dirname "$(readlink -f "$0")")
-    refresh="$aqui/waybar-refresh"
-    if [ -x "$refresh" ]; then
-        "$refresh"
-    elif command -v waybar-refresh >/dev/null 2>&1; then
-        waybar-refresh
-    elif command -v killall >/dev/null 2>&1 && pgrep -x waybar >/dev/null 2>&1; then
-        # Último recurso, SIN freno: sólo se llega acá con una instalación a medias, y es
-        # preferible una barra que se puede caer a una barra que miente los números.
-        killall -SIGUSR2 waybar || true
-    fi
-}
 
 # --- 1. leer el estado -----------------------------------------------------------------
 activo=$(activo_json | jq -r '.id')
@@ -199,17 +182,17 @@ for id in "${orden[@]}"; do
     cambiar_id $(( TMP + nuevo_de[$id] )) "${nuevo_de[$id]}"
 done
 
-# --- 6. avisarle a la barra --------------------------------------------------------------
-# Cambiar un ID no genera ningún evento que waybar pueda escuchar, así que hay que
-# empujarla con SIGUSR2. Eso NO se hace acá directamente: va por waybar-refresh, que agrupa
-# los pedidos seguidos en una sola señal.
+# --- 6. la barra se entera sola -----------------------------------------------------------
+# No hay que avisarle NADA a waybar, y eso es a proposito: el modulo de workspaces es
+# 'ext/workspaces', que habla el protocolo ext-workspace del compositor y ve el cambio de
+# ID por su cuenta (verificado renumerando sin mandar ninguna senal).
 #
-# No es una prolijidad, es lo que evita que la barra se caiga: SIGUSR2 destruye y
-# reconstruye todos los módulos, y encadenar señales -- que es exactamente lo que pasa
-# arrastrando un workspace varias posiciones -- la mata con SIGSEGV. El porqué completo, y
-# el número medido, están en el encabezado de waybar-refresh.
-if [ "$DRY" -eq 0 ]; then
-    avisar_barra
-fi
+# Antes esto mandaba un SIGUSR2, que es lo unico que sacaba de su error al modulo
+# 'hyprland/workspaces'. Pero SIGUSR2 no es un refresco: reconstruye TODOS los modulos, la
+# barra entera parpadea en cada movimiento, y encadenar esas recargas la mata con SIGSEGV
+# (una respuesta D-Bus que llega cuando el modulo que la pidio ya no existe; medido: 25
+# senales en 2 segundos alcanzan). Cambiar de modulo hizo desaparecer el parpadeo y el
+# problema de raiz. Si alguna vez se vuelve a 'hyprland/workspaces', hay que reponer el
+# aviso CON un freno que agrupe las senales: sin eso, arrastrar un workspace tira la barra.
 
 exit 0
