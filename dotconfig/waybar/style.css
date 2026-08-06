@@ -44,7 +44,13 @@ window#waybar {
 }
 
 #workspaces button {
-  padding: 0 9px;
+  /* Acompaña al padding de los módulos de la derecha (7px) para que los dos
+     extremos de la barra se vean igual de compactos: 9px al lado de 7px dejaba la
+     izquierda visiblemente más aireada. El valor es el proporcional (9 * 7/11), y
+     no los 5px que mantendrían la diferencia de 2px que había contra los módulos:
+     acá el padding no separa de una regla sino un número del siguiente, y a 5px
+     los dígitos se amontonan y el subrayado del activo queda angosto. */
+  padding: 0 6px;
   margin: 0;
   background: transparent;
   color: @dark-5;
@@ -94,7 +100,12 @@ window#waybar {
 #memory,
 #custom-disk,
 #clock {
-  padding: 0 11px;
+  /* Este padding es TODO el aire entre el contenido y la regla vertical, y como el
+     borde va a la izquierda de cada módulo, entre dos contenidos vecinos hay el
+     doble. Bajó de 11px a 7px para comprimir la barra. El piso está en ~5px: ahí
+     las reglas quedan pegadas al texto y dejan de leerse como separadores, que es
+     justo lo que tienen que hacer. */
+  padding: 0 7px;
   margin: 0;
   background-color: transparent;
   /* La regla se dibuja como imagen de fondo y NO con border-left porque un borde
