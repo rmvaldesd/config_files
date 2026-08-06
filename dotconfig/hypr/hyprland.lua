@@ -561,6 +561,47 @@ hl.bind(thirdMod .. " + J", hl.dsp.focus({ workspace = "e+1" })) -- Abajo / Sigu
 -- de la navegacion entre workspaces, que es de lo que se trata.
 hl.bind(thirdMod .. " + M", hl.dsp.exec_cmd("sort-workspaces"))
 
+-- ==========================================
+-- 2. REORDENAR WORKSPACES (arrastrar de posicion)
+-- ==========================================
+
+-- Arrastra el workspace ACTIVO una posicion, empujando a los demas para que la secuencia
+-- siga siendo 1..N sin huecos. Parado en el 1 de "1,2,3,4", dos veces a la derecha deja
+-- al que era 1 como 3, al 2 como 1 y al 3 como 2. Seguis en el mismo workspace y con las
+-- mismas ventanas: lo unico que cambia es su numero, o sea su lugar en la barra y en la
+-- navegacion relativa.
+--
+-- Las mismas teclas que la navegacion de arriba, mas SHIFT. Es la convencion que ya usa
+-- el resto de la config: SUPER + n ENFOCA el workspace n y SUPER + SHIFT + n MUEVE la
+-- ventana ahi. Aca, thirdMod + H/L ENFOCA el workspace vecino y agregarle SHIFT MUEVE el
+-- workspace hacia ese lado.
+--
+-- SIN 'repeating', y no por prolijidad: con auto-repeticion, mantener la tecla apretada
+-- disparaba el script decenas de veces por segundo y CADA corrida le manda un SIGUSR2 a
+-- waybar (es la unica forma de que la barra se entere de que cambiaron los IDs). Esa
+-- rafaga de recargas mataba la barra con SIGSEGV -- una respuesta D-Bus que llega cuando
+-- el modulo que la pidio ya fue destruido. Reproducido: 25 senales en 2 segundos alcanzan.
+--
+-- El script ademas se protege solo (un flock que descarta invocaciones encimadas y un
+-- freno que agrupa los avisos a la barra en uno), pero igual conviene no generar la
+-- rafaga: una tecla repetida movia el workspace 10 o 20 posiciones de un saque, que para
+-- reordenar es puro sobretiro. Una pulsacion, una posicion.
+--
+-- NO cruza de pantalla a proposito: esto renumera, y mandar un workspace a la otra
+-- pantalla es 'moveworkspacetomonitor', que es lo que hace el submapa SUPER + M. Los dos
+-- se llevan bien -- reordenar dentro de una pantalla deja un resultado que
+-- sort-workspaces no toca --, asi que se pueden usar en cualquier orden.
+--
+-- El script vive en bin_configs/, o sea que en una maquina ya instalada hay que correr
+-- 'bash ~/config_files/scripts/link-bins.sh' para crearle el symlink: no viaja solo con
+-- el git pull. Si falta, el atajo no hace nada.
+hl.bind(thirdMod .. " + SHIFT + H", hl.dsp.exec_cmd("move-workspace left"))
+hl.bind(thirdMod .. " + SHIFT + L", hl.dsp.exec_cmd("move-workspace right"))
+
+-- Los verticales, por simetria con la navegacion (que tiene K/J ademas de H/L).
+hl.bind(thirdMod .. " + SHIFT + K", hl.dsp.exec_cmd("move-workspace left"))
+hl.bind(thirdMod .. " + SHIFT + J", hl.dsp.exec_cmd("move-workspace right"))
+
 
 
 -- Laptop multimedia keys for volume and LCD brightness

@@ -67,6 +67,25 @@ cambiar_id() {
     hyprctl dispatch "hl.dsp.workspace.change_id({ workspace = $de, id = $a })" >/dev/null
 }
 
+# waybar-refresh vive AL LADO de este script, y se lo busca por ruta y no por PATH a
+# propósito: así funciona igual invocado por su symlink de /usr/local/bin o directamente
+# desde el repo, sin depender de que link-bins.sh lo haya enlazado a él también. El
+# 'readlink -f' es lo que resuelve el symlink hasta el archivo real del repo.
+avisar_barra() {
+    local aqui refresh
+    aqui=$(dirname "$(readlink -f "$0")")
+    refresh="$aqui/waybar-refresh"
+    if [ -x "$refresh" ]; then
+        "$refresh"
+    elif command -v waybar-refresh >/dev/null 2>&1; then
+        waybar-refresh
+    elif command -v killall >/dev/null 2>&1 && pgrep -x waybar >/dev/null 2>&1; then
+        # Último recurso, sin freno. Una señal suelta es segura: lo que mata a la barra es
+        # encadenarlas, y este script se corre de a una vez.
+        killall -SIGUSR2 waybar || true
+    fi
+}
+
 # --- 1. leer el estado -----------------------------------------------------------------
 # Las pantallas se ordenan por X y después por Y: X es el criterio real (izquierda a
 # derecha); el desempate por Y sólo importa con dos apiladas en la misma columna.
@@ -160,10 +179,14 @@ done
 # que esperar: no hay ningún evento de "cambió el ID" que waybar pueda escuchar, así que
 # se queda mintiendo hasta el próximo login. Verificado mirando la barra.
 #
-# SIGUSR2 es "releé la config", el mismo mecanismo que usa auto-reload.sh: reconstruye los
-# módulos sin reiniciar el proceso. La barra no parpadea.
-if [ "$DRY" -eq 0 ] && command -v killall >/dev/null 2>&1 && pgrep -x waybar >/dev/null 2>&1; then
-    killall -SIGUSR2 waybar || true
+# El aviso va por waybar-refresh y no con un 'killall -SIGUSR2' directo. Acá, que se
+# invoca de a una vez, la diferencia no se nota; importa porque el freno es COMPARTIDO con
+# move-workspace: reordenar y salir del submapa monitor -- que corre este script -- puede
+# encadenar dos avisos, y SIGUSR2 reconstruye todos los módulos, lo que con llamadas D-Bus
+# en vuelo llega a matar la barra. Pasando los dos por el mismo freno, sale una sola señal.
+# El detalle completo está en el encabezado de waybar-refresh.
+if [ "$DRY" -eq 0 ]; then
+    avisar_barra
 fi
 
 exit 0

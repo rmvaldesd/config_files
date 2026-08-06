@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+# Mueve el workspace ACTIVO a otra posición dentro de su pantalla, arrastrando a los
+# demás para que la secuencia siga siendo 1..N sin huecos.
+#
+#   antes:   1, 2, 3, 4   (parado en el 1)
+#   'move-workspace 3'
+#   después: el que era 1 ahora es 3, el 2 pasó a 1 y el 3 pasó a 2. El 4 no se movió.
+#
+# Seguís parado en el mismo workspace, con las mismas ventanas: lo único que cambia es
+# su número y, por lo tanto, su lugar en la barra y en la navegación relativa.
+#
+# Uso:
+#   move-workspace left | right     una posición hacia ese lado
+#   move-workspace <N>              a la posición N de la pantalla (1 = primera)
+#   move-workspace right --dry-run  muestra qué haría, sin tocar nada
+#
+# POR QUÉ SÓLO DENTRO DE LA PANTALLA
+#
+# Esto renumera; no muda nada de sitio. Mandar un workspace a la OTRA pantalla es
+# 'moveworkspacetomonitor', que es lo que hace el submapa SUPER + M. Y no tendría sentido
+# mezclarlos: sort-workspaces ordena por pantalla y después por ID, así que un número
+# "de la otra pantalla" se lo llevaría por delante en el próximo ordenamiento. Por eso los
+# extremos se topan en vez de saltar a la pantalla vecina.
+#
+# Como la reordenación es sólo dentro de una pantalla y deja los mismos IDs (repartidos
+# distinto), el resultado es ESTABLE frente a sort-workspaces: correrlo después no cambia
+# nada. Los dos comandos se pueden usar en cualquier orden.
+#
+# CÓMO
+#
+# Igual que sort-workspaces, y por los mismos motivos: 'workspace.change_id' de la API Lua
+# cambia el ID EN EL LUGAR -- no mueve ventanas, no cambia de monitor, no toca el layout ni
+# el estado de pantalla completa --, y se hace en DOS pasadas contra un rango temporal
+# porque una permutación tiene ciclos y el primer cambio chocaría contra un número todavía
+# ocupado. La sintaxis del dispatch es Lua porque este equipo configura Hyprland en Lua
+# (ver la nota en sort-workspaces).
+#
+# Los workspaces especiales (el scratchpad 'magic', de ID negativo) no entran: no tienen
+# posición en la secuencia.
+
+set -euo pipefail
+
+DRY=0
+destino_arg=""
+for a in "$@"; do
+    case "$a" in
+        --dry-run|-n) DRY=1 ;;
+        --help|-h)    sed -n '2,18p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        *)            destino_arg="$a" ;;
+    esac
+done
+
+[ -n "$destino_arg" ] || { printf 'uso: %s left|right|<N> [--dry-run]\n' "${0##*/}" >&2; exit 1; }
+
+command -v hyprctl >/dev/null 2>&1 || { echo "move-workspace: no hay hyprctl (¿esto es Hyprland?)" >&2; exit 1; }
+command -v jq      >/dev/null 2>&1 || { echo "move-workspace: falta jq" >&2; exit 1; }
+
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/move-workspace.lock"
+
+# Un movimiento a la vez. Si ya hay uno corriendo -- que pasa apretando el atajo rápido --
+# esta invocación se descarta en silencio en vez de encimarse: dos renumerados
+# entrelazados se pisan los IDs entre sí y dejan la secuencia hecha un nudo, porque cada
+# uno leyó el estado ANTES de que el otro lo cambiara.
+#
+# Descartar y no encolar es lo correcto acá: lo que se pierde es un movimiento de más
+# durante un arrastre, no una acción que el usuario vaya a extrañar.
+if [ "$DRY" -eq 0 ]; then
+    exec 9>"$LOCK"
+    flock -n 9 || exit 0
+fi
+
+# Igual que en sort-workspaces: el estado se puede inyectar desde archivos para probar el
+# planificador con configuraciones que no están enchufadas (muchos workspaces, el activo en
+# el medio, dos pantallas). Sin las variables, sale de Hyprland.
+workspaces_json() { if [ -n "${WS_MOVE_WORKSPACES:-}" ]; then cat "$WS_MOVE_WORKSPACES"; else hyprctl workspaces -j;      fi; }
+activo_json()     { if [ -n "${WS_MOVE_ACTIVO:-}"     ]; then cat "$WS_MOVE_ACTIVO";     else hyprctl activeworkspace -j; fi; }
+
+cambiar_id() {
+    local de="$1" a="$2"
+    if [ "$DRY" -eq 1 ]; then
+        printf '   %s -> %s\n' "$de" "$a"
+        return 0
+    fi
+    hyprctl dispatch "hl.dsp.workspace.change_id({ workspace = $de, id = $a })" >/dev/null
+}
+
+# waybar-refresh vive AL LADO de este script; se lo busca por ruta y no por PATH para que
+# funcione igual por su symlink de /usr/local/bin o directamente desde el repo. Mismo
+# criterio (y misma función) que sort-workspaces.
+avisar_barra() {
+    local aqui refresh
+    aqui=$(dirname "$(readlink -f "$0")")
+    refresh="$aqui/waybar-refresh"
+    if [ -x "$refresh" ]; then
+        "$refresh"
+    elif command -v waybar-refresh >/dev/null 2>&1; then
+        waybar-refresh
+    elif command -v killall >/dev/null 2>&1 && pgrep -x waybar >/dev/null 2>&1; then
+        # Último recurso, SIN freno: sólo se llega acá con una instalación a medias, y es
+        # preferible una barra que se puede caer a una barra que miente los números.
+        killall -SIGUSR2 waybar || true
+    fi
+}
+
+# --- 1. leer el estado -----------------------------------------------------------------
+activo=$(activo_json | jq -r '.id')
+pantalla=$(activo_json | jq -r '.monitor')
+
+if [ "$activo" -lt 0 ] 2>/dev/null; then
+    echo "move-workspace: el workspace activo es especial (scratchpad); no tiene posición." >&2
+    exit 1
+fi
+
+# Sólo los de ESTA pantalla, ordenados por ID: dentro de una pantalla no hay más "posición"
+# que el número.
+ids=()
+while IFS= read -r id; do
+    ids+=("$id")
+done < <(workspaces_json | jq -r --arg m "$pantalla" '[.[] | select(.id > 0 and .monitor == $m)] | sort_by(.id)[] | .id')
+
+total=${#ids[@]}
+[ "$total" -gt 1 ] || { echo "move-workspace: hay un solo workspace en $pantalla; no hay dónde moverlo."; exit 0; }
+
+# --- 2. dónde está y a dónde va --------------------------------------------------------
+desde=-1
+for i in "${!ids[@]}"; do
+    [ "${ids[$i]}" = "$activo" ] && { desde=$i; break; }
+done
+[ "$desde" -ge 0 ] || { echo "move-workspace: el workspace activo ($activo) no figura en $pantalla." >&2; exit 1; }
+
+case "$destino_arg" in
+    left|izq|-1)  hasta=$(( desde - 1 )) ;;
+    right|der|+1) hasta=$(( desde + 1 )) ;;
+    ''|*[!0-9]*)  echo "move-workspace: destino inválido '$destino_arg' (left, right o un número)" >&2; exit 1 ;;
+    # Posición absoluta, 1-based: la que ve el usuario en la barra.
+    *)            hasta=$(( destino_arg - 1 )) ;;
+esac
+
+# Los extremos se topan y no dan error: mantener apretado el atajo contra el borde no
+# debería quejarse ni, mucho menos, saltar a la otra pantalla.
+[ "$hasta" -lt 0 ] && hasta=0
+[ "$hasta" -ge "$total" ] && hasta=$(( total - 1 ))
+
+if [ "$hasta" -eq "$desde" ]; then
+    [ "$DRY" -eq 1 ] && echo "Ya está en la posición $(( desde + 1 )) de $pantalla: no hay nada que mover."
+    exit 0
+fi
+
+# --- 3. calcular el nuevo reparto ------------------------------------------------------
+# Se saca el activo de la lista y se lo reinserta en la posición destino. Los IDs que hay
+# en la pantalla son los MISMOS: lo único que cambia es cuál le toca a cada workspace.
+orden=()
+for i in "${!ids[@]}"; do
+    [ "$i" -eq "$desde" ] || orden+=("${ids[$i]}")
+done
+resto=("${orden[@]}")
+orden=()
+for i in "${!resto[@]}"; do
+    [ "$i" -eq "$hasta" ] && orden+=("$activo")
+    orden+=("${resto[$i]}")
+done
+# Si va al final, el bucle de arriba nunca llega a insertarlo.
+[ "$hasta" -ge "${#resto[@]}" ] && orden+=("$activo")
+
+declare -A nuevo_de
+for i in "${!orden[@]}"; do
+    nuevo_de["${orden[$i]}"]=${ids[$i]}
+done
+
+# --- 4. mostrar el plan ----------------------------------------------------------------
+if [ "$DRY" -eq 1 ]; then
+    printf '%s: posición %s -> %s\n' "$pantalla" "$(( desde + 1 ))" "$(( hasta + 1 ))"
+    for id in "${orden[@]}"; do
+        marca=""
+        [ "${nuevo_de[$id]}" -ne "$id" ] && marca="  *"
+        [ "$id" = "$activo" ] && marca="$marca  (activo)"
+        printf '  %3s -> %-3s%s\n' "$id" "${nuevo_de[$id]}" "$marca"
+    done
+    echo "--- pasada 1: al rango temporal"
+fi
+
+# --- 5. renumerar ----------------------------------------------------------------------
+# El rango temporal se calcula sobre TODOS los workspaces y no sólo los de esta pantalla:
+# los de la otra son IDs igual de ocupados y chocaríamos con ellos.
+max=0
+while IFS= read -r id; do
+    [ "$id" -gt "$max" ] && max=$id
+done < <(workspaces_json | jq -r '.[] | select(.id > 0) | .id')
+TMP=$(( max + 100 ))
+
+for id in "${orden[@]}"; do
+    [ "${nuevo_de[$id]}" -ne "$id" ] || continue
+    cambiar_id "$id" $(( TMP + nuevo_de[$id] ))
+done
+
+[ "$DRY" -eq 1 ] && echo "--- pasada 2: al número definitivo"
+for id in "${orden[@]}"; do
+    [ "${nuevo_de[$id]}" -ne "$id" ] || continue
+    cambiar_id $(( TMP + nuevo_de[$id] )) "${nuevo_de[$id]}"
+done
+
+# --- 6. avisarle a la barra --------------------------------------------------------------
+# Cambiar un ID no genera ningún evento que waybar pueda escuchar, así que hay que
+# empujarla con SIGUSR2. Eso NO se hace acá directamente: va por waybar-refresh, que agrupa
+# los pedidos seguidos en una sola señal.
+#
+# No es una prolijidad, es lo que evita que la barra se caiga: SIGUSR2 destruye y
+# reconstruye todos los módulos, y encadenar señales -- que es exactamente lo que pasa
+# arrastrando un workspace varias posiciones -- la mata con SIGSEGV. El porqué completo, y
+# el número medido, están en el encabezado de waybar-refresh.
+if [ "$DRY" -eq 0 ]; then
+    avisar_barra
+fi
+
+exit 0
