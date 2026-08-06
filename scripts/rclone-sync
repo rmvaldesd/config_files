@@ -153,7 +153,7 @@ avisar() {
 # Estado guardado como pares clave=valor. Se escribe a un temporal y se mueve encima:
 # 'status' puede leerlo justo mientras el demonio lo escribe, y un mv es atómico.
 escribir_estado() {
-    estado="$1"; detalle="$2"
+    estado="$1"; detalle="$2"; clase="${3:-}"
     ts_ok_previo=$(leer_campo TS_OK)
     [ "$estado" = "ok" ] && ts_ok_previo=$(ahora)
     # El PID que se guarda es SIEMPRE el del demonio: 'rclone-sync once' (el clic en
@@ -163,6 +163,15 @@ escribir_estado() {
     {
         printf 'ESTADO=%s\n' "$estado"
         printf 'DETALLE=%s\n' "$detalle"
+        # CLASE es el motivo en clave, no en prosa: 'borrado_masivo', 'offline', vacío.
+        # Existe porque el detalle es TEXTO PARA LEER (y desde que el tooltip está en
+        # inglés, texto traducible), y había dos decisiones del programa colgando de que
+        # ese texto dijera cierta palabra: el menú ofrecía aprobar un borrado frenado si
+        # el detalle contenía "frenado", y el demonio distinguía 'sin red' de 'error roto'
+        # buscando "sin conexión". Reescribir un mensaje rompía cualquiera de las dos en
+        # silencio -- el menú simplemente dejaba de ofrecer la opción. Ahora el que decide
+        # es este campo y el detalle se puede redactar como convenga.
+        printf 'CLASE=%s\n' "$clase"
         printf 'TS=%s\n'      "$(ahora)"
         printf 'TS_OK=%s\n'   "${ts_ok_previo:-}"
         printf 'PID=%s\n'     "$pid_guardado"
@@ -198,7 +207,7 @@ registrar_pid() {
             && mv "$ARCHIVO_ESTADO.tmp" "$ARCHIVO_ESTADO"
         refrescar_waybar
     else
-        escribir_estado sync "servicio recién arrancado, todavía sin sincronizar"
+        escribir_estado sync "service just started, no sync yet"
     fi
 }
 
@@ -301,37 +310,52 @@ ejecutar_bisync() {
         >"$SALIDA" 2>&1
 }
 
+# Salida de motivo_error(). Se inicializan acá y no sólo dentro de la función porque el
+# script corre con 'set -u': leerlas antes de la primera llamada sería un "unbound
+# variable" que mata al demonio.
+MOTIVO=""
+MOTIVO_CLASE=""
+
 # Traduce la salida de rclone a un motivo corto y legible para el tooltip.
 #
 # El orden de las ramas importa: se va de lo más específico a lo más genérico. Y los
 # patrones son deliberadamente estrechos -- un "429" suelto, por ejemplo, matcheaba el
 # recuento de bytes transferidos y reportaba "cuota superada" en errores que no tenían
 # nada que ver.
+#
+# No devuelve nada por stdout: deja el texto en $MOTIVO y el motivo en clave en
+# $MOTIVO_CLASE (ver el comentario de CLASE en escribir_estado). Tiene que ser por
+# variable y no por 'echo' porque el llamador lo usaba como "$(motivo_error)", y una
+# asignación hecha dentro de esa subshell no llegaría nunca al proceso que la lee: la
+# clase se perdería en silencio y volveríamos a decidir mirando el texto.
 motivo_error() {
+    MOTIVO_CLASE=""
     if grep -qE "cannot find prior|Bisync critical error|must run --resync" "$SALIDA"; then
-        echo "bisync perdió la línea base; se reconstruye sola"
+        MOTIVO="bisync lost its baseline; rebuilding it automatically"
     elif grep -qiE "couldn't connect|no such host|network is unreachable|connection refused|i/o timeout|context deadline exceeded|dial tcp" "$SALIDA"; then
-        echo "sin conexión con el remoto"
+        MOTIVO_CLASE=offline
+        MOTIVO="cannot reach the remote"
     elif grep -qiE "token expired|invalid_grant|oauth2:|401 Unauthorized" "$SALIDA"; then
-        echo "credenciales vencidas: rclone config reconnect $(printf '%s' "$REMOTO" | cut -d: -f1):"
+        MOTIVO="credentials expired: rclone config reconnect $(printf '%s' "$REMOTO" | cut -d: -f1):"
     elif grep -qE "Quota exceeded|rateLimitExceeded|userRateLimitExceeded|quotaExceeded|HTTP 429|Too Many Requests" "$SALIDA"; then
         # Se distingue la cuota COMPARTIDA de la propia porque el remedio es distinto y
         # nada intuitivo: si el client_id es el genérico de rclone, la cuota que se agotó
         # no es la tuya sino la de todos los usuarios de rclone del mundo juntos. Bajar
         # el intervalo no arregla nada ahí; hay que crearse un client_id propio.
         if grep -q "shared Google Drive client_id" "$SALIDA"; then
-            echo "cuota del client_id COMPARTIDO de rclone agotada: creá el tuyo (rclone.org/drive/#making-your-own-client-id)"
+            MOTIVO="rclone's SHARED client_id quota is exhausted: make your own (rclone.org/drive/#making-your-own-client-id)"
         else
-            echo "Drive está limitando las llamadas; bajá la frecuencia (INTERVALO)"
+            MOTIVO="Drive is rate limiting; sync less often (INTERVALO)"
         fi
     elif grep -qiE "max delete|too many deletes|Safety abort" "$SALIDA"; then
         # Esto NO se auto-resuelve a propósito: bisync frena cuando una vuelta borraría
         # más del 50% de los archivos, que es la firma de "se desmontó el disco" o "borré
         # la carpeta sin querer". Forzarlo solo convertiría la única red de seguridad
         # contra la pérdida masiva de datos en un trámite. Lo aprueba una persona.
-        echo "frenado: la pasada borraría >50% de los archivos. Si es a propósito: rclone-sync forzar"
+        MOTIVO_CLASE=borrado_masivo
+        MOTIVO="halted: this pass would delete >50% of the files. If that is intended: rclone-sync forzar"
     elif grep -qiE "no space left" "$SALIDA"; then
-        echo "sin espacio en disco"
+        MOTIVO="no space left on device"
     else
         # La PRIMERA línea de error, no la última: rclone remata con un resumen genérico
         # ("Errors: 1 (fatal error encountered)") que no dice absolutamente nada. El
@@ -343,8 +367,8 @@ motivo_error() {
             | sed -E 's/^[0-9]{4}\/[0-9]{2}\/[0-9]{2} [0-9:]+ (ERROR|CRITICAL|FATAL) *: *//' \
             | cut -c1-160)
         [ -z "$m" ] && m=$(tail -1 "$SALIDA" | cut -c1-160)
-        [ -z "$m" ] && m="error desconocido"
-        printf '%s' "$m"
+        [ -z "$m" ] && m="unknown error"
+        MOTIVO="$m"
     fi
 }
 
@@ -393,20 +417,21 @@ primera_vez() {
 # Una pasada completa, con reintentos. Deja el estado escrito y devuelve 0/1.
 ciclo() {
     if [ ! -d "$DIR_LOCAL" ]; then
-        escribir_estado error "no existe la carpeta local $DIR_LOCAL"
+        escribir_estado error "local folder $DIR_LOCAL does not exist"
         registrar "ERROR: no existe $DIR_LOCAL"
         return 1
     fi
 
     if ! hay_red; then
-        escribir_estado offline "sin red"
+        escribir_estado offline "no network" offline
         return 1
     fi
 
-    escribir_estado sync "sincronizando..."
+    escribir_estado sync "syncing..."
 
     intento=1
-    motivo="error desconocido"
+    motivo="unknown error"
+    MOTIVO_CLASE=""
     while [ "$intento" -le "$REINTENTOS" ]; do
         modo=""
         if primera_vez; then
@@ -420,7 +445,7 @@ ciclo() {
             ahora >"$(marca_base)"
             rm -f "$FLAG_RESYNC_SIN_EXITO"
             cambios=$(grep -cE "(Copied|Deleted|Renamed|Updated)" "$SALIDA" 2>/dev/null) || cambios=0
-            escribir_estado ok "$cambios cambio(s) en la última pasada"
+            escribir_estado ok "$cambios change(s) in the last pass"
             registrar "ok ($cambios cambio(s))"
             return 0
         fi
@@ -430,13 +455,13 @@ ciclo() {
         if pide_resync && [ "$modo" != resync ]; then
             if resync_permitido; then
                 registrar "rclone pide --resync; reconstruyendo línea base"
-                escribir_estado sync "reconstruyendo línea base..."
+                escribir_estado sync "rebuilding baseline..."
                 ahora >"$MARCA_RESYNC"
                 : >"$FLAG_RESYNC_SIN_EXITO"
                 if ejecutar_bisync resync; then
                     ahora >"$(marca_base)"
                     rm -f "$FLAG_RESYNC_SIN_EXITO"
-                    escribir_estado ok "línea base reconstruida"
+                    escribir_estado ok "baseline rebuilt"
                     registrar "ok tras --resync"
                     return 0
                 fi
@@ -445,11 +470,12 @@ ciclo() {
             fi
         fi
 
-        motivo=$(motivo_error)
+        motivo_error
+        motivo="$MOTIVO"
         registrar "intento $intento/$REINTENTOS falló: $motivo"
 
         if [ "$intento" -lt "$REINTENTOS" ]; then
-            escribir_estado sync "reintentando ($intento/$REINTENTOS): $motivo"
+            escribir_estado sync "retrying ($intento/$REINTENTOS): $motivo" "$MOTIVO_CLASE"
             dormir $(( ESPERA_REINTENTO * intento ))
         fi
         intento=$(( intento + 1 ))
@@ -457,10 +483,10 @@ ciclo() {
 
     # Un fallo por falta de conexión no es lo mismo que uno de verdad: no tiene sentido
     # pintar la barra de rojo ni notificar porque te fuiste del alcance del wifi.
-    if printf '%s' "$motivo" | grep -qi "sin conexión"; then
-        escribir_estado offline "$motivo"
+    if [ "$MOTIVO_CLASE" = offline ]; then
+        escribir_estado offline "$motivo" "$MOTIVO_CLASE"
     else
-        escribir_estado error "$motivo"
+        escribir_estado error "$motivo" "$MOTIVO_CLASE"
     fi
     return 1
 }
@@ -505,7 +531,7 @@ cmd_once() {
 cmd_daemon() {
     PID_DEMONIO=$$
     PID_SLEEP=""
-    trap 'escribir_estado detenido "demonio detenido"; [ -n "$PID_SLEEP" ] && kill "$PID_SLEEP" 2>/dev/null; exit 0' TERM INT
+    trap 'escribir_estado detenido "daemon stopped"; [ -n "$PID_SLEEP" ] && kill "$PID_SLEEP" 2>/dev/null; exit 0' TERM INT
 
     cargar_config
     registrar "demonio arrancado (pid $$, intervalo ${INTERVALO}s, $DIR_LOCAL <-> $REMOTO)"
@@ -548,14 +574,15 @@ cmd_resync() {
     if con_lock ejecutar_bisync resync; then
         ahora >"$(marca_base)"
         rm -f "$FLAG_RESYNC_SIN_EXITO"
-        escribir_estado ok "línea base reconstruida a mano"
+        escribir_estado ok "baseline rebuilt by hand"
         echo "Listo."
     else
         # Con una terminal delante la salida ya se vio (ejecutar_bisync la pasa por tee);
         # volcarla de nuevo sería mostrarla dos veces.
         [ -t 1 ] || cat "$SALIDA"
-        echo "FALLÓ: $(motivo_error)" >&2
-        escribir_estado error "$(motivo_error)"
+        motivo_error
+        echo "FALLÓ: $MOTIVO" >&2
+        escribir_estado error "$MOTIVO" "$MOTIVO_CLASE"
         # 'return' y no 'exit': estas funciones también se llaman desde el menú, y un
         # exit acá cerraría de golpe la ventana flotante ante el primer fallo. El código
         # de salida del script se mantiene igual porque el dispatcher del final devuelve
@@ -578,13 +605,14 @@ cmd_forzar() {
     echo
     if con_lock ejecutar_bisync force; then
         ahora >"$(marca_base)"
-        escribir_estado ok "borrados aplicados a mano con --force"
+        escribir_estado ok "pending deletions applied by hand with --force"
         registrar "ok tras --force (borrado masivo aprobado por el usuario)"
         echo "Listo."
     else
         [ -t 1 ] || cat "$SALIDA"
-        echo "FALLÓ: $(motivo_error)" >&2
-        escribir_estado error "$(motivo_error)"
+        motivo_error
+        echo "FALLÓ: $MOTIVO" >&2
+        escribir_estado error "$MOTIVO" "$MOTIVO_CLASE"
         # 'return' y no 'exit': estas funciones también se llaman desde el menú, y un
         # exit acá cerraría de golpe la ventana flotante ante el primer fallo. El código
         # de salida del script se mantiene igual porque el dispatcher del final devuelve
@@ -674,7 +702,7 @@ EOF
         # verdad. Tenerla siempre a la vista sería invitar a apretarla por curiosidad, y
         # es justo la opción que desarma la última protección contra perder archivos.
         ofrece_forzar=0
-        if printf '%s' "$DETALLE_R" | grep -q "frenado"; then
+        if [ "$(leer_campo CLASE)" = borrado_masivo ]; then
             ofrece_forzar=1
             echo "    6) Aplicar el borrado masivo que quedó frenado"
         fi
@@ -776,14 +804,31 @@ escapar_json() {
     printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | sed -z 's/\n/\\n/g'
 }
 
+# El tooltip NO lo pinta waybar como texto plano: lo pasa por pango con
+# set_tooltip_markup(), o sea que lo parsea como marcado. Un '<' abre una etiqueta, y si no
+# cierra bien, pango falla y GTK muestra el tooltip VACÍO -- sin un error a la vista, sólo
+# un recuadro en blanco (o el del módulo de al lado, que GTK deja pegado). Es exactamente lo
+# que pasaba con la línea "carpeta <-> remoto" de acá abajo: el '<-' no es un nombre de
+# etiqueta válido y se comía el tooltip entero.
+#
+# Acá no se usa ningún marcado, así que se neutralizan los tres caracteres que lo activan.
+# El '&' va primero, si no se re-escaparían los '&' que introducen los otros dos.
+escapar_pango() {
+    printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+
+# El texto va en inglés porque termina en el tooltip de waybar, que está en inglés como
+# el resto de la barra. El menú de la terminal usa la misma función y muestra el valor en
+# inglés bajo una etiqueta en español ("Al día   5m ago"): es una fecha, se entiende igual,
+# y no vale la pena duplicar la función para eso.
 hace() {
-    [ -z "${1:-}" ] && { printf 'nunca'; return; }
+    [ -z "${1:-}" ] && { printf 'never'; return; }
     d=$(( $(ahora) - $1 ))
     [ "$d" -lt 0 ] && d=0
-    if   [ "$d" -lt 60 ];    then printf 'hace %ss' "$d"
-    elif [ "$d" -lt 3600 ];  then printf 'hace %sm' "$(( d / 60 ))"
-    elif [ "$d" -lt 86400 ]; then printf 'hace %sh %sm' "$(( d / 3600 ))" "$(( d % 3600 / 60 ))"
-    else                          printf 'hace %sd' "$(( d / 86400 ))"
+    if   [ "$d" -lt 60 ];    then printf '%ss ago' "$d"
+    elif [ "$d" -lt 3600 ];  then printf '%sm ago' "$(( d / 60 ))"
+    elif [ "$d" -lt 86400 ]; then printf '%sh %sm ago' "$(( d / 3600 ))" "$(( d % 3600 / 60 ))"
+    else                          printf '%sd ago' "$(( d / 86400 ))"
     fi
 }
 
@@ -819,14 +864,14 @@ resolver_estado() {
     if demonio_vivo "$(leer_campo PID)"; then
         if [ -z "$ESTADO_R" ]; then
             ESTADO_R=desconocido
-            DETALLE_R="todavía no corrió ninguna sincronización"
+            DETALLE_R="no sync has run yet"
         fi
     elif servicio_habilitado; then
         ESTADO_R=detenido
-        DETALLE_R="el servicio debería estar corriendo y no está"
+        DETALLE_R="the service should be running and it is not"
     else
         ESTADO_R=pausado
-        DETALLE_R="desactivado a mano; no se sincroniza ni al arrancar el equipo"
+        DETALLE_R="disabled by hand; it will not sync, not even on boot"
     fi
 }
 
@@ -848,31 +893,35 @@ cmd_status() {
     resolver_estado
     estado="$ESTADO_R"; detalle="$DETALLE_R"
 
+    # El título del tooltip va en inglés, como el módulo de swap y el de memoria: el texto
+    # que se ve en la barra es lo único que mira alguien que no es vos. Los nombres de los
+    # estados ($estado, que sale por 'alt' y da la clase CSS) siguen en español porque no
+    # son texto: son las claves que usan style.css y el resto del script.
     case "$estado" in
-        ok)          texto="󰅠";        clase=ok;          titulo="Sincronizado" ;;
-        sync)        texto="󰘿";        clase=sync;        titulo="Sincronizando" ;;
-        offline)     texto="󰅤";        clase=offline;     titulo="Sin conexión" ;;
-        error)       texto="󰧠 error"; clase=error;       titulo="SIN SINCRONIZAR" ;;
-        detenido)    texto="󰧠 off";   clase=detenido;    titulo="Sincronización caída" ;;
+        ok)          texto="󰅠";        clase=ok;          titulo="Synced" ;;
+        sync)        texto="󰘿";        clase=sync;        titulo="Syncing" ;;
+        offline)     texto="󰅤";        clase=offline;     titulo="Offline" ;;
+        error)       texto="󰧠 error"; clase=error;       titulo="NOT SYNCED" ;;
+        detenido)    texto="󰧠 off";   clase=detenido;    titulo="Sync is down" ;;
         # Pausado NO lleva palabra al lado: no hay nada que avisar, lo apagaste vos.
-        pausado)     texto="󰅣";        clase=pausado;     titulo="Sincronización desactivada" ;;
-        *)           texto="󰨹";        clase=desconocido; titulo="Estado desconocido" ;;
+        pausado)     texto="󰅣";        clase=pausado;     titulo="Sync disabled" ;;
+        *)           texto="󰨹";        clase=desconocido; titulo="Unknown state" ;;
     esac
 
     tooltip="$titulo
 $local_dir  <->  $remoto
 
-Última sincronización correcta: $(hace "$ts_ok")
-Último intento: $(hace "$ts")
+Last successful sync: $(hace "$ts_ok")
+Last attempt: $(hace "$ts")
 $detalle
 
-Cada ${INTERVALO}s · clic: menú · clic derecho: ver log"
+Every ${INTERVALO}s · click: menu · right click: log"
 
     printf '{"text":"%s","alt":"%s","class":"%s","tooltip":"%s"}\n' \
         "$(escapar_json "$texto")" \
         "$(escapar_json "$estado")" \
         "$(escapar_json "$clase")" \
-        "$(escapar_json "$tooltip")"
+        "$(escapar_json "$(escapar_pango "$tooltip")")"
 }
 
 # ---------------------------------------------------------------------------

@@ -462,6 +462,7 @@ zsh: `rehash`.
 | Batería | — (`format-alt`: alterna a tiempo restante) |
 | Perfil de energía | Cicla entre performance / balanced / power-saver |
 | Bluetooth | bluetui, en una terminal |
+| Sincronización con Drive | El menú de `rclone-sync`, en una terminal (clic derecho: el log) |
 | Red | nmtui, en una terminal |
 | CPU | btop, en una terminal |
 | Swap | htop, en una terminal |
