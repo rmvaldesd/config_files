@@ -30,6 +30,32 @@
     "custom/disk",
     "clock"
   ],
+  // OJO: hacer CLICK en un número no lleva a ese workspace, y no hay nada acá que
+  // lo arregle. Es un bug de waybar, no de esta config: al hacer click manda por el
+  // socket la orden clásica 'dispatch workspace 2', y esta config es Lua, donde esa
+  // forma ya no existe -- Hyprland la envuelve en 'hl.dispatch(workspace 2)', que ni
+  // siquiera es Lua válido, y responde un error de parseo que waybar se traga.
+  // Verificado mandando la orden cruda al socket: devuelve el error y el workspace
+  // no cambia. El módulo no expone ningún 'on-click' con el que redirigirlo.
+  //
+  // Ya está arreglado upstream (Alexays/Waybar#5008, PR #5013, cerrado el
+  // 2026-07-04) para "la próxima release"; la instalada es la 0.15.0, anterior a
+  // eso. O sea que esto se destraba solo cuando actualice el paquete: NO hay que
+  // tocar nada acá.
+  //
+  // Se probó 'ext/workspaces' + '"on-click": "activate"', que sí hace andar el click
+  // porque habla el protocolo ext-workspace del compositor en vez de la IPC de
+  // Hyprland, y SE DESCARTÓ. El motivo es una regresión que no se ve hasta enchufar
+  // el segundo monitor: ese módulo sólo conoce las clases .active/.urgent/.hidden,
+  // mientras que el de Hyprland distingue .active (el que TIENE el foco) de .visible
+  // (el que se ve en un monitor pero no lo tiene). Como style.css estiliza .active y
+  // no .visible, hoy la barra se apaga entera cuando el foco se va a la otra
+  // pantalla, y eso es justamente la señal de "el foco no está acá". Con
+  // ext/workspaces cada barra marca siempre el suyo y esa señal se pierde.
+  // Comparado en capturas con un monitor headless.
+  //
+  // El módulo no necesita bloque de config propio, así que no lo tiene.
+  //
   "hyprland/window": {
     "max-length": 50
   },
