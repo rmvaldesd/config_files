@@ -522,11 +522,18 @@ ahí aparecen como una lista de `firefox` sueltos sin un total.
 
 ```sh
 ram-top                 las 10 que más usan
+ram-top -i              interactivo: recorrer con las flechas y ver el detalle
 ram-top -n 20           cambiar cuántas
 ram-top -t              con el detalle de procesos de cada una
 ram-top firefox         sólo esa, con el detalle
 ram-top --rss           medir con RSS, para ver la diferencia
 ```
+
+**`ram-top -i` es la forma cómoda de mirarlo.** Abre la lista en fzf y, a medida que
+te movés con las flechas, el panel de la derecha muestra los procesos de la
+aplicación que tenés encima. `Enter` deja ese detalle impreso en la terminal al
+salir, y `Ctrl-R` relee todo. Los números del panel se recalculan en cada
+movimiento, así que ves el estado actual y no una foto de cuando arrancó.
 
 **Mide con PSS, y esa es la parte que importa.** Sumar el RSS de los procesos de una
 aplicación cuenta la memoria compartida una vez por proceso, y da un número muy

@@ -9,6 +9,7 @@
 #
 # Uso:
 #   ram-top                 las 10 aplicaciones que más usan
+#   ram-top -i              INTERACTIVO: recorrer con las flechas y ver el detalle
 #   ram-top -n 20           cambiar cuántas
 #   ram-top -t              con el detalle de procesos de cada una
 #   ram-top firefox         sólo esa aplicación, con el detalle
@@ -54,6 +55,8 @@
 
 import argparse
 import os
+import shutil
+import subprocess
 import sys
 
 # Procesos que NO son una aplicación sino el entorno que las lanza: al llegar a uno de
@@ -238,21 +241,9 @@ def mem_total():
     return 0
 
 
-def main():
-    ap = argparse.ArgumentParser(
-        description="Aplicaciones que más RAM usan, consolidadas por aplicación.",
-        epilog="Se mide con PSS, que no cuenta dos veces la memoria compartida entre "
-               "los procesos de una misma aplicación.")
-    ap.add_argument("filtro", nargs="?", help="mostrar sólo las que coincidan con este nombre")
-    ap.add_argument("-n", type=int, default=10, metavar="N", help="cuántas mostrar (por defecto 10)")
-    ap.add_argument("-t", "--tree", action="store_true", help="detallar los procesos de cada una")
-    ap.add_argument("--rss", action="store_true", help="medir con RSS en vez de PSS (infla: ver el encabezado)")
-    args = ap.parse_args()
-
-    campo = "rss" if args.rss else "pss"
+def calcular(campo):
+    """Las aplicaciones ordenadas por memoria, de mayor a menor."""
     procs, sin_permiso, yo = leer_procesos()
-
-    # Agrupar: cada proceso legible suma a la raíz de su aplicación.
     apps = {}
     for p in procs.values():
         if not p["legible"] or p[campo] == 0:
@@ -262,11 +253,118 @@ def main():
         g = apps.setdefault(clave, {"mem": 0, "procesos": [], "raiz": raiz})
         g["mem"] += p[campo]
         g["procesos"].append(p)
+    return sorted(apps.items(), key=lambda kv: kv[1]["mem"], reverse=True), sin_permiso
 
-    orden = sorted(apps.items(), key=lambda kv: kv[1]["mem"], reverse=True)
+
+def lineas_lista(campo):
+    """Las filas que come fzf: nombre crudo, un TAB, y la fila ya formateada."""
+    orden, _ = calcular(campo)
+    total = mem_total()
+    ancho = max([len(k) for k, _ in orden] + [12]) if orden else 12
+    filas = []
+    for nombre, g in orden:
+        pct = 100.0 * g["mem"] / total if total else 0
+        filas.append("%s\t%-*s %10s  %5.1f%%  %4d" %
+                     (nombre, ancho, nombre[:ancho], humano(g["mem"]), pct, len(g["procesos"])))
+    return filas
+
+
+def imprimir_lista(campo):
+    for l in lineas_lista(campo):
+        print(l)
+    return 0
+
+
+def interactivo(args, campo):
+    """Recorrer la lista con las flechas y ver el detalle de la aplicación marcada.
+
+    Es fzf con '--preview', el mismo patrón que find-file y pick-window: la lista de
+    aplicaciones a la izquierda, y a la derecha el detalle de la que tenés encima, que
+    se actualiza al moverte.
+
+    El preview vuelve a llamar a ESTE script con '--exact', y eso tiene dos
+    consecuencias buenas: el detalle sale del mismo código que la salida normal (no hay
+    una segunda implementación que se desincronice), y los números se RELEEN en cada
+    movimiento, así que lo que ves está vivo en vez de congelado al arrancar.
+
+    Se lo invoca por ruta absoluta y no por nombre: el script vive en bin_configs/ y
+    puede no estar en el PATH todavía, que es justo el caso recién clonado el repo.
+    """
+    if not shutil.which("fzf"):
+        print("ram-top: falta fzf, que es lo que dibuja el modo interactivo.", file=sys.stderr)
+        print("         Sin él sirven igual 'ram-top -t' y 'ram-top <nombre>'.", file=sys.stderr)
+        return 1
+
+    yo_mismo = os.path.abspath(sys.argv[0])
+    extra = " --rss" if args.rss else ""
+    # El nombre va como primer campo separado por TAB y se esconde con '--with-nth':
+    # fzf lo sigue teniendo como {1} para armar el preview, pero no ensucia la lista.
+    lineas = lineas_lista(campo)
+    if not lineas:
+        print("ram-top: no hay nada que mostrar", file=sys.stderr)
+        return 1
+
+    cmd = [
+        "fzf", "--height=100%", "--delimiter=\t", "--with-nth=2..",
+        "--prompt", "ram ~> ",
+        "--header", "flechas: recorrer   Enter: fijar el detalle   Ctrl-R: releer",
+        "--preview", "%s --exact --tree%s -- {1}" % (yo_mismo, extra),
+        "--preview-window", "right:58%:wrap",
+        "--bind", "ctrl-r:reload(%s --lista%s)" % (yo_mismo, extra),
+    ]
+    try:
+        # Se captura SÓLO stdout. fzf dibuja su interfaz en stderr y la lee del
+        # terminal: con 'capture_output=True' esa interfaz se iría al pipe y no se
+        # vería nada. Es un error que no aparece en ninguna prueba automática, porque
+        # sin terminal fzf tampoco dibuja.
+        r = subprocess.run(cmd, input="\n".join(lineas),
+                           stdout=subprocess.PIPE, text=True)
+    except OSError as e:
+        print("ram-top: no se pudo lanzar fzf (%s)" % e, file=sys.stderr)
+        return 1
+
+    elegido = r.stdout.strip().split("\t")[0] if r.stdout.strip() else ""
+    if not elegido:
+        return 0
+    # Al salir se deja el detalle impreso, para que quede en la terminal en vez de
+    # desaparecer con el menú.
+    return subprocess.run([yo_mismo, "--exact", "--tree"] + (["--rss"] if args.rss else []) +
+                          ["--", elegido]).returncode
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="Aplicaciones que más RAM usan, consolidadas por aplicación.",
+        epilog="Se mide con PSS, que no cuenta dos veces la memoria compartida entre "
+               "los procesos de una misma aplicación.")
+    ap.add_argument("filtro", nargs="?", help="mostrar sólo las que coincidan con este nombre")
+    ap.add_argument("-n", type=int, default=10, metavar="N", help="cuántas mostrar (por defecto 10)")
+    ap.add_argument("-t", "--tree", action="store_true", help="detallar los procesos de cada una")
+    ap.add_argument("--rss", action="store_true", help="medir con RSS en vez de PSS (infla: ver el encabezado)")
+    ap.add_argument("-i", "--interactive", action="store_true",
+                    help="recorrer la lista con las flechas y ver el detalle de cada una (fzf)")
+    ap.add_argument("-x", "--exact", action="store_true",
+                    help="el filtro tiene que coincidir exacto, no por pedazo")
+    ap.add_argument("--lista", action="store_true", help=argparse.SUPPRESS)
+    args = ap.parse_args()
+
+    campo = "rss" if args.rss else "pss"
+
+    if args.interactive:
+        return interactivo(args, campo)
+    if args.lista:
+        # Sólo para el Ctrl-R del modo interactivo: reimprime la lista que come fzf.
+        return imprimir_lista(campo)
+
+    orden, sin_permiso = calcular(campo)
     if args.filtro:
         f = args.filtro.lower()
-        orden = [(k, v) for k, v in orden if f in k.lower()]
+        # El modo interactivo pide coincidencia exacta: si no, ver "ghostty" mostraría
+        # también cualquier otra aplicación que contenga esa palabra.
+        if args.exact:
+            orden = [(k, v) for k, v in orden if k.lower() == f]
+        else:
+            orden = [(k, v) for k, v in orden if f in k.lower()]
         if not orden:
             print("ram-top: nada que coincida con %r" % args.filtro, file=sys.stderr)
             return 1
