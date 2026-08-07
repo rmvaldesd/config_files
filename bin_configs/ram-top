@@ -9,7 +9,9 @@
 #
 # Uso:
 #   ram-top                 las 10 aplicaciones que más usan
-#   ram-top -i              INTERACTIVO: recorrer con las flechas y ver el detalle
+#   ram-top -i              INTERACTIVO: recorrer con las flechas y ver el detalle.
+#                           Enter entra a los procesos de esa aplicación, Escape vuelve.
+#                           En pantallas angostas el panel se pasa solo abajo.
 #   ram-top -n 20           cambiar cuántas
 #   ram-top -t              con el detalle de procesos de cada una
 #   ram-top firefox         sólo esa aplicación, con el detalle
@@ -256,17 +258,118 @@ def calcular(campo):
     return sorted(apps.items(), key=lambda kv: kv[1]["mem"], reverse=True), sin_permiso
 
 
+def barra(valor, pico, ancho=12):
+    """Barra proporcional a la MÁS GRANDE, no al total de RAM: con 32 GiB, todas las
+    barras contra el total serían un hilito y no se compararían entre sí."""
+    return "\u2588" * max(1, round(ancho * valor / pico)) if pico else ""
+
+
 def lineas_lista(campo):
-    """Las filas que come fzf: nombre crudo, un TAB, y la fila ya formateada."""
+    """Las filas que come fzf en la vista de aplicaciones.
+
+    Formato: nombre crudo, un TAB, y la fila ya armada. El nombre se esconde con
+    '--with-nth=2..', pero fzf lo sigue teniendo como {1} para armar el preview y el
+    salto a la segunda vista.
+    """
     orden, _ = calcular(campo)
+    if not orden:
+        return []
     total = mem_total()
-    ancho = max([len(k) for k, _ in orden] + [12]) if orden else 12
+    ancho = max([len(k) for k, _ in orden] + [12])
+    pico = orden[0][1]["mem"]
     filas = []
     for nombre, g in orden:
         pct = 100.0 * g["mem"] / total if total else 0
-        filas.append("%s\t%-*s %10s  %5.1f%%  %4d" %
-                     (nombre, ancho, nombre[:ancho], humano(g["mem"]), pct, len(g["procesos"])))
+        filas.append("%s\t%-*s %9s %5.1f%% %4dp  %s" %
+                     (nombre, ancho, nombre[:ancho], humano(g["mem"]), pct,
+                      len(g["procesos"]), barra(g["mem"], pico)))
     return filas
+
+
+def lineas_procesos(app, campo):
+    """Las filas de la SEGUNDA vista: los procesos de una aplicación.
+
+    Mismo truco que arriba: el PID va como primer campo escondido, para que el preview
+    pueda pedir el detalle de ese proceso concreto.
+    """
+    orden, _ = calcular(campo)
+    for nombre, g in orden:
+        if nombre == app:
+            procesos = sorted(g["procesos"], key=lambda x: x[campo], reverse=True)
+            pico = procesos[0][campo] if procesos else 0
+            filas = []
+            for pr in procesos:
+                etiq = app if pr["pid"] == g["raiz"] else pr["rol"]
+                marca = "*" if pr["pid"] == g["raiz"] else " "
+                filas.append("%d\t%s %-7d %-22s %9s  %s" %
+                             (pr["pid"], marca, pr["pid"], etiq[:22],
+                              humano(pr[campo]), barra(pr[campo], pico)))
+            return filas
+    return []
+
+
+def detalle_proceso(pid):
+    """Todo lo que se sabe de UN proceso, para el preview de la segunda vista.
+
+    'Privada' es el dato que más dice y el que no se ve en ningún otro lado: es la
+    memoria que sólo usa este proceso, o sea la que de verdad se libera si muere. El
+    resto la comparte con sus hermanos, y por eso el total de la aplicación es mucho
+    menor que la suma de los RSS.
+    """
+    try:
+        crudo = open("/proc/%d/stat" % pid).read()
+        comm = crudo[crudo.index("(") + 1:crudo.rindex(")")]
+    except (OSError, ValueError):
+        print("El proceso %d ya no existe." % pid)
+        return 0
+
+    m = {}
+    try:
+        for l in open("/proc/%d/smaps_rollup" % pid):
+            if ":" in l:
+                k, _, v = l.partition(":")
+                partes = v.split()
+                if partes and partes[0].isdigit():
+                    m[k] = int(partes[0])
+    except OSError:
+        pass
+
+    st = {}
+    try:
+        for l in open("/proc/%d/status" % pid):
+            k, _, v = l.partition(":")
+            st[k] = v.strip()
+    except OSError:
+        pass
+
+    privada = m.get("Private_Dirty", 0) + m.get("Private_Clean", 0)
+    compartida = m.get("Shared_Dirty", 0) + m.get("Shared_Clean", 0)
+
+    print("PID %d   %s" % (pid, comm))
+    print("-" * 46)
+    print("  %-14s %10s   %s" % ("PSS", humano(m.get("Pss", 0)),
+                                 "lo que le toca de lo compartido, más lo propio"))
+    print("  %-14s %10s" % ("RSS", humano(m.get("Rss", 0))))
+    print("  %-14s %10s   %s" % ("privada", humano(privada), "se libera si el proceso muere"))
+    print("  %-14s %10s   %s" % ("compartida", humano(compartida), "la usan también sus hermanos"))
+    if m.get("Swap"):
+        print("  %-14s %10s" % ("en swap", humano(m["Swap"])))
+    if st.get("VmHWM"):
+        print("  %-14s %10s   %s" % ("pico RSS", humano(int(st["VmHWM"].split()[0])),
+                                     "lo más alto desde que arrancó"))
+    if st.get("Threads"):
+        print("  %-14s %10s" % ("hilos", st["Threads"]))
+
+    try:
+        cmd = open("/proc/%d/cmdline" % pid).read().replace("\0", " ").strip()
+    except OSError:
+        cmd = ""
+    if cmd:
+        print()
+        print("comando:")
+        for i in range(0, min(len(cmd), 600), 62):
+            print("  " + cmd[i:i + 62])
+    return 0
 
 
 def imprimir_lista(campo):
@@ -275,61 +378,86 @@ def imprimir_lista(campo):
     return 0
 
 
+def imprimir_procesos(app, campo):
+    for l in lineas_procesos(app, campo):
+        print(l)
+    return 0
+
+
+# El preview a la derecha sólo entra cómodo si hay lugar para las dos cosas: la lista
+# con sus barras necesita unas 55 columnas y el detalle otras 50. Por debajo de eso se
+# pasa ABAJO, donde la lista conserva el ancho completo y no se le comen las barras.
+#
+# La condición la evalúa fzf, no este script, y esa es la gracia: se reacomoda sola al
+# REDIMENSIONAR la terminal, no sólo al arrancar.
+VENTANA_PREVIEW = "right,50%,border-left,<52(down,55%,border-top)"
+
+
+def _fzf(lineas, prompt, header, preview, extra=None):
+    """Corre fzf y devuelve el primer campo de lo elegido, o None si se salió."""
+    cmd = ["fzf", "--height=100%", "--delimiter=\t", "--with-nth=2..",
+           "--prompt", prompt, "--header", header,
+           "--preview", preview, "--preview-window", VENTANA_PREVIEW,
+           "--bind", "ctrl-o:toggle-preview"]
+    if extra:
+        cmd += extra
+    # Se captura SÓLO stdout. fzf dibuja su interfaz en stderr y la lee del terminal:
+    # con 'capture_output=True' esa interfaz se iría al pipe y no se vería nada. Es un
+    # error que ninguna prueba a ciegas delata, porque sin terminal fzf tampoco dibuja.
+    r = subprocess.run(cmd, input="\n".join(lineas), stdout=subprocess.PIPE, text=True)
+    salida = r.stdout.strip()
+    return salida.split("\t")[0] if salida else None
+
+
 def interactivo(args, campo):
-    """Recorrer la lista con las flechas y ver el detalle de la aplicación marcada.
+    """Dos vistas: las aplicaciones, y los procesos de una de ellas.
 
-    Es fzf con '--preview', el mismo patrón que find-file y pick-window: la lista de
-    aplicaciones a la izquierda, y a la derecha el detalle de la que tenés encima, que
-    se actualiza al moverte.
+    En las dos te movés con las flechas y el panel muestra el detalle de lo que tenés
+    encima. Enter en una aplicación ENTRA a sus procesos; Escape vuelve. Se navega en
+    un bucle y no anidando fzf dentro de fzf, así que volver es realmente volver: la
+    lista de aplicaciones se recalcula al regresar y no queda una pila de menús.
 
-    El preview vuelve a llamar a ESTE script con '--exact', y eso tiene dos
-    consecuencias buenas: el detalle sale del mismo código que la salida normal (no hay
-    una segunda implementación que se desincronice), y los números se RELEEN en cada
-    movimiento, así que lo que ves está vivo en vez de congelado al arrancar.
-
-    Se lo invoca por ruta absoluta y no por nombre: el script vive en bin_configs/ y
-    puede no estar en el PATH todavía, que es justo el caso recién clonado el repo.
+    Que Enter entre en vez de salir es lo que evita perder la pantalla principal: para
+    mirar los procesos de una app ya no hay que cerrar el menú.
     """
     if not shutil.which("fzf"):
         print("ram-top: falta fzf, que es lo que dibuja el modo interactivo.", file=sys.stderr)
         print("         Sin él sirven igual 'ram-top -t' y 'ram-top <nombre>'.", file=sys.stderr)
         return 1
 
-    yo_mismo = os.path.abspath(sys.argv[0])
+    yo = os.path.abspath(sys.argv[0])
     extra = " --rss" if args.rss else ""
-    # El nombre va como primer campo separado por TAB y se esconde con '--with-nth':
-    # fzf lo sigue teniendo como {1} para armar el preview, pero no ensucia la lista.
-    lineas = lineas_lista(campo)
-    if not lineas:
-        print("ram-top: no hay nada que mostrar", file=sys.stderr)
-        return 1
 
-    cmd = [
-        "fzf", "--height=100%", "--delimiter=\t", "--with-nth=2..",
-        "--prompt", "ram ~> ",
-        "--header", "flechas: recorrer   Enter: fijar el detalle   Ctrl-R: releer",
-        "--preview", "%s --exact --tree%s -- {1}" % (yo_mismo, extra),
-        "--preview-window", "right:58%:wrap",
-        "--bind", "ctrl-r:reload(%s --lista%s)" % (yo_mismo, extra),
-    ]
-    try:
-        # Se captura SÓLO stdout. fzf dibuja su interfaz en stderr y la lee del
-        # terminal: con 'capture_output=True' esa interfaz se iría al pipe y no se
-        # vería nada. Es un error que no aparece en ninguna prueba automática, porque
-        # sin terminal fzf tampoco dibuja.
-        r = subprocess.run(cmd, input="\n".join(lineas),
-                           stdout=subprocess.PIPE, text=True)
-    except OSError as e:
-        print("ram-top: no se pudo lanzar fzf (%s)" % e, file=sys.stderr)
-        return 1
+    while True:
+        lineas = lineas_lista(campo)
+        if not lineas:
+            print("ram-top: no hay nada que mostrar", file=sys.stderr)
+            return 1
+        app = _fzf(
+            lineas,
+            "ram ~> ",
+            "Enter: sus procesos   Ctrl-R: releer   Ctrl-O: panel",
+            "%s --exact --tree%s -- {1}" % (yo, extra),
+            ["--bind", "ctrl-r:reload(%s --lista%s)" % (yo, extra)],
+        )
+        if app is None:
+            return 0
 
-    elegido = r.stdout.strip().split("\t")[0] if r.stdout.strip() else ""
-    if not elegido:
-        return 0
-    # Al salir se deja el detalle impreso, para que quede en la terminal en vez de
-    # desaparecer con el menú.
-    return subprocess.run([yo_mismo, "--exact", "--tree"] + (["--rss"] if args.rss else []) +
-                          ["--", elegido]).returncode
+        while True:
+            filas = lineas_procesos(app, campo)
+            if not filas:
+                break   # la aplicación se cerró mientras mirabas: volver a la lista
+            elegido = _fzf(
+                filas,
+                "%s ~> " % app,
+                "Escape: volver   Enter: fijar   Ctrl-O: panel",
+                "%s%s --proc {1}" % (yo, extra),
+                ["--bind", "ctrl-r:reload(%s --procesos %s%s)" % (yo, app, extra)],
+            )
+            if elegido is None:
+                break   # Escape: volver a la lista de aplicaciones
+            # Enter sobre un proceso: se sale dejando su detalle impreso.
+            return detalle_proceso(int(elegido))
 
 
 def main():
@@ -345,7 +473,10 @@ def main():
                     help="recorrer la lista con las flechas y ver el detalle de cada una (fzf)")
     ap.add_argument("-x", "--exact", action="store_true",
                     help="el filtro tiene que coincidir exacto, no por pedazo")
+    # Ocultas: las usan el preview y el Ctrl-R del modo interactivo.
     ap.add_argument("--lista", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--procesos", metavar="APP", help=argparse.SUPPRESS)
+    ap.add_argument("--proc", metavar="PID", help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     campo = "rss" if args.rss else "pss"
@@ -355,6 +486,14 @@ def main():
     if args.lista:
         # Sólo para el Ctrl-R del modo interactivo: reimprime la lista que come fzf.
         return imprimir_lista(campo)
+    if args.procesos:
+        return imprimir_procesos(args.procesos, campo)
+    if args.proc:
+        try:
+            return detalle_proceso(int(args.proc))
+        except ValueError:
+            print("ram-top: --proc espera un PID", file=sys.stderr)
+            return 1
 
     orden, sin_permiso = calcular(campo)
     if args.filtro:

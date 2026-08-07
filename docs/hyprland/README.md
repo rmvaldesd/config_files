@@ -530,10 +530,28 @@ ram-top --rss           medir con RSS, para ver la diferencia
 ```
 
 **`ram-top -i` es la forma cómoda de mirarlo.** Abre la lista en fzf y, a medida que
-te movés con las flechas, el panel de la derecha muestra los procesos de la
-aplicación que tenés encima. `Enter` deja ese detalle impreso en la terminal al
-salir, y `Ctrl-R` relee todo. Los números del panel se recalculan en cada
-movimiento, así que ves el estado actual y no una foto de cuando arrancó.
+te movés con las flechas, el panel muestra los procesos de la aplicación que tenés
+encima. Los números se recalculan en cada movimiento, así que ves el estado actual y
+no una foto de cuando arrancó; `Ctrl-R` relee la lista entera.
+
+Son **dos vistas**, y se navega entre ellas sin perder la de arriba:
+
+| Tecla | En la lista de aplicaciones | En la lista de procesos |
+|---|---|---|
+| `Enter` | Entra a los procesos de esa aplicación | Sale dejando el detalle de ese proceso impreso |
+| `Escape` | Sale | **Vuelve** a las aplicaciones |
+| `Ctrl-O` | Oculta el panel (la lista queda a pantalla completa) | ídem |
+| `Ctrl-R` | Relee | ídem |
+
+La segunda vista da, por proceso, lo que no se ve en ningún otro lado: cuánta memoria
+es **privada** —la que se libera de verdad si ese proceso muere— contra cuánta
+comparte con sus hermanos, el pico de RSS desde que arrancó, los hilos y la línea de
+comandos completa.
+
+**En pantallas angostas el panel se pasa solo abajo**, para que la lista conserve el
+ancho completo y no se le coman las barras. Lo decide fzf comparando el ancho que le
+tocaría al panel contra un mínimo, así que se reacomoda al **redimensionar** la
+terminal y no sólo al arrancar.
 
 **Mide con PSS, y esa es la parte que importa.** Sumar el RSS de los procesos de una
 aplicación cuenta la memoria compartida una vez por proceso, y da un número muy
