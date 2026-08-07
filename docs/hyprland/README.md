@@ -546,13 +546,15 @@ Son **dos vistas** y se navega con **teclas de vim**, sin perder la de arriba:
 | `j` / `k` | Bajar / subir | ídem |
 | `g` / `G` | Al primero / al último | ídem |
 | `Ctrl-D` / `Ctrl-U` | Media pantalla | ídem |
-| `l` o `Enter` | **Entra** a los procesos de esa aplicación | — |
-| `h` o `Escape` | — | **Vuelve** a las aplicaciones |
-| `Enter` | — | Sale dejando el detalle de ese proceso impreso |
+| `l` o `Enter` | **Entra** a los procesos de esa aplicación | — (no hace nada: el detalle ya está en el panel) |
+| `h` o `Escape` | Salir | **Vuelve** a las aplicaciones |
 | `/` | Buscar (`Escape` cierra la búsqueda) | ídem |
-| `q` | Salir | Salir |
+| `q` | Salir | **Vuelve** a las aplicaciones |
 | `Ctrl-O` | — (esta vista no tiene panel) | Oculta el panel |
 | `Ctrl-R` | Relee | ídem |
+
+Desde la segunda vista **ninguna tecla te devuelve a la shell**: `q` ahí vuelve a las
+aplicaciones y recién un segundo `q` sale, como al salir de un pager anidado.
 
 Las letras navegan porque el menú arranca **sin campo de búsqueda**: con el campo
 activo, una `j` se escribiría en el filtro en vez de bajar. La búsqueda queda a un

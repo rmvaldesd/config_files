@@ -23,8 +23,11 @@
 #
 #   j / k          bajar y subir            g / G     al primero / al último
 #   Ctrl-D/Ctrl-U  media pantalla           /         buscar (Escape la cierra)
-#   l o Enter      entrar a los procesos    h o Esc   volver a las aplicaciones
-#   q              salir                    Ctrl-O    ocultar el panel (2da vista)
+#   l o Enter      entrar a los procesos    h, q o Esc  volver a las aplicaciones
+#   q              salir (en la principal)  Ctrl-O      ocultar el panel (2da vista)
+#
+# Ninguna tecla de la segunda vista te devuelve a la shell: 'q' ahí vuelve a las
+# aplicaciones, y recién un segundo 'q' sale. Es como salir de un pager anidado.
 #
 # Sale en texto y no como menú cuando la salida NO es un terminal (una tubería, otro
 # script) o cuando pedís una aplicación por nombre: ahí ya dijiste qué querés ver.
@@ -497,16 +500,22 @@ def interactivo(args, campo):
             elegido = _fzf(
                 filas,
                 "%s ~> " % app,
-                "j/k move   h or Esc: back   Enter: pin this one   Ctrl-O: panel   q quit",
+                "j/k move   h, q or Esc: back   Ctrl-O: panel",
                 "%s%s --proc {1}" % (yo, extra),
                 ["--bind", "ctrl-r:reload(%s --procesos %s%s)" % (yo, app, extra),
-                 "--bind", "h:abort"],
+                 "--bind", "h:abort",
+                 # Enter no tiene nada que hacer acá: el desglose del proceso ya está
+                 # en el panel. Antes salía del programa imprimiéndolo, y eso se sentía
+                 # como que la pantalla se caía -- estabas mirando y de golpe volvías a
+                 # la shell con un muro de texto. Sin trabajo útil, mejor que no haga
+                 # nada.
+                 "--bind", "enter:ignore"],
                 teclas=("h",),
             )
-            if elegido is None:
-                break   # Escape: volver a la lista de aplicaciones
-            # Enter sobre un proceso: se sale dejando su detalle impreso.
-            return detalle_proceso(int(elegido))
+            # Todas las salidas de esta vista vuelven a las aplicaciones: 'h', Escape
+            # y 'q'. Se sale del programa con 'q' en la vista principal, igual que uno
+            # sale de un pager anidado. Así ninguna tecla te tira a la shell desde acá.
+            break
 
 
 def main():
