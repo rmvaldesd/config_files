@@ -1,0 +1,321 @@
+#!/usr/bin/env python3
+#
+# Qué aplicaciones se están comiendo la RAM, CONSOLIDADAS por aplicación.
+#
+# El problema que resuelve: los navegadores y las apps de Electron no son un proceso
+# sino veinte. En htop o btop aparecen como una lista de "firefox" sueltos y no hay
+# forma de ver cuánto pesa Firefox en total. Acá se suman por aplicación, y con
+# '--tree' se abre el detalle de cada una.
+#
+# Uso:
+#   ram-top                 las 10 aplicaciones que más usan
+#   ram-top -n 20           cambiar cuántas
+#   ram-top -t              con el detalle de procesos de cada una
+#   ram-top firefox         sólo esa aplicación, con el detalle
+#   ram-top --rss           medir con RSS en vez de PSS (para ver la diferencia)
+#
+# POR QUÉ PSS Y NO RSS, QUE ES LO QUE TODO EL MUNDO MIRA
+#
+# Sumar el RSS de los procesos de una aplicación da un número MUY inflado, porque el
+# RSS de cada hijo incluye toda la memoria que comparte con sus hermanos y con el
+# padre: la misma página se cuenta una vez por proceso. Medido en este equipo sobre
+# los 19 procesos de Firefox: 4964 MiB sumando RSS contra 2787 MiB reales. Un 78% de
+# más, que es la diferencia entre "algo anda muy mal" y "es un navegador con pestañas
+# abiertas".
+#
+# PSS (Proportional Set Size) reparte cada página compartida entre los procesos que la
+# usan: si tres procesos comparten 30 MiB, cada uno suma 10. Sumar PSS de un grupo da
+# un número que SÍ significa algo -- cuánta RAM se liberaría cerrando la aplicación --
+# y por eso es lo correcto para consolidar. Sale de /proc/PID/smaps_rollup.
+#
+# POR QUÉ SE AGRUPA POR ANCESTRO Y NO POR CGROUP
+#
+# Lo natural sería agrupar por cgroup, que es como systemd separa las aplicaciones.
+# Pero en este equipo NO sirve: Hyprland lanza todo dentro de la misma
+# 'session-c1.scope', así que Firefox, la terminal y Obsidian caen en el mismo grupo.
+# Verificado leyendo /proc/PID/cgroup.
+#
+# Así que se sube por el árbol de procesos hasta el primero que ya no tiene un padre
+# "de sesión" -- PID 1, Hyprland, systemd, el gestor de login, o un SHELL -- y ese se
+# toma como la aplicación.
+#
+# Que los shells corten la cadena importa en los dos sentidos: un script envoltorio no
+# se roba el nombre de lo que supervisa (sin eso, waybar figuraba como "auto-reload",
+# que es el script que lo lanza), y lo que arranques a mano desde la terminal aparece
+# con su propio nombre en vez de sumado a ghostty -- que es lo que uno quiere ver si
+# una compilación se está comiendo la RAM.
+#
+# LO QUE NO SE VE
+#
+# El PSS de los procesos de otros usuarios (demonios de root) no es legible sin
+# permisos, así que quedan afuera. Son ~27 procesos en este equipo y no son
+# "aplicaciones". El pie del informe dice cuántos se saltearon, para que el total no
+# parezca completo cuando no lo es.
+
+import argparse
+import os
+import sys
+
+# Procesos que NO son una aplicación sino el entorno que las lanza: al llegar a uno de
+# estos se deja de subir y se toma el hijo como la raíz de la aplicación.
+SESION = {
+    "systemd", "Hyprland", "ly-dm", "login", "sshd", "init", "start-hyprland",
+}
+
+# Un script envoltorio NO es la aplicación. waybar, por ejemplo, lo lanza y lo
+# supervisa auto-reload.sh: sin esto, waybar aparecía en el informe como
+# "auto-reload", que esconde qué es lo que realmente está usando la memoria. Se mira
+# el ejecutable REAL (que para un script es el intérprete) y no el nombre, que para
+# un script es el del archivo. Lo mismo hace que lo que arranques a mano desde la
+# terminal figure con su propio nombre y no sumado a ghostty.
+SHELLS = {"sh", "bash", "zsh", "dash", "fish", "ksh", "ash"}
+
+# Nombres poco informativos: si la raíz se llama así, conviene el del proceso padre
+# real o el de la línea de comandos, que dice más.
+GENERICOS = {"electron", "python3", "python", "node", "java", "sh", "bash", "zsh"}
+
+
+def leer_procesos():
+    """(pid -> datos) de todo lo que se pueda leer, con su PSS y su RSS."""
+    yo = os.getuid()
+    procs = {}
+    sin_permiso = 0
+    for entrada in os.listdir("/proc"):
+        if not entrada.isdigit():
+            continue
+        pid = int(entrada)
+        try:
+            st = os.stat("/proc/%d" % pid)
+            # /proc/PID/stat trae el comm entre paréntesis, y el comm puede tener
+            # espacios y paréntesis adentro: por eso se corta por el ÚLTIMO ')' y no
+            # se hace un split() ingenuo, que se rompe con "(sd-pam)" y similares.
+            crudo = open("/proc/%d/stat" % pid).read()
+            comm = crudo[crudo.index("(") + 1:crudo.rindex(")")]
+            ppid = int(crudo[crudo.rindex(")") + 2:].split()[1])
+        except (OSError, ValueError):
+            continue
+
+        pss = rss = None
+        try:
+            for linea in open("/proc/%d/smaps_rollup" % pid):
+                if linea.startswith("Pss:"):
+                    pss = int(linea.split()[1])
+                elif linea.startswith("Rss:"):
+                    rss = int(linea.split()[1])
+        except PermissionError:
+            sin_permiso += 1
+        except OSError:
+            continue
+
+        try:
+            exe_base = os.path.basename(os.readlink("/proc/%d/exe" % pid))
+        except OSError:
+            exe_base = comm
+
+        procs[pid] = {
+            "pid": pid, "comm": comm, "ppid": ppid, "uid": st.st_uid,
+            "pss": pss or 0, "rss": rss or 0, "legible": pss is not None,
+            "nombre": nombre_de(pid, comm), "exe": exe_base,
+            "rol": rol_de(pid, comm),
+        }
+    return procs, sin_permiso, yo
+
+
+def nombre_de(pid, comm):
+    """Un nombre que sirva para leer, que no siempre es el del ejecutable.
+
+    El comm de /proc/PID/stat viene cortado a 15 caracteres, así que 'teams-for-linux'
+    o 'power-profile-sync' quedan mutilados, y por eso se prefiere el binario real que
+    apunta 'exe'. Pero el binario tampoco alcanza en dos casos que sí pasan acá:
+
+      - Ejecutables VERSIONADOS. claude vive en
+        ~/.local/share/claude/versions/2.1.223, así que el basename es "2.1.223" y en
+        el informe aparecía una fila llamada así. Si el nombre es sólo dígitos y
+        puntos, el comm dice mucho más.
+      - RUNTIMES genéricos. Obsidian es '/usr/lib/electron43/electron' corriendo
+        '/usr/lib/obsidian/app.asar': el binario dice "electron", que no distingue una
+        app de Electron de otra. En esos casos el primer argumento que no es una
+        bandera identifica la aplicación de verdad -- y si es un .asar, lo que sirve es
+        el nombre del DIRECTORIO que lo contiene, no el archivo (que siempre se llama
+        app.asar).
+    """
+    try:
+        base = os.path.basename(os.readlink("/proc/%d/exe" % pid))
+    except OSError:
+        return comm
+
+    if base.replace(".", "").isdigit():
+        return comm or base
+
+    if base in GENERICOS:
+        try:
+            crudo = open("/proc/%d/cmdline" % pid).read()
+        except OSError:
+            crudo = ""
+        # cmdline normalmente separa los argumentos con bytes NUL, pero Electron (y
+        # Chromium en general) reescriben su argv y dejan TODO en un solo string
+        # separado por espacios. Sin este caso, Obsidian se quedaba sin resolver y
+        # aparecía en el informe como "electron".
+        partes = [a for a in crudo.split("\0") if a]
+        if len(partes) < 2:
+            partes = [a for a in crudo.replace("\0", " ").split() if a]
+        for arg in partes[1:]:
+            if arg.startswith("-"):
+                continue
+            if arg.endswith(".asar"):
+                return os.path.basename(os.path.dirname(arg)) or base
+            nombre = os.path.basename(arg)
+            return os.path.splitext(nombre)[0] or base
+    return base
+
+
+def rol_de(pid, comm):
+    """Para qué sirve ESTE proceso dentro de su aplicación.
+
+    Sin esto, el detalle de una app de Electron son siete filas que dicen "electron" y
+    no se entiende cuál es cuál. Chromium y Electron marcan el rol con '--type=', así
+    que de ahí sale "renderer", "gpu-process", "zygote"...
+
+    Firefox no lo necesita: su comm ya viene con el rol puesto ("Isolated Web Co",
+    "WebExtensions", "Privileged Cont"), que es lo más específico que da el kernel --
+    el comm está limitado a 15 caracteres y el sitio de cada pestaña no aparece en
+    /proc, así que a "qué pestaña es" no se puede llegar desde acá.
+    """
+    try:
+        crudo = open("/proc/%d/cmdline" % pid).read()
+    except OSError:
+        return comm
+    partes = [a for a in crudo.split("\0") if a]
+    if len(partes) < 2:
+        partes = [a for a in crudo.replace("\0", " ").split() if a]
+
+    tipo = sub = None
+    for a in partes:
+        if a.startswith("--type="):
+            tipo = a.split("=", 1)[1]
+        elif a.startswith("--utility-sub-type="):
+            # "network.mojom.NetworkService" -> "network", que es lo que se entiende.
+            sub = a.split("=", 1)[1].split(".")[0]
+    if tipo:
+        return "%s: %s" % (tipo, sub) if sub else tipo
+    return comm
+
+
+def raiz_de(pid, procs, yo):
+    """Sube por el árbol hasta la raíz de la aplicación.
+
+    Se corta cuando el padre es PID 1, cuando el padre es un proceso de sesión (ver
+    SESION), cuando el padre es de otro usuario, o cuando el padre no es legible. El
+    tope de vueltas es una red contra un árbol con un ciclo, que no debería existir
+    pero cuesta una línea descartar.
+    """
+    actual = pid
+    for _ in range(64):
+        p = procs.get(actual)
+        if p is None:
+            return actual
+        padre = procs.get(p["ppid"])
+        if (p["ppid"] <= 1 or padre is None
+                or padre["uid"] != yo
+                or padre["comm"] in SESION
+                or padre["nombre"] in SESION
+                or padre["exe"] in SHELLS):
+            return actual
+        actual = p["ppid"]
+    return actual
+
+
+def humano(kib):
+    if kib >= 1024 * 1024:
+        return "%.1f GiB" % (kib / 1024 / 1024)
+    return "%.0f MiB" % (kib / 1024)
+
+
+def mem_total():
+    for linea in open("/proc/meminfo"):
+        if linea.startswith("MemTotal:"):
+            return int(linea.split()[1])
+    return 0
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="Aplicaciones que más RAM usan, consolidadas por aplicación.",
+        epilog="Se mide con PSS, que no cuenta dos veces la memoria compartida entre "
+               "los procesos de una misma aplicación.")
+    ap.add_argument("filtro", nargs="?", help="mostrar sólo las que coincidan con este nombre")
+    ap.add_argument("-n", type=int, default=10, metavar="N", help="cuántas mostrar (por defecto 10)")
+    ap.add_argument("-t", "--tree", action="store_true", help="detallar los procesos de cada una")
+    ap.add_argument("--rss", action="store_true", help="medir con RSS en vez de PSS (infla: ver el encabezado)")
+    args = ap.parse_args()
+
+    campo = "rss" if args.rss else "pss"
+    procs, sin_permiso, yo = leer_procesos()
+
+    # Agrupar: cada proceso legible suma a la raíz de su aplicación.
+    apps = {}
+    for p in procs.values():
+        if not p["legible"] or p[campo] == 0:
+            continue
+        raiz = raiz_de(p["pid"], procs, yo)
+        clave = procs[raiz]["nombre"] if raiz in procs else p["nombre"]
+        g = apps.setdefault(clave, {"mem": 0, "procesos": [], "raiz": raiz})
+        g["mem"] += p[campo]
+        g["procesos"].append(p)
+
+    orden = sorted(apps.items(), key=lambda kv: kv[1]["mem"], reverse=True)
+    if args.filtro:
+        f = args.filtro.lower()
+        orden = [(k, v) for k, v in orden if f in k.lower()]
+        if not orden:
+            print("ram-top: nada que coincida con %r" % args.filtro, file=sys.stderr)
+            return 1
+        args.tree = True   # pediste una app concreta: el detalle es lo que querés ver
+
+    total_ram = mem_total()
+    mostradas = orden[: args.n]
+    ancho = max([len(k) for k, _ in mostradas] + [12])
+    pico = mostradas[0][1]["mem"] if mostradas else 1
+
+    etiqueta = "RSS" if args.rss else "PSS"
+    print("%-*s %10s  %6s  %5s" % (ancho, "APLICACIÓN", etiqueta, "%RAM", "PROC"))
+    print("-" * (ancho + 28))
+
+    for nombre, g in mostradas:
+        pct = 100.0 * g["mem"] / total_ram if total_ram else 0
+        # Barra proporcional a la más grande, no al total: con 32 GiB de RAM todas las
+        # barras contra el total serían un hilito y no se compararían entre sí.
+        barra = "█" * max(1, round(12 * g["mem"] / pico))
+        print("%-*s %10s  %5.1f%%  %4d  %s"
+              % (ancho, nombre[:ancho], humano(g["mem"]), pct, len(g["procesos"]), barra))
+
+        if args.tree:
+            hijos = sorted(g["procesos"], key=lambda p: p[campo], reverse=True)
+            for p in hijos[:8]:
+                raiz = p["pid"] == g["raiz"]
+                etiq = nombre if raiz else p["rol"]
+                print("    %s %-7d %-22s %9s"
+                      % ("*" if raiz else " ", p["pid"], etiq[:22], humano(p[campo])))
+            if len(hijos) > 8:
+                resto = sum(p[campo] for p in hijos[8:])
+                print("      %-30s %9s" % ("+%d procesos más" % (len(hijos) - 8), humano(resto)))
+            print()
+
+    suma = sum(g["mem"] for _, g in orden)
+    print("-" * (ancho + 28))
+    print("%-*s %10s  %5.1f%%  %4d aplicaciones"
+          % (ancho, "TOTAL", humano(suma), 100.0 * suma / total_ram if total_ram else 0, len(orden)))
+    if sin_permiso:
+        print("(%d procesos de otros usuarios quedan afuera: su memoria no es legible sin root)"
+              % sin_permiso)
+    if args.rss:
+        print("(RSS cuenta la memoria compartida una vez POR PROCESO: los totales están inflados)")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (BrokenPipeError, KeyboardInterrupt):
+        # Salida normal si se cierra el pager o se corta con Ctrl-C.
+        sys.exit(0)

@@ -76,6 +76,9 @@ con `Return` o `Escape`.
 | `SUPER + CONTROL + H` / `K` | Workspace anterior (recorrido 1..N, cruza a la otra pantalla en el borde) |
 | `SUPER + CONTROL + L` / `J` | Workspace siguiente (ídem) |
 | `SUPER + rueda del mouse` | Cambiar de workspace, mismo recorrido |
+| Clic en un número de la barra | Ir a ese workspace |
+| `SUPER + CONTROL + SHIFT + H` / `K` | **Arrastrar el workspace** una posición a la izquierda (ver abajo) |
+| `SUPER + CONTROL + SHIFT + L` / `J` | … una posición a la derecha |
 | `SUPER + S` | Mostrar/ocultar el workspace especial *magic* |
 | `SUPER + SHIFT + S` | Mandar la ventana al workspace *magic* |
 | `SUPER + M` | Entrar al **modo monitor** (ver abajo) |
@@ -105,7 +108,12 @@ sino enchufar el monitor y reacomodar dos o tres seguidos sin salir del modo.
 Empujar contra el borde no hace nada: si no hay pantalla de ese lado, Hyprland
 avisa *"Monitor not found"* y el workspace se queda donde está. No da la vuelta.
 
-Mientras estés adentro, waybar lo muestra (módulo `hyprland/submap`).
+Mientras estés adentro, waybar lo muestra: una **pastilla de color con un icono**,
+al principio de los indicadores de la derecha — un monitor y fondo cyan para este
+modo, una regla y fondo coral para el modo redimensionar. Es la única pastilla de
+la barra, a propósito: un submodo no es un indicador más sino un estado en el que
+las teclas hacen otra cosa, y tiene que cantar. Pasando el mouse por encima, el
+tooltip dice de qué modo se trata y qué teclas tiene.
 
 ### Renumerar: los workspaces quedan 1..N en orden visual
 
@@ -133,12 +141,22 @@ mudar las ventanas de un workspace a otro — habría reconstruido el tiling.
 
 Dos detalles que no son obvios y por eso están en el script:
 
-- **Se renumera en dos pasadas**, contra un rango temporal que arranca 100 arriba
-  del ID más alto. Una permutación tiene ciclos: si el 2 va al 3 y el 3 al 2, el
-  primer cambio chocaría contra un número todavía ocupado.
-- **Al final se le manda `SIGUSR2` a waybar.** Sin eso no se ve nada: la barra no
-  se entera de que cambió un ID —no hay evento que escuchar— y encima deja de
-  marcar cuál está activo, porque el activo pasó a tener un número que no conoce.
+- **Hace falta un número temporal para romper los ciclos.** Si el 2 va al 3 y el 3
+  al 2, el primer cambio chocaría contra un número todavía ocupado. Pero sólo se
+  usa cuando de verdad hay un ciclo: primero se mueven los que tienen el destino
+  libre —eso resuelve las cadenas (el 5 pasa a 3 cuando el 3 ya se fue) sin gastar
+  ninguno— y recién si nadie puede avanzar se estaciona uno en el rango temporal,
+  que arranca 100 arriba del ID más alto. En la práctica casi nunca aparece.
+- **Todos los cambios van en un solo `hyprctl --batch`.** Cada `hyprctl` suelto es
+  un proceso más una ida y vuelta por el socket, y entre uno y otro el estado
+  intermedio es visible: se veían aparecer workspaces numerados 109, 110 —los
+  temporales— como si hubiera de más. En un lote no hay ventana para eso.
+
+**A la barra no hay que avisarle nada.** El módulo de workspaces es
+`ext/workspaces`, que habla el protocolo del compositor y ve los cambios de ID por
+su cuenta. Antes esto mandaba un `SIGUSR2`, que no es un refresco sino una
+reconstrucción de *todos* los módulos: la barra entera parpadeaba en cada
+movimiento, y encadenar esas recargas llegaba a matarla.
 
 Para ver qué haría sin tocar nada:
 
@@ -150,6 +168,46 @@ sort-workspaces --dry-run
 > que crearle el symlink con `bash ~/config_files/scripts/link-bins.sh` (ver
 > [Scripts propios](#scripts-propios-link-binssh)). Sin eso el atajo no hace nada,
 > aunque el modo monitor sigue saliendo con `Escape` igual.
+
+### Reordenar: arrastrar un workspace de posición
+
+`SUPER + CONTROL + SHIFT + H` / `L` (o `K` / `J`) mueve el workspace **activo** una
+posición hacia ese lado, empujando a los demás para que la secuencia siga siendo
+1..N sin huecos. Estando en el 1 de `1, 2, 3, 4`, dos veces a la derecha:
+
+```
+antes:    1, 2, 3, 4      (parado en el 1)
+después:  el que era 1 ahora es 3, el 2 pasó a 1 y el 3 pasó a 2. El 4 no se movió.
+```
+
+Seguís parado en el mismo workspace y con las mismas ventanas: lo único que cambia
+es su número, o sea su lugar en la barra y en el recorrido de la navegación
+relativa.
+
+Son las mismas teclas que la navegación entre workspaces más `SHIFT`, que es la
+convención del resto de la config: `SUPER + n` **enfoca** el workspace n y
+`SUPER + SHIFT + n` **mueve** la ventana ahí; acá `SUPER + CONTROL + H` enfoca el
+workspace vecino y agregarle `SHIFT` mueve el workspace hacia ese lado.
+
+**No cruza de pantalla, y es a propósito.** Esto renumera; mandar un workspace a la
+otra pantalla es el [modo monitor](#modo-monitor). Contra los extremos no hace nada
+y no se queja. Como reordenar dentro de una pantalla reparte los mismos números
+entre los mismos workspaces, el resultado es **estable**: correr `sort-workspaces`
+después no lo deshace, así que los dos se pueden usar en cualquier orden.
+
+**Una pulsación, una posición:** el atajo no tiene auto-repetición. Manteniéndolo
+apretado el workspace volaba diez o veinte posiciones de un saque, que para
+reordenar es puro sobretiro.
+
+Para ver qué haría sin tocar nada, o para saltar directo a una posición:
+
+```sh
+move-workspace right --dry-run
+move-workspace 3              # a la tercera posición de la pantalla
+```
+
+> `move-workspace` también vive en `bin_configs/`: mismo `link-bins.sh` que
+> `sort-workspaces`. Sin el symlink, el atajo no hace nada.
 
 ## Aplicaciones y sesión
 
@@ -456,6 +514,51 @@ mano, drivers por marca y diagnóstico.
 
 ## Mantenimiento
 
+### Qué se está comiendo la RAM: `ram-top`
+
+Las aplicaciones que más memoria usan, **sumadas por aplicación**. Es lo que htop y
+btop no hacen: un navegador o una app de Electron no son un proceso sino veinte, y
+ahí aparecen como una lista de `firefox` sueltos sin un total.
+
+```sh
+ram-top                 las 10 que más usan
+ram-top -n 20           cambiar cuántas
+ram-top -t              con el detalle de procesos de cada una
+ram-top firefox         sólo esa, con el detalle
+ram-top --rss           medir con RSS, para ver la diferencia
+```
+
+**Mide con PSS, y esa es la parte que importa.** Sumar el RSS de los procesos de una
+aplicación cuenta la memoria compartida una vez por proceso, y da un número muy
+inflado: en este equipo, los procesos de Firefox suman 4.9 GiB de RSS contra 2.7 GiB
+reales. PSS reparte cada página compartida entre los que la usan, así que el total de
+un grupo sí significa algo — cuánta RAM se liberaría cerrando esa aplicación.
+`ram-top --rss` muestra las dos cosas para comparar.
+
+El detalle nombra el **rol** de cada proceso cuando puede (`renderer`, `gpu-process`,
+`utility: network`), que es lo que distingue siete procesos de Electron llamados todos
+igual. El `*` marca el proceso principal.
+
+```
+obsidian        358 MiB    1.1%     7  ████████████
+    * 98097   obsidian                 116 MiB
+      98156   renderer                  98 MiB
+      98148   gpu-process               91 MiB
+      98152   utility: network          27 MiB
+```
+
+Agrupa subiendo por el árbol de procesos, no por cgroup: bajo Hyprland **todo cae en
+la misma `session-c1.scope`**, así que el cgroup no distingue una aplicación de otra.
+Los shells cortan la cadena, de modo que lo que arranques desde la terminal figura con
+su propio nombre y no sumado a `ghostty`.
+
+Los procesos de otros usuarios (demonios de root) quedan afuera: su memoria no es
+legible sin permisos. El pie del informe dice cuántos, para que el total no parezca
+completo cuando no lo es.
+
+> `ram-top` vive en `bin_configs/`: hace falta `bash ~/config_files/scripts/link-bins.sh`
+> (ver [Scripts propios](#scripts-propios-link-binssh)).
+
 ### Paquetes huérfanos: `clean-orphans`
 
 Lista los paquetes **huérfanos** — instalados como dependencia de algo que ya no
@@ -529,6 +632,7 @@ zsh: `rehash`.
 
 | Módulo | Clic izquierdo abre |
 |---|---|
+| Workspaces | Va a ese workspace |
 | Reloj | Google Calendar (chromium en modo app) |
 | Volumen | wiremix, en una terminal |
 | Batería | — (`format-alt`: alterna a tiempo restante) |
