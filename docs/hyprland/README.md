@@ -521,27 +521,41 @@ btop no hacen: un navegador o una app de Electron no son un proceso sino veinte,
 ahí aparecen como una lista de `firefox` sueltos sin un total.
 
 ```sh
-ram-top                 las 10 que más usan
-ram-top -i              interactivo: recorrer con las flechas y ver el detalle
+ram-top                 en una terminal, arranca el modo interactivo
+ram-top -p              forzar la salida de texto, sin menú
+ram-top firefox         sólo esa, en texto
 ram-top -n 20           cambiar cuántas
 ram-top -t              con el detalle de procesos de cada una
-ram-top firefox         sólo esa, con el detalle
 ram-top --rss           medir con RSS, para ver la diferencia
 ```
+
+Corrido en una terminal arranca **interactivo**; en una tubería o dentro de otro
+script sale texto, y pedir una aplicación por nombre también, porque ahí ya dijiste
+qué querés ver. Es el mismo criterio de `find-file` para elegir entre fzf y rofi.
 
 **`ram-top -i` es la forma cómoda de mirarlo.** Abre la lista en fzf y, a medida que
 te movés con las flechas, el panel muestra los procesos de la aplicación que tenés
 encima. Los números se recalculan en cada movimiento, así que ves el estado actual y
 no una foto de cuando arrancó; `Ctrl-R` relee la lista entera.
 
-Son **dos vistas**, y se navega entre ellas sin perder la de arriba:
+Son **dos vistas** y se navega con **teclas de vim**, sin perder la de arriba:
 
 | Tecla | En la lista de aplicaciones | En la lista de procesos |
 |---|---|---|
-| `Enter` | Entra a los procesos de esa aplicación | Sale dejando el detalle de ese proceso impreso |
-| `Escape` | Sale | **Vuelve** a las aplicaciones |
+| `j` / `k` | Bajar / subir | ídem |
+| `g` / `G` | Al primero / al último | ídem |
+| `Ctrl-D` / `Ctrl-U` | Media pantalla | ídem |
+| `l` o `Enter` | **Entra** a los procesos de esa aplicación | — |
+| `h` o `Escape` | — | **Vuelve** a las aplicaciones |
+| `Enter` | — | Sale dejando el detalle de ese proceso impreso |
+| `/` | Buscar (`Escape` cierra la búsqueda) | ídem |
+| `q` | Salir | Salir |
 | `Ctrl-O` | Oculta el panel (la lista queda a pantalla completa) | ídem |
 | `Ctrl-R` | Relee | ídem |
+
+Las letras navegan porque el menú arranca **sin campo de búsqueda**: con el campo
+activo, una `j` se escribiría en el filtro en vez de bajar. La búsqueda queda a un
+`/` de distancia, igual que en vim o en un pager.
 
 La segunda vista da, por proceso, lo que no se ve en ningún otro lado: cuánta memoria
 es **privada** —la que se libera de verdad si ese proceso muere— contra cuánta

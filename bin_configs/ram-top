@@ -8,14 +8,24 @@
 # '--tree' se abre el detalle de cada una.
 #
 # Uso:
-#   ram-top                 las 10 aplicaciones que más usan
-#   ram-top -i              INTERACTIVO: recorrer con las flechas y ver el detalle.
-#                           Enter entra a los procesos de esa aplicación, Escape vuelve.
-#                           En pantallas angostas el panel se pasa solo abajo.
+#   ram-top                 en una terminal, arranca el modo interactivo (ver abajo)
+#   ram-top -p              forzar la salida de texto, sin menú
+#   ram-top firefox         sólo esa aplicación, en texto
 #   ram-top -n 20           cambiar cuántas
 #   ram-top -t              con el detalle de procesos de cada una
-#   ram-top firefox         sólo esa aplicación, con el detalle
 #   ram-top --rss           medir con RSS en vez de PSS (para ver la diferencia)
+#
+# EL MODO INTERACTIVO
+#
+# Se navega con teclas de vim y son dos vistas:
+#
+#   j / k          bajar y subir            g / G     al primero / al último
+#   Ctrl-D/Ctrl-U  media pantalla           /         buscar (Escape la cierra)
+#   l o Enter      entrar a los procesos    h o Esc   volver a las aplicaciones
+#   q              salir                    Ctrl-O    ocultar el panel
+#
+# Sale en texto y no como menú cuando la salida NO es un terminal (una tubería, otro
+# script) o cuando pedís una aplicación por nombre: ahí ya dijiste qué querés ver.
 #
 # POR QUÉ PSS Y NO RSS, QUE ES LO QUE TODO EL MUNDO MIRA
 #
@@ -393,11 +403,42 @@ def imprimir_procesos(app, campo):
 VENTANA_PREVIEW = "right,50%,border-left,<52(down,55%,border-top)"
 
 
-def _fzf(lineas, prompt, header, preview, extra=None):
-    """Corre fzf y devuelve el primer campo de lo elegido, o None si se salió."""
-    cmd = ["fzf", "--height=100%", "--delimiter=\t", "--with-nth=2..",
+def _fzf(lineas, prompt, header, preview, extra=None, teclas=()):
+    """Corre fzf y devuelve el primer campo de lo elegido, o None si se salió.
+
+    Arranca SIN campo de búsqueda ('--no-input'), y eso es lo que libera las letras
+    para navegar como en vim: con el campo activo, una 'j' se escribiría en el filtro
+    en vez de bajar. La búsqueda sigue estando a un '/' de distancia, igual que en vim
+    o en un pager.
+
+    Entrar y salir de la búsqueda tiene DOS sutilezas que se ven sólo al usarlo:
+
+      - Hay que SOLTAR las letras de navegación mientras buscás. Si no, siguen atadas
+        y se comen lo que escribís: buscando "ghost" quedaba "host", porque la 'g' se
+        la llevaba el atajo de "ir al primero". Por eso '/' hace unbind de todas y
+        Escape las vuelve a atar.
+      - Escape tiene que hacer cosas distintas según dónde estés, y por eso es un
+        'transform' que decide en el momento: si estás buscando, cierra la búsqueda;
+        si no, sale de la vista. Sin eso, Escape saldría del programa a mitad de una
+        búsqueda. Y para volver hay que usar 'search()' con la cadena vacía, NO
+        'clear-query': ese último borra el texto pero deja el filtro aplicado, así que
+        la lista seguía recortada aunque ya no estuvieras buscando.
+    """
+    letras = ["j", "k", "g", "G", "q"] + list(teclas)
+    navegacion = ("j:down,k:up,g:first,G:last,"
+                  "ctrl-d:half-page-down,ctrl-u:half-page-up,"
+                  "ctrl-f:page-down,ctrl-b:page-up")
+    buscar = "/:show-input+enable-search+unbind(%s)" % ",".join(letras)
+    escape = ("esc:transform:if [[ $FZF_INPUT_STATE == enabled ]]; then "
+              "echo 'search()+hide-input+disable-search+rebind(%s)'; "
+              "else echo abort; fi" % ",".join(letras))
+    cmd = ["fzf", "--height=100%", "--delimiter=\t", "--with-nth=2..", "--no-input",
            "--prompt", prompt, "--header", header,
            "--preview", preview, "--preview-window", VENTANA_PREVIEW,
+           "--bind", navegacion,
+           "--bind", buscar,
+           "--bind", escape,
+           "--bind", "q:abort",
            "--bind", "ctrl-o:toggle-preview"]
     if extra:
         cmd += extra
@@ -436,9 +477,11 @@ def interactivo(args, campo):
         app = _fzf(
             lineas,
             "ram ~> ",
-            "Enter: sus procesos   Ctrl-R: releer   Ctrl-O: panel",
+            "j/k mover   l o Enter: sus procesos   / buscar   q salir",
             "%s --exact --tree%s -- {1}" % (yo, extra),
-            ["--bind", "ctrl-r:reload(%s --lista%s)" % (yo, extra)],
+            ["--bind", "ctrl-r:reload(%s --lista%s)" % (yo, extra),
+             "--bind", "l:accept"],
+            teclas=("l",),
         )
         if app is None:
             return 0
@@ -450,9 +493,11 @@ def interactivo(args, campo):
             elegido = _fzf(
                 filas,
                 "%s ~> " % app,
-                "Escape: volver   Enter: fijar   Ctrl-O: panel",
+                "j/k mover   h o Esc: volver   Enter: fijar   q salir",
                 "%s%s --proc {1}" % (yo, extra),
-                ["--bind", "ctrl-r:reload(%s --procesos %s%s)" % (yo, app, extra)],
+                ["--bind", "ctrl-r:reload(%s --procesos %s%s)" % (yo, app, extra),
+                 "--bind", "h:abort"],
+                teclas=("h",),
             )
             if elegido is None:
                 break   # Escape: volver a la lista de aplicaciones
@@ -470,7 +515,9 @@ def main():
     ap.add_argument("-t", "--tree", action="store_true", help="detallar los procesos de cada una")
     ap.add_argument("--rss", action="store_true", help="medir con RSS en vez de PSS (infla: ver el encabezado)")
     ap.add_argument("-i", "--interactive", action="store_true",
-                    help="recorrer la lista con las flechas y ver el detalle de cada una (fzf)")
+                    help="forzar el modo interactivo (es el default en una terminal)")
+    ap.add_argument("-p", "--plano", action="store_true",
+                    help="forzar la salida de texto, sin menú")
     ap.add_argument("-x", "--exact", action="store_true",
                     help="el filtro tiene que coincidir exacto, no por pedazo")
     # Ocultas: las usan el preview y el Ctrl-R del modo interactivo.
@@ -481,7 +528,16 @@ def main():
 
     campo = "rss" if args.rss else "pss"
 
-    if args.interactive:
+    # El modo interactivo es el DEFAULT cuando hay terminal y no se pidió una
+    # aplicación concreta. Es el mismo criterio que usa find-file para elegir entre
+    # fzf y rofi: '-t 1' pregunta si la salida es un terminal, que es el único dato
+    # confiable -- si el comando está en una tubería o dentro de otro script, lo que
+    # se necesita es texto, no un menú. Pedir una aplicación por nombre ya dice qué
+    # querés ver, así que ahí también sale directo el texto.
+    interactivo_por_defecto = (sys.stdout.isatty() and not args.filtro
+                               and not args.plano and not args.lista
+                               and not args.procesos and not args.proc)
+    if args.interactive or interactivo_por_defecto:
         return interactivo(args, campo)
     if args.lista:
         # Sólo para el Ctrl-R del modo interactivo: reimprime la lista que come fzf.
