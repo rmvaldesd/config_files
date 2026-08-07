@@ -159,11 +159,22 @@
     "format": " {}%",
     "on-click": "exec ghostty --title=btop -e btop"
   },
+  // El clic abre 'ram-top' y no htop: htop lista procesos sueltos, y una aplicación
+  // moderna son veinte -- Firefox aparece como una fila de "firefox" repetidos sin un
+  // total. ram-top los suma por aplicación, que es lo que uno quiere saber parado
+  // frente al módulo de memoria. Ver bin_configs/ram-top.
+  //
+  // El 'sh -c' con fallback es por el mismo motivo que el atajo SUPER + A: ram-top vive
+  // en bin_configs/ y necesita el symlink de scripts/link-bins.sh. En un equipo recién
+  // clonado todavía no está, y sin el fallback el clic abriría una ventana que se
+  // cierra sola. Con él, cae a htop y al menos hace algo.
+  //
+  // El '--title' es lo que matchea la window_rule de hyprland.lua que la hace flotante.
   "memory": {
     "interval": 30,
     "format": " {percentage}%",
     "tooltip-format": "{used:0.1f}G/{total:0.1f}G used",
-    "on-click": "exec ghostty --title=htop -e htop"
+    "on-click": "exec ghostty --title=ram-top -e sh -c 'if command -v ram-top >/dev/null 2>&1; then ram-top; else htop; fi'"
   },
   // Swap en uso. Va pegado a memoria porque se leen juntos: la memoria dice cuánto entra
   // y este cuánto se está desbordando.

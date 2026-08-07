@@ -718,3 +718,19 @@ hl.window_rule({
   float = true,
   size  = { 1024, 680 },
 })
+
+-- ram-top (el clic en el modulo de memoria de la barra) va aparte por el mismo motivo
+-- que btop: necesita ancho. Su segunda vista pone el desglose del proceso en un panel
+-- al costado, y ese panel solo entra si le quedan unas 52 columnas; por debajo de eso
+-- fzf lo manda abajo, que funciona pero se ve mas apretado. Con este tamano entra al
+-- costado, que es como se lee mejor.
+--
+-- Vale la misma advertencia de arriba: 'size' solo acepta una tabla de dos numeros en
+-- pixeles logicos. Las variantes con porcentajes se aceptan sin error y no hacen nada.
+hl.window_rule({
+  name  = "ram-top-flotante",
+  match = { title = "^ram-top$" },
+
+  float = true,
+  size  = { 1200, 720 },
+})

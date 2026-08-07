@@ -686,7 +686,7 @@ zsh: `rehash`.
 | Red | nmtui, en una terminal |
 | CPU | btop, en una terminal |
 | Swap | htop, en una terminal |
-| Memoria | htop, en una terminal |
+| Memoria | `ram-top`, en una ventana flotante ([ver abajo](#qué-se-está-comiendo-la-ram-ram-top)) |
 | Disco | btop, en una terminal |
 | Idioma del teclado | Cambia al siguiente layout |
 
