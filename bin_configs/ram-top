@@ -407,6 +407,20 @@ def imprimir_procesos(app, campo):
 # REDIMENSIONAR la terminal, no sólo al arrancar.
 VENTANA_PREVIEW = "right,50%,border-left,<52(down,55%,border-top)"
 
+# Los mismos colores que fija FZF_DEFAULT_OPTS en zshrc.local: acento cyan #75f1fa
+# sobre la escala zinc, igual que waybar, mako, rofi y ghostty. Van repetidos acá a
+# propósito, por el mismo motivo que '--layout=reverse': esa variable la exporta la
+# configuración de la SHELL, y waybar -- que lanza este comando al hacer clic en el
+# módulo de memoria -- no la tiene, porque a waybar la arranca Hyprland y no una zsh
+# interactiva. Sin esto, la ventana flotante salía con los colores de fábrica de fzf y
+# el puntero en magenta, que no existe en ninguna otra parte del entorno.
+#
+# No se fija 'bg' a propósito, igual que en zshrc.local: así se respeta el fondo y la
+# transparencia de ghostty.
+COLORES = ("fg+:#fafafa,bg+:#3f3f46,hl:#75f1fa,hl+:#75f1fa,"
+           "info:#a1a1aa,prompt:#75f1fa,pointer:#75f1fa,"
+           "marker:#75f1fa,spinner:#75f1fa,header:#71717a,border:#3f3f46")
+
 
 def _fzf(lineas, prompt, header, preview=None, extra=None, teclas=()):
     """Corre fzf y devuelve el primer campo de lo elegido, o None si se salió.
@@ -437,7 +451,18 @@ def _fzf(lineas, prompt, header, preview=None, extra=None, teclas=()):
     escape = ("esc:transform:if [[ $FZF_INPUT_STATE == enabled ]]; then "
               "echo 'search()+hide-input+disable-search+rebind(%s)'; "
               "else echo abort; fi" % ",".join(letras))
-    cmd = ["fzf", "--height=100%", "--delimiter=\t", "--with-nth=2..", "--no-input",
+    # '--layout=reverse' NO es opcional y no es cosmético: sin él, fzf usa su layout por
+    # defecto, que dibuja la lista de ABAJO hacia arriba y deja el primero -- o sea la
+    # aplicación que más memoria usa -- al pie de la pantalla. La lista se lee entonces
+    # de menor a mayor, al revés de lo que muestra la salida de texto.
+    #
+    # Costó encontrarlo porque desde una terminal se veía bien: zshrc.local exporta un
+    # FZF_DEFAULT_OPTS que ya trae '--layout=reverse', así que fzf lo tomaba de ahí. Pero
+    # waybar la lanza Hyprland y NO tiene esa variable -- verificado leyendo su
+    # /proc/PID/environ --, así que el clic en el módulo de memoria abría la lista dada
+    # vuelta. Fijarlo acá hace que el comando se vea igual lo lance quien lo lance.
+    cmd = ["fzf", "--height=100%", "--layout=reverse", "--color", COLORES,
+           "--delimiter=\t", "--with-nth=2..", "--no-input",
            "--prompt", prompt, "--header", header,
            "--bind", navegacion,
            "--bind", buscar,
