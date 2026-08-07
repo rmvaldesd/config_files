@@ -17,12 +17,14 @@
 #
 # EL MODO INTERACTIVO
 #
-# Se navega con teclas de vim y son dos vistas:
+# Se navega con teclas de vim y son dos vistas. La PRIMERA es sólo la lista: sin panel
+# al costado, así entra el doble de aplicaciones y las barras no se recortan. El
+# desglose aparece al entrar con Enter, que es cuando lo pediste.
 #
 #   j / k          bajar y subir            g / G     al primero / al último
 #   Ctrl-D/Ctrl-U  media pantalla           /         buscar (Escape la cierra)
 #   l o Enter      entrar a los procesos    h o Esc   volver a las aplicaciones
-#   q              salir                    Ctrl-O    ocultar el panel
+#   q              salir                    Ctrl-O    ocultar el panel (2da vista)
 #
 # Sale en texto y no como menú cuando la salida NO es un terminal (una tubería, otro
 # script) o cuando pedís una aplicación por nombre: ahí ya dijiste qué querés ver.
@@ -330,7 +332,7 @@ def detalle_proceso(pid):
         crudo = open("/proc/%d/stat" % pid).read()
         comm = crudo[crudo.index("(") + 1:crudo.rindex(")")]
     except (OSError, ValueError):
-        print("El proceso %d ya no existe." % pid)
+        print("Process %d is gone." % pid)
         return 0
 
     m = {}
@@ -358,17 +360,17 @@ def detalle_proceso(pid):
     print("PID %d   %s" % (pid, comm))
     print("-" * 46)
     print("  %-14s %10s   %s" % ("PSS", humano(m.get("Pss", 0)),
-                                 "lo que le toca de lo compartido, más lo propio"))
+                                 "its share of what is shared, plus its own"))
     print("  %-14s %10s" % ("RSS", humano(m.get("Rss", 0))))
-    print("  %-14s %10s   %s" % ("privada", humano(privada), "se libera si el proceso muere"))
-    print("  %-14s %10s   %s" % ("compartida", humano(compartida), "la usan también sus hermanos"))
+    print("  %-14s %10s   %s" % ("private", humano(privada), "freed if this process dies"))
+    print("  %-14s %10s   %s" % ("shared", humano(compartida), "also used by its siblings"))
     if m.get("Swap"):
         print("  %-14s %10s" % ("en swap", humano(m["Swap"])))
     if st.get("VmHWM"):
-        print("  %-14s %10s   %s" % ("pico RSS", humano(int(st["VmHWM"].split()[0])),
-                                     "lo más alto desde que arrancó"))
+        print("  %-14s %10s   %s" % ("peak RSS", humano(int(st["VmHWM"].split()[0])),
+                                     "highest since it started"))
     if st.get("Threads"):
-        print("  %-14s %10s" % ("hilos", st["Threads"]))
+        print("  %-14s %10s" % ("threads", st["Threads"]))
 
     try:
         cmd = open("/proc/%d/cmdline" % pid).read().replace("\0", " ").strip()
@@ -376,7 +378,7 @@ def detalle_proceso(pid):
         cmd = ""
     if cmd:
         print()
-        print("comando:")
+        print("command line:")
         for i in range(0, min(len(cmd), 600), 62):
             print("  " + cmd[i:i + 62])
     return 0
@@ -403,7 +405,7 @@ def imprimir_procesos(app, campo):
 VENTANA_PREVIEW = "right,50%,border-left,<52(down,55%,border-top)"
 
 
-def _fzf(lineas, prompt, header, preview, extra=None, teclas=()):
+def _fzf(lineas, prompt, header, preview=None, extra=None, teclas=()):
     """Corre fzf y devuelve el primer campo de lo elegido, o None si se salió.
 
     Arranca SIN campo de búsqueda ('--no-input'), y eso es lo que libera las letras
@@ -434,12 +436,15 @@ def _fzf(lineas, prompt, header, preview, extra=None, teclas=()):
               "else echo abort; fi" % ",".join(letras))
     cmd = ["fzf", "--height=100%", "--delimiter=\t", "--with-nth=2..", "--no-input",
            "--prompt", prompt, "--header", header,
-           "--preview", preview, "--preview-window", VENTANA_PREVIEW,
            "--bind", navegacion,
            "--bind", buscar,
            "--bind", escape,
-           "--bind", "q:abort",
-           "--bind", "ctrl-o:toggle-preview"]
+           "--bind", "q:abort"]
+    # Sin preview no hay panel que mostrar ni que alternar: la primera pantalla es sólo
+    # la lista, y el detalle aparece al entrar con Enter.
+    if preview:
+        cmd += ["--preview", preview, "--preview-window", VENTANA_PREVIEW,
+                "--bind", "ctrl-o:toggle-preview"]
     if extra:
         cmd += extra
     # Se captura SÓLO stdout. fzf dibuja su interfaz en stderr y la lee del terminal:
@@ -462,8 +467,8 @@ def interactivo(args, campo):
     mirar los procesos de una app ya no hay que cerrar el menú.
     """
     if not shutil.which("fzf"):
-        print("ram-top: falta fzf, que es lo que dibuja el modo interactivo.", file=sys.stderr)
-        print("         Sin él sirven igual 'ram-top -t' y 'ram-top <nombre>'.", file=sys.stderr)
+        print("ram-top: fzf is missing, and it is what draws the interactive mode.", file=sys.stderr)
+        print("         Without it, 'ram-top -t' and 'ram-top <name>' still work.", file=sys.stderr)
         return 1
 
     yo = os.path.abspath(sys.argv[0])
@@ -472,14 +477,13 @@ def interactivo(args, campo):
     while True:
         lineas = lineas_lista(campo)
         if not lineas:
-            print("ram-top: no hay nada que mostrar", file=sys.stderr)
+            print("ram-top: nothing to show", file=sys.stderr)
             return 1
         app = _fzf(
             lineas,
             "ram ~> ",
-            "j/k mover   l o Enter: sus procesos   / buscar   q salir",
-            "%s --exact --tree%s -- {1}" % (yo, extra),
-            ["--bind", "ctrl-r:reload(%s --lista%s)" % (yo, extra),
+            "j/k move   l or Enter: its processes   / search   q quit",
+            extra=["--bind", "ctrl-r:reload(%s --lista%s)" % (yo, extra),
              "--bind", "l:accept"],
             teclas=("l",),
         )
@@ -493,7 +497,7 @@ def interactivo(args, campo):
             elegido = _fzf(
                 filas,
                 "%s ~> " % app,
-                "j/k mover   h o Esc: volver   Enter: fijar   q salir",
+                "j/k move   h or Esc: back   Enter: pin this one   Ctrl-O: panel   q quit",
                 "%s%s --proc {1}" % (yo, extra),
                 ["--bind", "ctrl-r:reload(%s --procesos %s%s)" % (yo, app, extra),
                  "--bind", "h:abort"],
@@ -507,19 +511,19 @@ def interactivo(args, campo):
 
 def main():
     ap = argparse.ArgumentParser(
-        description="Aplicaciones que más RAM usan, consolidadas por aplicación.",
-        epilog="Se mide con PSS, que no cuenta dos veces la memoria compartida entre "
-               "los procesos de una misma aplicación.")
-    ap.add_argument("filtro", nargs="?", help="mostrar sólo las que coincidan con este nombre")
-    ap.add_argument("-n", type=int, default=10, metavar="N", help="cuántas mostrar (por defecto 10)")
-    ap.add_argument("-t", "--tree", action="store_true", help="detallar los procesos de cada una")
-    ap.add_argument("--rss", action="store_true", help="medir con RSS en vez de PSS (infla: ver el encabezado)")
+        description="Which applications are using the most RAM, grouped per application.",
+        epilog="Measured with PSS, which does not double count the memory shared "
+               "between the processes of one application.")
+    ap.add_argument("filtro", nargs="?", help="show only the ones matching this name")
+    ap.add_argument("-n", type=int, default=10, metavar="N", help="how many to show (default 10)")
+    ap.add_argument("-t", "--tree", action="store_true", help="break down the processes of each one")
+    ap.add_argument("--rss", action="store_true", help="measure with RSS instead of PSS (inflates: see the header)")
     ap.add_argument("-i", "--interactive", action="store_true",
-                    help="forzar el modo interactivo (es el default en una terminal)")
+                    help="force interactive mode (the default on a terminal)")
     ap.add_argument("-p", "--plano", action="store_true",
-                    help="forzar la salida de texto, sin menú")
+                    help="force plain text output, no menu")
     ap.add_argument("-x", "--exact", action="store_true",
-                    help="el filtro tiene que coincidir exacto, no por pedazo")
+                    help="the filter must match exactly, not as a substring")
     # Ocultas: las usan el preview y el Ctrl-R del modo interactivo.
     ap.add_argument("--lista", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--procesos", metavar="APP", help=argparse.SUPPRESS)
@@ -548,7 +552,7 @@ def main():
         try:
             return detalle_proceso(int(args.proc))
         except ValueError:
-            print("ram-top: --proc espera un PID", file=sys.stderr)
+            print("ram-top: --proc expects a PID", file=sys.stderr)
             return 1
 
     orden, sin_permiso = calcular(campo)
@@ -561,7 +565,7 @@ def main():
         else:
             orden = [(k, v) for k, v in orden if f in k.lower()]
         if not orden:
-            print("ram-top: nada que coincida con %r" % args.filtro, file=sys.stderr)
+            print("ram-top: nothing matches %r" % args.filtro, file=sys.stderr)
             return 1
         args.tree = True   # pediste una app concreta: el detalle es lo que querés ver
 
@@ -571,7 +575,7 @@ def main():
     pico = mostradas[0][1]["mem"] if mostradas else 1
 
     etiqueta = "RSS" if args.rss else "PSS"
-    print("%-*s %10s  %6s  %5s" % (ancho, "APLICACIÓN", etiqueta, "%RAM", "PROC"))
+    print("%-*s %10s  %6s  %5s" % (ancho, "APPLICATION", etiqueta, "%RAM", "PROC"))
     print("-" * (ancho + 28))
 
     for nombre, g in mostradas:
@@ -591,18 +595,18 @@ def main():
                       % ("*" if raiz else " ", p["pid"], etiq[:22], humano(p[campo])))
             if len(hijos) > 8:
                 resto = sum(p[campo] for p in hijos[8:])
-                print("      %-30s %9s" % ("+%d procesos más" % (len(hijos) - 8), humano(resto)))
+                print("      %-30s %9s" % ("+%d more processes" % (len(hijos) - 8), humano(resto)))
             print()
 
     suma = sum(g["mem"] for _, g in orden)
     print("-" * (ancho + 28))
-    print("%-*s %10s  %5.1f%%  %4d aplicaciones"
+    print("%-*s %10s  %5.1f%%  %4d applications"
           % (ancho, "TOTAL", humano(suma), 100.0 * suma / total_ram if total_ram else 0, len(orden)))
     if sin_permiso:
-        print("(%d procesos de otros usuarios quedan afuera: su memoria no es legible sin root)"
+        print("(%d processes from other users are left out: their memory is not readable without root)"
               % sin_permiso)
     if args.rss:
-        print("(RSS cuenta la memoria compartida una vez POR PROCESO: los totales están inflados)")
+        print("(RSS counts shared memory once PER PROCESS: these totals are inflated)")
     return 0
 
 

@@ -533,10 +533,11 @@ Corrido en una terminal arranca **interactivo**; en una tubería o dentro de otr
 script sale texto, y pedir una aplicación por nombre también, porque ahí ya dijiste
 qué querés ver. Es el mismo criterio de `find-file` para elegir entre fzf y rofi.
 
-**`ram-top -i` es la forma cómoda de mirarlo.** Abre la lista en fzf y, a medida que
-te movés con las flechas, el panel muestra los procesos de la aplicación que tenés
-encima. Los números se recalculan en cada movimiento, así que ves el estado actual y
-no una foto de cuando arrancó; `Ctrl-R` relee la lista entera.
+**El modo interactivo es la forma cómoda de mirarlo.** La primera pantalla es sólo la
+lista —sin panel al costado, así entran el doble de aplicaciones y las barras no se
+recortan— y el desglose aparece al **entrar** en una. Los números se recalculan en
+cada movimiento, así que ves el estado actual y no una foto de cuando arrancó;
+`Ctrl-R` relee.
 
 Son **dos vistas** y se navega con **teclas de vim**, sin perder la de arriba:
 
@@ -550,22 +551,24 @@ Son **dos vistas** y se navega con **teclas de vim**, sin perder la de arriba:
 | `Enter` | — | Sale dejando el detalle de ese proceso impreso |
 | `/` | Buscar (`Escape` cierra la búsqueda) | ídem |
 | `q` | Salir | Salir |
-| `Ctrl-O` | Oculta el panel (la lista queda a pantalla completa) | ídem |
+| `Ctrl-O` | — (esta vista no tiene panel) | Oculta el panel |
 | `Ctrl-R` | Relee | ídem |
 
 Las letras navegan porque el menú arranca **sin campo de búsqueda**: con el campo
 activo, una `j` se escribiría en el filtro en vez de bajar. La búsqueda queda a un
 `/` de distancia, igual que en vim o en un pager.
 
-La segunda vista da, por proceso, lo que no se ve en ningún otro lado: cuánta memoria
-es **privada** —la que se libera de verdad si ese proceso muere— contra cuánta
-comparte con sus hermanos, el pico de RSS desde que arrancó, los hilos y la línea de
-comandos completa.
+La segunda vista sí trae panel, y da por proceso lo que no se ve en ningún otro lado:
+cuánta memoria es **privada** —la que se libera de verdad si ese proceso muere—
+contra cuánta comparte con sus hermanos, el pico de RSS desde que arrancó, los hilos
+y la línea de comandos completa.
 
-**En pantallas angostas el panel se pasa solo abajo**, para que la lista conserve el
-ancho completo y no se le coman las barras. Lo decide fzf comparando el ancho que le
-tocaría al panel contra un mínimo, así que se reacomoda al **redimensionar** la
-terminal y no sólo al arrancar.
+> La salida está en inglés, igual que los tooltips de la barra.
+
+**En pantallas angostas el panel de la segunda vista se pasa solo abajo**, para que la
+lista conserve el ancho completo y no se le coman las barras. Lo decide fzf comparando
+el ancho que le tocaría al panel contra un mínimo, así que se reacomoda al
+**redimensionar** la terminal y no sólo al arrancar.
 
 **Mide con PSS, y esa es la parte que importa.** Sumar el RSS de los procesos de una
 aplicación cuenta la memoria compartida una vez por proceso, y da un número muy
