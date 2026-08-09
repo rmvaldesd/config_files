@@ -1,0 +1,229 @@
+# rTorrent — config de extras/rtorrent.sh
+#
+# Basada en el ejemplo que circula como "el" rtorrent.rc
+# (https://gist.github.com/bryanjswift/1525912), pero reescrita: ese gist es de la
+# época de rTorrent 0.8/0.9 y buena parte de sus comandos ya no existen. Cada línea
+# de acá se probó contra el binario de Arch, rTorrent 0.16.19, arrancándolo de verdad
+# con un HOME de mentira; lo que no pasó la prueba no quedó.
+#
+# Lo que rompió del gist, para que no vuelva por copiar y pegar de internet:
+#
+#   system.method.set / system.method.set_key -> ahora method.set / method.set_key
+#   dht / peer_exchange                       -> dht.mode.set / protocol.pex.set
+#   port_random                               -> network.listen.port.random.set
+#
+# Y varias trampas que NO se arreglan con los nombres "modernos" que recomienda todo
+# el mundo, porque en 0.16 cambiaron otra vez:
+#
+#   network.port_range.set   NO existe            -> network.listen.port.range.set
+#   schedule2                NO existe            -> schedule (el viejo, que sí sigue vivo)
+#   dht.port.set             "no longer supported" -> dht.override_port.set (acá va sin línea)
+#   trackers.use_udp.set     "no longer supported" -> se saca, ya no se prende ni apaga
+#   allow_incoming,...       "Obsolete"            -> handshake_* / stream_*
+#
+# Ojo con la segunda: el propio ejemplo que instala el paquete, en
+# /usr/share/doc/rtorrent/rtorrent.rc, usa schedule2 y network.port_range.set. Está
+# desactualizado respecto del binario que viene en el mismo paquete.
+#
+# Las tres últimas no son errores de arranque: rTorrent levanta igual y las avisa por
+# la línea de estado, donde se pisan entre sí y se pierden. Si tocás este archivo,
+# revisá los mensajes de los primeros segundos, no sólo que arranque.
+#
+# Referencia de comandos: https://rtorrent-docs.readthedocs.io/en/latest/cmd-ref.html
+# (buena, pero va por detrás de 0.16: verificá contra el binario antes de creerle).
+
+# =====================================================================
+# RUTAS
+# =====================================================================
+# Las rutas se arman con (system.env,HOME) en vez de escribirlas a mano para que este
+# archivo sea idéntico en el repo y en ~/.config/rtorrent/, y así 'rtorrent.sh status'
+# pueda compararlos con cmp. Probado que resuelven: rTorrent creó el log y la sesión
+# exactamente donde dicen estas líneas.
+method.insert = cfg.basedir,   private|const|string, (cat,(system.env,HOME),"/Downloads/rtorrent/")
+method.insert = cfg.dir.data,  private|const|string, (cat,(cfg.basedir),"downloads/")
+method.insert = cfg.dir.state, private|const|string, (cat,(system.env,HOME),"/.local/state/rtorrent/")
+
+# Dónde caen los datos de los torrents.
+directory.default.set = (cat,(cfg.dir.data))
+
+# Estado de la sesión: qué torrents había cargados, en qué iba cada uno. Va en
+# ~/.local/state y no junto a las descargas porque es estado de la aplicación, no
+# contenido tuyo; por eso 'rtorrent.sh uninstall' lo conserva pero lo nombra aparte.
+#
+# OJO: si este directorio no existe, rTorrent NO lo crea: aborta al arrancar con
+# "Could not lock session directory". Las carpetas las crea el instalador.
+session.path.set = (cat,(cfg.dir.state),"session")
+
+# =====================================================================
+# LÍMITES
+# =====================================================================
+# Cuántos pares por torrent, bajando y sembrando.
+throttle.min_peers.normal.set = 40
+throttle.max_peers.normal.set = 100
+throttle.min_peers.seed.set   = 10
+throttle.max_peers.seed.set   = 50
+
+# Subidas simultáneas por torrent.
+throttle.max_uploads.set = 15
+
+# Velocidad global en KiB/s; 0 es sin límite.
+#
+# Quedan las dos en 0 a propósito. El gist ponía upload_rate = 300, un número atado a
+# la conexión de quien lo escribió; en un portátil que se mueve entre redes, un tope
+# fijo o te frena de más o no te protege. Si notás que sembrar te arruina la latencia,
+# el que conviene tocar es el de subida: poné ~80% de tu ancho de subida real.
+throttle.global_down.max_rate.set_kb = 0
+throttle.global_up.max_rate.set_kb   = 0
+
+# =====================================================================
+# RED
+# =====================================================================
+# Puerto de escucha. El rango alto es el del gist y tiene sentido: los puertos
+# clásicos de BitTorrent (6881-6889) son los primeros que miran los ISP que moldean
+# tráfico. Con .random.set arranca en una posición al azar del rango en cada inicio.
+network.listen.port.range.set  = 33101-33199
+network.listen.port.random.set = yes
+
+# Cifrado del protocolo. Son dos cosas distintas y por eso van dos palabras:
+#
+#   handshake_prefer : intenta el handshake cifrado al salir, y acepta las dos formas
+#                      al entrar. Es lo que sirve contra el ISP que moldea BitTorrent.
+#   stream_allow     : acepta cifrar el flujo de datos si el otro lo pide, pero no lo
+#                      exige. RC4 sobre todo el contenido cuesta CPU y no te oculta de
+#                      nadie que mire en serio: esto es ofuscación, no privacidad.
+#
+# El vocabulario viejo (allow_incoming, try_outgoing, enable_retry, prefer_plaintext)
+# TODAVÍA se acepta, pero 0.16 lo marca en pantalla con "Obsolete encryption options
+# used". Y no es sólo cosmético: comprobado leyendo los valores efectivos, esa cadena
+# entera colapsaba a handshake=allow / stream=allow, o sea que el 'try_outgoing' no
+# hacía nada. Con 'prefer' sí sale cifrado.
+protocol.encryption.set = handshake_prefer,stream_allow
+
+# DHT y PEX: encuentran pares sin depender del tracker. rTorrent respeta solo la
+# bandera 'private' de cada torrent, así que esto no te delata en trackers privados;
+# los torrents marcados como privados quedan afuera por su cuenta.
+#
+# NO se fija el puerto de DHT a propósito. El comando del gist (dht_port) y su sucesor
+# (dht.port.set) están los dos muertos en 0.16 -- el segundo avisa "no longer
+# supported, use dht.override_port.set" --, y el reemplazo tampoco conviene: clavarlo
+# en 6881 sería mandar el DHT justo al puerto más moldeado que hay, después de haber
+# elegido un rango alto y aleatorio para el resto. Sin la línea, DHT usa el puerto de
+# escucha y queda dentro del mismo rango.
+#
+# Va en 'on' y no en 'auto' porque 'auto' levanta DHT recién cuando algún torrent lo
+# necesita, y para entonces los nodos de arranque de abajo ya se programaron y se
+# perdieron. Con 'on' arranca siempre y la tabla de ruteo se va llenando sola.
+dht.mode.set     = on
+protocol.pex.set = yes
+
+# NODOS DE ARRANQUE DE DHT. Sin esto DHT no sirve para nada, y es lo que hacía que un
+# magnet sin trackers vivos se quedara colgado para siempre: rTorrent arranca con la
+# tabla de ruteo VACÍA y no tiene de dónde sacar el primer nodo. Comprobado leyendo
+# ~/.local/state/rtorrent/session/rtorrent.dht_cache: sin estas líneas queda en
+# 'contacts' y 'nodes' vacíos indefinidamente; con ellas, a los ~100 segundos ya hay
+# nodos reales en la tabla.
+#
+# Son los tres routers públicos de siempre. Sólo se consultan al arrancar: una vez que
+# la tabla tiene nodos, DHT se sostiene solo y el cache sobrevive entre sesiones.
+schedule = dht_bootstrap_1,5,0,"dht.add_node=dht.transmissionbt.com:6881"
+schedule = dht_bootstrap_2,6,0,"dht.add_node=router.bittorrent.com:6881"
+schedule = dht_bootstrap_3,7,0,"dht.add_node=router.utorrent.com:6881"
+
+# 'trackers.use_udp.set' NO va: en 0.16 responde "no longer supported". Los trackers
+# UDP se usan igual, ya no es algo que se prenda o apague.
+
+# =====================================================================
+# DISCO
+# =====================================================================
+# No rehashear al terminar. rTorrent ya verifica cada pieza contra su SHA-1 a medida
+# que la escribe; el rehash completo es una segunda pasada por todo el archivo que
+# sólo sirve para descartar corrupción del disco. En un SSD es tiempo y desgaste.
+pieces.hash.on_completion.set = no
+
+# =====================================================================
+# CARPETA VIGILADA
+# =====================================================================
+# Dejás un .torrent en ~/Downloads/rtorrent/watch/ y arranca solo, sin abrir la UI.
+# Revisa cada 5 segundos.
+#
+# La ruta va literal y con '~' a propósito. Probado: la forma calculada
+# load.start=(cat,(cfg.dir.watch),"*.torrent") NO carga nada -- el glob no se expande
+# --, y 'directory.watch.added' (que es lo que recomienda el ejemplo del paquete)
+# tampoco carga, ni con ruta absoluta. La única forma que funcionó en 0.16.19 es esta:
+# schedule + load.start con la ruta escrita tal cual.
+#
+# Va la variante _verbose y no 'load.start' pelado porque la muda falla EN SILENCIO:
+# comprobado dejando un archivo basura llamado roto.torrent en la carpeta, load.start
+# no dice absolutamente nada y load.start_verbose avisa
+# 'Reading torrent file failed: "..."'. Sólo habla cuando algo sale mal, así que no
+# agrega ruido; lo que evita es dejar un .torrent corrupto o copiado a medias sin
+# explicación de por qué no arranca.
+#
+# El sufijo NO cambia el arranque: 'start' sigue queriendo decir que entra corriendo.
+# La otra mitad de la familia es load.normal, que carga pero deja el torrent parado
+# esperando un ^s -- que es, justamente, lo que hace rTorrent con los magnet.
+schedule = watch_directory,5,5,load.start_verbose=~/Downloads/rtorrent/watch/*.torrent
+
+# =====================================================================
+# MANTENIMIENTO
+# =====================================================================
+# Cierra torrents si el disco baja de 1 GB libre, para no llenar la partición.
+schedule = low_diskspace,5,60,close_low_diskspace=1000M
+
+# Guarda la sesión cada 15 minutos (arranca a los 5). Sin esto, un corte de luz te
+# hace perder el progreso desde el último guardado automático.
+schedule = session_save,300,900,session.save=
+
+# =====================================================================
+# INTERFAZ
+# =====================================================================
+# Navegación con teclas de vim (j/k), igual que el resto de este entorno. El default
+# es "emacs", donde te movés con las flechas.
+ui.keymap.style.set = "vi"
+
+# Lista de descargas en formato completo (dos líneas por torrent, con la barra de
+# progreso). La alternativa es "compact", una línea por torrent.
+ui.torrent_list.layout.set = "full"
+
+# =====================================================================
+# LOG
+# =====================================================================
+# Sin esto, los errores pasan por la línea de estado y se pierden. El archivo queda
+# en ~/.local/state/rtorrent/rtorrent.log.
+log.open_file  = "rtorrent", (cat,(cfg.dir.state),"rtorrent.log")
+log.add_output = "info", "rtorrent"
+
+# =====================================================================
+# LO QUE NO ESTÁ, Y POR QUÉ
+# =====================================================================
+#
+# MOVER AL TERMINAR (el 'move_complete' del gist, que mandaba lo terminado a
+# ./unsorted). No funciona en rTorrent 0.16.19 y por eso no está.
+#
+# Se probaron siete variantes contra el binario, con un torrent de prueba que
+# completa de verdad: el hook 'event.download.finished' SÍ dispara, pero cualquier
+# comando genérico adentro -- execute.throw, execute.nothrow -- muere con "Target of
+# wrong type to generic command". Falla igual envuelto en un method.insert ... simple,
+# con destino literal en vez de calculado, y con las dos sintaxis de argumentos
+# ($argument.0= y (argument.0)). Con la vieja llega a ejecutar el mv, pero los
+# argumentos no se sustituyen y termina creando un directorio llamado "placeholder.1".
+#
+# O sea: no es un problema de escribirlo bien, es que en esta versión no se puede.
+# Por eso las descargas van todas a una sola carpeta, downloads/, en vez del par
+# incomplete/complete que tendría sentido si el movimiento funcionara.
+#
+# GRUPO DE RATIO (ratio.enable / ratio.min.set del gist). Los comandos existen como
+# group.seeding.ratio.*, pero quedan afuera porque cierran torrents solos al llegar a
+# un ratio, y eso es una política, no una mejora: en un tracker privado te puede
+# costar la cuenta. Si lo querés, son estas cuatro líneas (ratio en centésimas: 200 =
+# 2.0):
+#
+#   group.seeding.ratio.enable=
+#   group.seeding.ratio.min.set=200
+#   group.seeding.ratio.max.set=2000
+#   group.seeding.ratio.upload.set=250M
+#
+# ORDENAMIENTO DE VISTAS (el bloque view.sort_* del gist). Los comandos siguen
+# existiendo, pero el gist los reprograma cada 5 segundos sobre cuatro vistas, con
+# accesores viejos (d.get_ratio, d.get_name). Es ruido: dentro de la UI ordenás con
+# las teclas de la vista y listo.
