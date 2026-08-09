@@ -46,7 +46,8 @@ correspondiente en el mismo commit.
 | `SUPER + SHIFT + C` | Cerrar la ventana |
 | `SUPER + V` | Alternar flotante |
 | `SUPER + SHIFT + T` | Alternar flotante (mismo efecto que `SUPER + V`) |
-| `SUPER + SHIFT + F` | Maximizar |
+| `SUPER + SHIFT + F` | Maximizar (respeta waybar, gaps y barra de título) |
+| `SUPER + CONTROL + F` | Pantalla completa (se come la pantalla entera) |
 | `SUPER + P` | Modo pseudo |
 | `SUPER + R` | Entrar al **modo redimensionar** (ver abajo) |
 | `SUPER + click izquierdo` (arrastrando) | Mover la ventana con el mouse |

@@ -374,7 +374,16 @@ hl.bind(secondMod .. " + K", hl.dsp.window.move({ direction = "down" }))
 
 
 hl.bind(secondMod .. " + T", hl.dsp.window.float({ action = "toggle" }))
+-- Los dos modos de agrandar una ventana, juntos a proposito para que se lean de a pares.
+-- 'maximized' la estira hasta los bordes del monitor pero respeta la waybar, los gaps y
+-- la barra de titulo; 'fullscreen' se come la pantalla entera, sin nada alrededor. Son
+-- los dos unicos valores que acepta el dispatcher (el propio binario lo dice si te
+-- equivocas: 'expected fullscreen/maximized').
+--
+-- Se escribe "CONTROL" a mano en vez de usar thirdMod porque esa variable recien se
+-- define mas abajo, con los binds de workspaces; la combinacion resultante es la misma.
 hl.bind(secondMod .. " + F", hl.dsp.window.fullscreen({ mode = "maximized" }))
+hl.bind(mainMod .. " + CONTROL + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
 
 hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("hyprlock"))
 
