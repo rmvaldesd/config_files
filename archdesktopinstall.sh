@@ -174,7 +174,7 @@ paquetes_utilidades=(
     imv               # Visor de imágenes nativo de Wayland, controlado por teclado (n/p para navegar, +/- zoom, q para salir). Es el habitual en setups de Hyprland/sway por ser mínimo. Queda como predeterminado para imágenes sin pasos extra: las asociaciones vienen dentro del mimeapps.list que enlaza la sección 9.
     zathura           # Visor de documentos minimalista con teclas tipo vim (j/k para desplazar, / para buscar, q para salir). Queda asociado a PDF vía mimeapps.list.
     zathura-pdf-poppler # OBLIGATORIO: zathura por sí solo NO abre ningún archivo, necesita un plugin de backend. Se elige poppler sobre mupdf porque este último arrastra tesseract con sus datos de OCR, innecesario para leer PDFs.
-    mpv               # Reproductor de video y audio, nativo de Wayland y controlado por teclado (espacio pausa, flechas saltan, f pantalla completa, q sale). Queda asociado a los formatos de video vía mimeapps.list. Si alguna vez querés una interfaz gráfica, celluloid y haruna son frontends sobre este mismo motor.
+    mpv               # Reproductor de video y audio, nativo de Wayland y controlado por teclado (espacio pausa, flechas saltan, f pantalla completa, q sale). Queda asociado a los formatos de video vía mimeapps.list, y su config (dotconfig/mpv/mpv.conf, enlazada en la sección 9) le prende el perfil de calidad y la decodificación por hardware, que mpv trae apagada de fábrica. Si alguna vez querés una interfaz gráfica, celluloid y haruna son frontends sobre este mismo motor.
     libreoffice-fresh # Suite ofimática. La variante 'fresh' trae las versiones nuevas; 'libreoffice-still' es la conservadora, si preferís estabilidad sobre funciones. No se instala el paquete de idioma (libreoffice-fresh-es) porque el locale de este equipo es en_US.
     gimp              # Editor de imágenes. NO se asocia a los tipos de imagen a propósito: esos abren con imv, que es el visor; solo .xcf (image/x-xcf) abre directo en GIMP, porque ningún visor lo lee. Para el resto, GIMP queda en el menú "Abrir con" de Thunar.
     obsidian          # Base de conocimiento sobre archivos Markdown locales.
@@ -370,7 +370,7 @@ mkdir -p "$HOME/.config"
 # Enlaza cada directorio de config_files/dotconfig dentro de ~/.config.
 # El guard de existencia permite sumar o quitar directorios del repo sin tocar este
 # script: los que no estén en dotconfig/ simplemente se saltean.
-for dir in nvim hypr waybar rofi mako ghostty git; do
+for dir in nvim hypr waybar rofi mako ghostty git mpv; do
     origen="$HOME/config_files/dotconfig/$dir"
     [ -d "$origen" ] || continue
     destino="$HOME/.config/$dir"
