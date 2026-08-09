@@ -5,11 +5,18 @@ Instaladores opcionales que **no** forman parte del entorno base
 donde hagan falta. Cada script sabe instalarse, desinstalarse y reportar su
 estado.
 
-| Script | Qué instala | Uso |
+Cada uno vive en su propia carpeta, junto a los archivos que despliegue. Varios tienen
+un solo archivo adentro y la carpeta igual va: así el día que un instalador necesite
+sumar una plantilla de config, una unit de systemd o una regla de udev, tiene dónde
+ponerla sin ensuciar la raíz de `extras/` ni obligar a mover nada después. Los scripts
+resuelven las rutas de sus archivos desde su propia ubicación (`BASH_SOURCE`) y no
+desde `$PWD`, así que se pueden invocar desde donde sea.
+
+| Carpeta | Qué instala | Uso |
 |---|---|---|
-| [`virtualization.sh`](./virtualization.sh) | QEMU/KVM + libvirt + virt-manager: todo lo necesario para crear y correr máquinas virtuales, incluido UEFI (edk2-ovmf) y TPM emulado (swtpm) para guests Windows 11. | `./virtualization.sh install \| uninstall \| status` (sin argumentos: menú) |
-| [`docker.sh`](./docker.sh) | Docker engine + Compose v2 + buildx: levantar servicios desde `docker-compose.yaml` con `docker compose up`. Suma al usuario al grupo `docker` y habilita el demonio al boot. | `./docker.sh install \| uninstall \| status` (sin argumentos: menú) |
-| [`mssql-odbc17.sh`](./mssql-odbc17.sh) | Driver Microsoft ODBC 17 for SQL Server (equivalente en Arch a msodbcsql17 + unixODBC-devel de Fedora), con `openssl-1.1`, que el driver necesita sí o sí. Viene de AUR: requiere `yay` ya instalado. `status` no se conforma con ver el driver registrado: comprueba también que el `.so` cargue y que haya un OpenSSL 1.x que el driver sepa abrir, así te dice si tu app va a poder usarlo. | `./mssql-odbc17.sh install \| uninstall \| status` (sin argumentos: menú) |
+| [`virtualization/`](./virtualization/) | QEMU/KVM + libvirt + virt-manager: todo lo necesario para crear y correr máquinas virtuales, incluido UEFI (edk2-ovmf) y TPM emulado (swtpm) para guests Windows 11. | `./virtualization/virtualization.sh install \| uninstall \| status` (sin argumentos: menú) |
+| [`docker/`](./docker/) | Docker engine + Compose v2 + buildx: levantar servicios desde `docker-compose.yaml` con `docker compose up`. Suma al usuario al grupo `docker` y habilita el demonio al boot. | `./docker/docker.sh install \| uninstall \| status` (sin argumentos: menú) |
+| [`mssql-odbc17/`](./mssql-odbc17/) | Driver Microsoft ODBC 17 for SQL Server (equivalente en Arch a msodbcsql17 + unixODBC-devel de Fedora), con `openssl-1.1`, que el driver necesita sí o sí. Viene de AUR: requiere `yay` ya instalado. `status` no se conforma con ver el driver registrado: comprueba también que el `.so` cargue y que haya un OpenSSL 1.x que el driver sepa abrir, así te dice si tu app va a poder usarlo. | `./mssql-odbc17/mssql-odbc17.sh install \| uninstall \| status` (sin argumentos: menú) |
 
 ## Modo de arranque
 
@@ -35,7 +42,8 @@ cambiarlo.
 
 ## Convenciones
 
-- Un script por entorno, autocontenido, con `install`/`uninstall`/`status`.
+- Una carpeta por entorno: el script, con `install`/`uninstall`/`status`, más los
+  archivos que despliegue.
 - No ejecutarlos como root: piden `sudo` puntualmente, igual que el instalador
   principal.
 - `uninstall` nunca borra datos del usuario (discos de VMs, configs); dice dónde

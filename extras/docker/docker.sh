@@ -5,10 +5,10 @@
 # Vive en extras/ porque NO es parte del entorno base que arma archdesktopinstall.sh:
 # se corre a mano en las máquinas donde haga falta.
 #
-#   ./docker.sh install     # instala, habilita el demonio y te suma al grupo docker
-#   ./docker.sh uninstall   # da de baja todo; imágenes y volúmenes se conservan
-#   ./docker.sh status      # qué hay instalado y en qué estado
-#   ./docker.sh             # menú interactivo con esas tres opciones
+#   ./docker/docker.sh install     # instala, habilita el demonio y te suma al grupo docker
+#   ./docker/docker.sh uninstall   # da de baja todo; imágenes y volúmenes se conservan
+#   ./docker/docker.sh status      # qué hay instalado y en qué estado
+#   ./docker/docker.sh             # menú interactivo con esas tres opciones
 #
 # Los comentarios van en español como el resto del repo; los mensajes en inglés.
 

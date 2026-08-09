@@ -4,10 +4,10 @@
 # Vive en extras/ porque NO es parte del entorno base que arma archdesktopinstall.sh:
 # se corre a mano en las máquinas donde haga falta virtualizar.
 #
-#   ./virtualization.sh install     # instala todo, habilita el servicio y la red NAT
-#   ./virtualization.sh uninstall   # da de baja todo; los discos de las VMs se conservan
-#   ./virtualization.sh status      # qué hay instalado y en qué estado
-#   ./virtualization.sh             # menú interactivo con esas tres opciones
+#   ./virtualization/virtualization.sh install     # instala todo, habilita el servicio y la red NAT
+#   ./virtualization/virtualization.sh uninstall   # da de baja todo; los discos de las VMs se conservan
+#   ./virtualization/virtualization.sh status      # qué hay instalado y en qué estado
+#   ./virtualization/virtualization.sh             # menú interactivo con esas tres opciones
 #
 # Los comentarios van en español como el resto del repo; los mensajes en inglés.
 

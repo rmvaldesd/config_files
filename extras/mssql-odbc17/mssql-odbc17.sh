@@ -5,10 +5,10 @@
 # Vive en extras/ porque NO es parte del entorno base que arma archdesktopinstall.sh:
 # se corre a mano en las máquinas donde haga falta conectarse a SQL Server.
 #
-#   ./mssql-odbc.sh install     # instala el driver, sus deps y lo deja registrado
-#   ./mssql-odbc.sh uninstall   # da de baja el stack
-#   ./mssql-odbc.sh status      # si tu aplicación va a poder cargar el driver o no
-#   ./mssql-odbc.sh             # menú interactivo con esas tres opciones
+#   ./mssql-odbc17/mssql-odbc17.sh install     # instala el driver, sus deps y lo deja registrado
+#   ./mssql-odbc17/mssql-odbc17.sh uninstall   # da de baja el stack
+#   ./mssql-odbc17/mssql-odbc17.sh status      # si tu aplicación va a poder cargar el driver o no
+#   ./mssql-odbc17/mssql-odbc17.sh             # menú interactivo con esas tres opciones
 #
 # Los comentarios van en español como el resto del repo; los mensajes en inglés.
 
