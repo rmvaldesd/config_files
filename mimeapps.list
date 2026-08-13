@@ -307,6 +307,7 @@ x-scheme-handler/mailto=userapp-Thunderbird-82AZS3.desktop
 x-scheme-handler/mid=userapp-Thunderbird-82AZS3.desktop
 message/rfc822=userapp-Thunderbird-82AZS3.desktop
 x-scheme-handler/net.thunderbird=userapp-Thunderbird-0UIUS3.desktop
+x-scheme-handler/apidog=apidog.desktop
 
 [Added Associations]
 x-scheme-handler/mailto=userapp-Thunderbird-82AZS3.desktop;
