@@ -750,15 +750,15 @@ hl.window_rule({
 -- while visible so the exit/confirm buttons stay clickable.
 -- See https://github.com/hyprwm/Hyprland/issues/4809
 hl.window_rule({
-  name  = "zoom-menu-stay-focused",
-  match = { class = "^zoom$", title = "^menu window$" },
+  name         = "zoom-menu-stay-focused",
+  match        = { class = "^zoom$", title = "^menu window$" },
 
   stay_focused = true,
 })
 
 hl.window_rule({
-  name  = "zoom-confirm-stay-focused",
-  match = { class = "^zoom$", title = "^confirm window$" },
+  name         = "zoom-confirm-stay-focused",
+  match        = { class = "^zoom$", title = "^confirm window$" },
 
   stay_focused = true,
 })
