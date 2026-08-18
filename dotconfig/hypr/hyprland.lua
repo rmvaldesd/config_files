@@ -47,7 +47,7 @@ hl.monitor({
 ---------------------
 
 -- Set programs that you use
-local terminal          = "ghostty"
+local terminal          = "foot"
 local fileManager       = "thunar"
 local launcher          = "rofi -show drun -show-icons"
 local runner            = "rofi -show run"
@@ -91,7 +91,7 @@ local screenshotMonitor = "hyprshot -m output -m active --clipboard-only"
 -- para que salga flotante y no como una ventana mas en el mosaico.
 -- Usa glow si esta instalado (renderiza las tablas) y cae a less si no, asi el
 -- atajo nunca queda roto.
-local ayuda             = "ghostty --title=ayuda-atajos -e sh -c "
+local ayuda             = "foot --title=ayuda-atajos -e sh -c "
     .. "'D=$HOME/config_files/docs/hyprland/README.md; "
     .. "if command -v glow >/dev/null 2>&1; then glow -p \"$D\"; else less \"$D\"; fi'"
 

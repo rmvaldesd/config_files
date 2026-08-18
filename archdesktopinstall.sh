@@ -129,6 +129,7 @@ paquetes_escritorio=(
     hyprland                      # El compositor/gestor de ventanas principal basado en Wayland.
     waybar                        # La barra de estado superior/inferior altamente configurable mediante CSS.
     ghostty                       # Terminal moderna y ultrarrápida que utiliza aceleración por GPU.
+    foot                          # Terminal Wayland nativo, minimalista y de bajo consumo de recursos.
     rofi                          # Lanzador de aplicaciones y menús dinámicos (con soporte nativo para Wayland).
     firefox                       # Navegador web principal.
     chromium                      # Navegador secundario; Waybar lo usa para abrir Google Calendar en modo app (on-click del reloj).
@@ -370,7 +371,7 @@ mkdir -p "$HOME/.config"
 # Enlaza cada directorio de config_files/dotconfig dentro de ~/.config.
 # El guard de existencia permite sumar o quitar directorios del repo sin tocar este
 # script: los que no estén en dotconfig/ simplemente se saltean.
-for dir in nvim hypr waybar rofi mako ghostty git mpv; do
+for dir in nvim hypr waybar rofi mako ghostty foot git mpv; do
     origen="$HOME/config_files/dotconfig/$dir"
     [ -d "$origen" ] || continue
     destino="$HOME/.config/$dir"

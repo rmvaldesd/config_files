@@ -142,7 +142,7 @@
     "tooltip-format": "{controller_alias}\t{controller_address}",
     "tooltip-format-connected": "{controller_alias}\t{controller_address}\n\n{device_enumerate}",
     "tooltip-format-enumerate-connected": "{device_alias}\t{device_address}",
-    "on-click": "exec ghostty --title=bluetui -e bluetui"
+    "on-click": "exec foot --title=bluetui -e bluetui"
   },
   // Sin 'max-length' -- lo tenía (10) y lo que hacía era CORTAR el módulo: se veía
   // "0.5…" en vez de "0.5%". Ese valor no son píxeles ni caracteres reales: waybar lo
@@ -157,7 +157,7 @@
   "cpu": {
     "interval": 10,
     "format": " {}%",
-    "on-click": "exec ghostty --title=btop -e btop"
+    "on-click": "exec foot --title=btop -e btop"
   },
   // El clic abre 'ram-top' y no htop: htop lista procesos sueltos, y una aplicación
   // moderna son veinte -- Firefox aparece como una fila de "firefox" repetidos sin un
@@ -174,7 +174,7 @@
     "interval": 30,
     "format": " {percentage}%",
     "tooltip-format": "{used:0.1f}G/{total:0.1f}G used",
-    "on-click": "exec ghostty --title=ram-top -e sh -c 'if command -v ram-top >/dev/null 2>&1; then ram-top; else htop; fi'"
+    "on-click": "exec foot --title=ram-top -e sh -c 'if command -v ram-top >/dev/null 2>&1; then ram-top; else htop; fi'"
   },
   // Swap en uso. Va pegado a memoria porque se leen juntos: la memoria dice cuánto entra
   // y este cuánto se está desbordando.
@@ -192,7 +192,7 @@
     "return-type": "json",
     "interval": 30,
     "format": "{}",
-    "on-click": "exec ghostty --title=htop -e htop"
+    "on-click": "exec foot --title=htop -e htop"
   },
   // Espacio en disco. Va después de memoria porque cierra la serie de "cuánto queda de
   // cada cosa": CPU, swap, RAM y, al final, disco.
@@ -217,7 +217,7 @@
     "format": "{}",
     // btop, igual que #cpu: su panel de disco es lo más parecido a "y ahora qué borro"
     // que hay instalado sin sumar un paquete nuevo.
-    "on-click": "exec ghostty --title=btop -e btop"
+    "on-click": "exec foot --title=btop -e btop"
   },
   "network": {
     "format": "",
@@ -233,7 +233,7 @@
     // a dejarlo en "…" -- un módulo de red que no muestra el estado de la red.
     // nmtui viene dentro del propio networkmanager, así que no suma ningún paquete.
     // Mismo patrón que el módulo de bluetooth con bluetui: una TUI en su terminal.
-    "on-click": "exec ghostty --title=nmtui -e nmtui"
+    "on-click": "exec foot --title=nmtui -e nmtui"
   },
   "clock": {
     // %d dia, %b mes abreviado (el locale del equipo es en_US -> "Jul"), %H:%M en
@@ -269,7 +269,7 @@
     ],
     // wiremix es TUI, así que va en su propia terminal como bluetui/nmtui/btop/htop.
     // El --title es lo que matchea la regla de ventana flotante en hyprland.lua.
-    "on-click": "exec ghostty --title=wiremix -e wiremix"
+    "on-click": "exec foot --title=wiremix -e wiremix"
   },
   "pulseaudio/slider": {
     "min": 0,
@@ -319,7 +319,7 @@
     "interval": 30,
     "signal": 8,
     "format": "{}",
-    "on-click": "exec ghostty --title=rclone-sync -e ~/config_files/scripts/rclone-sync menu",
-    "on-click-right": "exec ghostty --title=rclone-log -e ~/config_files/scripts/rclone-sync log"
+    "on-click": "exec foot --title=rclone-sync -e ~/config_files/scripts/rclone-sync menu",
+    "on-click-right": "exec foot --title=rclone-log -e ~/config_files/scripts/rclone-sync log"
   }
 }
