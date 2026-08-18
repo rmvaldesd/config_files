@@ -743,3 +743,29 @@ hl.window_rule({
   float = true,
   size  = { 1200, 720 },
 })
+
+-- Zoom popup windows disappear on Hyprland due to focus behavior: the popup
+-- opens as a floating window, Hyprland removes focus when the mouse moves off it,
+-- and Zoom closes the popup on focus loss. stay_focused keeps the popup focused
+-- while visible so the exit/confirm buttons stay clickable.
+-- See https://github.com/hyprwm/Hyprland/issues/4809
+hl.window_rule({
+  name  = "zoom-menu-stay-focused",
+  match = { class = "^zoom$", title = "^menu window$" },
+
+  stay_focused = true,
+})
+
+hl.window_rule({
+  name  = "zoom-confirm-stay-focused",
+  match = { class = "^zoom$", title = "^confirm window$" },
+
+  stay_focused = true,
+})
+
+-- Zoom a veces minimiza a la bandeja en vez de salir: la ventana desaparece pero el
+-- proceso sigue corriendo, y como Zoom es de instancia unica no se vuelve a abrir hasta
+-- matarlo. Este atajo lo mata entero (la ventana + los procesos auxiliares como el de
+-- compartir pantalla). Z de Zoom.
+hl.bind("SUPER + CONTROL + Z",
+  hl.dsp.exec_cmd("pkill -f '/usr/bin/zoom' || true"))

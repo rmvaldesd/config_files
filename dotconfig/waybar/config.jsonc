@@ -16,6 +16,7 @@
   // no un olvido.
   "modules-center": [],
   "modules-right": [
+    "tray",
     "custom/submap",
     "custom/language",
     "group/volume",
@@ -70,6 +71,15 @@
     "on-click": "activate",
     "sort-by-name": true
   },
+  // Bandeja del sistema (StatusNotifier). Zoom minimiza a acá al cerrar la ventana,
+  // así que sin este módulo el proceso queda corriendo invisible y no se puede volver
+  // a abrir sin matarlo. Con él, el icono de Zoom aparece y se sale con
+  // clic derecho -> Quit / Exit Zoom.
+  "tray": {
+    "icon-size": 18,
+    "spacing": 6,
+    "tooltip": true
+  },
   // Un icono por modo -- una regla para resize, un monitor para monitor -- en vez del
   // nombre del submapa, que ocupaba mucho para lo poco que aporta: cuando aparece
   // acabás de apretar la tecla, así que ya sabés en cuál estás. La palabra se muda al
@@ -84,8 +94,7 @@
   //
   // El script se cuelga del socket de EVENTOS de Hyprland, así que no hace polling ni
   // necesita que hyprland.lua le avise nada. Por eso NO lleva 'interval': waybar lo
-  // corre en modo continuo y lee una línea JSON por evento. El porqué de esa decisión
-  // -- y de por qué el socket se lee con python -- está en el encabezado del script.
+  // corre en modo continuo y lee una línea JSON por evento.
   //
   // 'restart-interval' es la red de seguridad: si Hyprland se reinicia, el socket
   // muere y el script termina. Sin esto el módulo quedaría mudo hasta el próximo
@@ -95,7 +104,7 @@
   // del ellipsizado: los módulos custom no se arman con el ellipsizado prendido, y se
   // verificó que el icono no se corta.
   "custom/submap": {
-    "exec": "~/.config/waybar/scripts/submap.py",
+    "exec": "~/.config/waybar/scripts/submap.lua",
     "return-type": "json",
     "restart-interval": 5,
     "format": "{}"

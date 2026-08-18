@@ -245,6 +245,9 @@ paquetes_utilidades=(
     system-config-printer # GUI para añadir y gestionar impresoras: Hyprland no trae panel de impresoras propio. La alternativa sin instalar nada es la interfaz web de CUPS en http://localhost:631.
     ufw               # Firewall sencillo; se activa en la sección 7 con política deny-incoming/allow-outgoing.
     spotify-launcher  # Descarga y mantiene actualizado el cliente oficial de Spotify desde el repositorio propio de Spotify.
+    # --- Lua para módulos custom de Waybar ---
+    lua-dkjson        # Codificador/decodificador JSON puro en Lua; lo usa submap.lua para generar la salida JSON de waybar.
+    lua-socket        # Extensión de sockets para Lua (Unix domain sockets); lo usa submap.lua para escuchar los eventos de Hyprland en .socket2.sock.
 )
 sudo pacman -S --needed --noconfirm "${paquetes_utilidades[@]}"
 
