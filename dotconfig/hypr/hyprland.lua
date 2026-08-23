@@ -350,20 +350,20 @@ hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 --hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit")) -- dwindle only
 
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd(browser))
-hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(terminal))
+hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + Space", hl.dsp.exec_cmd(launcher))
 hl.bind(secondMod .. " + Space", hl.dsp.exec_cmd(runner))
 
 -- Move focus with mainMod + arrow keys
 hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + L", hl.dsp.focus({ direction = "right" }))
-hl.bind(mainMod .. " + I", hl.dsp.focus({ direction = "up" }))
-hl.bind(mainMod .. " + K", hl.dsp.focus({ direction = "down" }))
+hl.bind(mainMod .. " + K", hl.dsp.focus({ direction = "up" }))
+hl.bind(mainMod .. " + J", hl.dsp.focus({ direction = "down" }))
 
 hl.bind(secondMod .. " + H", hl.dsp.window.move({ direction = "left" }))
 hl.bind(secondMod .. " + L", hl.dsp.window.move({ direction = "right" }))
-hl.bind(secondMod .. " + I", hl.dsp.window.move({ direction = "up" }))
-hl.bind(secondMod .. " + K", hl.dsp.window.move({ direction = "down" }))
+hl.bind(secondMod .. " + K", hl.dsp.window.move({ direction = "up" }))
+hl.bind(secondMod .. " + J", hl.dsp.window.move({ direction = "down" }))
 
 hl.bind(secondMod .. " + T", hl.dsp.window.float({ action = "toggle" }))
 -- Los dos modos de agrandar una ventana, juntos a proposito para que se lean de a pares.
@@ -428,7 +428,7 @@ hl.define_submap("resize", function()
 	-- Ajustar tamaño de ventana activa (manteniendo presionado con repeating = true)
 	hl.bind("L", hl.dsp.window.resize({ x = 10, y = 0, relative = true }), { repeating = true })
 	hl.bind("H", hl.dsp.window.resize({ x = -10, y = 0, relative = true }), { repeating = true })
-	hl.bind("I", hl.dsp.window.resize({ x = 0, y = -10, relative = true }), { repeating = true })
+	hl.bind("K", hl.dsp.window.resize({ x = 0, y = -10, relative = true }), { repeating = true })
 	hl.bind("J", hl.dsp.window.resize({ x = 0, y = 10, relative = true }), { repeating = true })
 
 	-- Salir del submapa al presionar Enter o Escape
@@ -453,8 +453,8 @@ hl.bind(mainMod .. " + M", hl.dsp.submap("monitor"))
 
 hl.define_submap("monitor", function()
 	-- Las direcciones son las mismas que en el resto de la config: H/L para
-	-- izquierda/derecha, I/K para arriba/abajo. Las flechas hacen exactamente lo
-	-- mismo, asi no hay que acordarse de que aca "arriba" es I y no J.
+	-- izquierda/derecha, K/J para arriba/abajo. Las flechas hacen exactamente lo
+	-- mismo, por si en el momento salen antes que las letras.
 	--
 	-- El monitor se elige por DIRECCION (l/r/u/d) y no por indice relativo
 	-- (+1/-1) porque el indice da la vuelta: en dos pantallas, empujar a la
@@ -465,8 +465,8 @@ hl.define_submap("monitor", function()
 	-- Sin 'workspace' en la tabla, el dispatcher usa el workspace activo.
 	hl.bind("H", hl.dsp.workspace.move({ monitor = "l" }))
 	hl.bind("L", hl.dsp.workspace.move({ monitor = "r" }))
-	hl.bind("I", hl.dsp.workspace.move({ monitor = "u" }))
-	hl.bind("K", hl.dsp.workspace.move({ monitor = "d" }))
+	hl.bind("K", hl.dsp.workspace.move({ monitor = "u" }))
+	hl.bind("J", hl.dsp.workspace.move({ monitor = "d" }))
 
 	hl.bind("Left", hl.dsp.workspace.move({ monitor = "l" }))
 	hl.bind("Right", hl.dsp.workspace.move({ monitor = "r" }))

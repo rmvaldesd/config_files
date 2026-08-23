@@ -46,8 +46,8 @@ local ICONO_DEFAULT = "\243\176\140\140"  -- nf-md-keyboard U+F030C
 -- Las teclas de cada modo, que son las que uno no se acuerda al entrar. Salen de las
 -- definiciones de submapa de hyprland.lua; si allá cambian los binds, acá también.
 local AYUDAS = {
-    resize  = "resize mode: H/L width, I/J height. Enter or Esc to exit",
-    monitor = "monitor mode: H/L/I/K or arrows move the workspace. Enter or Esc to exit",
+    resize  = "resize mode: H/L width, K/J height. Enter or Esc to exit",
+    monitor = "monitor mode: H/L/K/J or arrows move the workspace. Enter or Esc to exit",
 }
 
 

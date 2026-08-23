@@ -41,8 +41,8 @@ correspondiente en el mismo commit.
 
 | Atajo | Acción |
 |---|---|
-| `SUPER + H` / `L` / `I` / `K` | Mover el **foco** a izquierda / derecha / arriba / abajo |
-| `SUPER + SHIFT + H` / `L` / `I` / `K` | **Mover la ventana** en esa dirección |
+| `SUPER + H` / `L` / `K` / `J` | Mover el **foco** a izquierda / derecha / arriba / abajo |
+| `SUPER + SHIFT + H` / `L` / `K` / `J` | **Mover la ventana** en esa dirección |
 | `SUPER + SHIFT + C` | Cerrar la ventana |
 | `SUPER + V` | Alternar flotante |
 | `SUPER + SHIFT + T` | Alternar flotante (mismo efecto que `SUPER + V`) |
@@ -61,12 +61,12 @@ con `Return` o `Escape`.
 | Tecla | Acción |
 |---|---|
 | `H` / `L` | Angostar / ensanchar (10 px) |
-| `I` / `J` | Achicar / agrandar en alto (10 px) |
+| `K` / `J` | Achicar / agrandar en alto (10 px) |
 | `Return` o `Escape` | Salir del modo |
 
-> **Ojo con la inconsistencia:** para mover el foco, arriba/abajo son `I`/`K`;
-> dentro del modo redimensionar son `I`/`J`. No es un error de este documento,
-> es como está en la config.
+> Arriba/abajo son `K`/`J` acá y en todos lados: foco, mover ventana, modo
+> monitor y navegación entre workspaces. Antes el foco usaba `I`/`K` y el modo
+> redimensionar `I`/`J`; se unificó todo al esquema de vim.
 
 ## Workspaces
 
@@ -94,12 +94,12 @@ pantalla a otra. Se sale con `Return` o `Escape`. *M* de monitor.
 |---|---|
 | `H` o `←` | Mover el workspace a la pantalla de la izquierda |
 | `L` o `→` | … a la derecha |
-| `I` o `↑` | … arriba |
-| `K` o `↓` | … abajo |
+| `K` o `↑` | … arriba |
+| `J` o `↓` | … abajo |
 | `Return` o `Escape` | Salir del modo **y renumerar** (ver abajo) |
 
-Las flechas hacen exactamente lo mismo que las letras. Acá arriba/abajo son
-`I`/`K`, igual que para mover el foco — no como en el modo redimensionar.
+Las flechas hacen exactamente lo mismo que las letras. Arriba/abajo son `K`/`J`,
+igual que en el resto de la config.
 
 Es un modo y no un atajo directo por dos razones: las tres combinaciones
 direccionales ya están tomadas (`SUPER` foco, `SUPER + SHIFT` ventana,
@@ -214,7 +214,7 @@ move-workspace 3              # a la tercera posición de la pantalla
 
 | Atajo | Acción |
 |---|---|
-| `SUPER + T` | Terminal (ghostty) |
+| `SUPER + Return` | Terminal (foot) |
 | `SUPER + B` | Navegador (firefox) |
 | `SUPER + E` | Gestor de archivos (thunar) |
 | `SUPER + F` | Buscar un archivo en todo `~` y abrirlo con su aplicación por defecto |
