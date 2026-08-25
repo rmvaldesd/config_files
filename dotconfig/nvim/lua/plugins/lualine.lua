@@ -25,7 +25,20 @@ return {
         lualine_y = {},
         lualine_z = {}
       },
-      tabline = {},
+      -- Top bar (buffer list). Toggle it with <leader>tb -- see keymappings.lua.
+      tabline = {
+        lualine_a = {
+          {
+            'buffers',
+            mode = 2,                  -- show buffer name + number
+            show_filename_only = true,
+            hide_filename_extension = false,
+            show_modified_status = true,
+            symbols = { modified = ' ●', alternate_file = '', directory = ' ' },
+          },
+        },
+        lualine_z = { { 'tabs', mode = 2 } },
+      },
       extensions = {}
     })
   end

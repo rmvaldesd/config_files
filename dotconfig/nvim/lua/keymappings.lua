@@ -50,3 +50,13 @@ vim.keymap.set("n", "<leader>scp", ":Copilot suggestion toggle_auto_trigger<CR>"
 -- nesting under it would add a timeoutlen delay before every breakpoint toggle.
 vim.keymap.set("n", "<leader>x", "<cmd>BufDel<CR>",       { desc = "close current buffer" })
 vim.keymap.set("n", "<leader>X", "<cmd>BufDelOthers<CR>", { desc = "close all buffers except current" })
+
+-- lualine tabline (top buffer bar). lualine sets showtabline=2 on setup, so the
+-- toggle just flips it between 2 (always visible) and 0 (hidden).
+vim.keymap.set("n", "<leader>tb", function()
+  vim.o.showtabline = vim.o.showtabline == 0 and 2 or 0
+end, { desc = "toggle top buffer bar (lualine tabline)" })
+
+-- jump between buffers shown in the bar
+vim.keymap.set("n", "<S-l>", "<cmd>bnext<CR>",     { desc = "next buffer" })
+vim.keymap.set("n", "<S-h>", "<cmd>bprevious<CR>", { desc = "previous buffer" })
