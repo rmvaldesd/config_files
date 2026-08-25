@@ -1,0 +1,28 @@
+[Unit]
+# Revive el bluetooth al SALIR de la suspension.
+#
+# Diagnostico 2026-08-19, ThinkPad con btusb/btintel + Hyprland: despues de un
+# suspend/resume (s2idle) el controlador "despierta" ("Controller resume with wake
+# event 0x0") pero queda pegado: 'Powered: yes' y el radio ve dispositivos, pero
+# 'Discovering: yes' se queda en on sin que nadie haya pedido scan y ningun
+# emparejado se reconecta.
+#
+# OJO: reiniciar bluetooth.service NO arregla ese caso -- verificado a mano ese dia,
+# igual que un power off/on por mgmt. El estado vive en el driver, debajo del daemon,
+# y solo lo limpia recargar el modulo. De eso se encarga bluetooth-reset, que prueba
+# primero el reinicio barato y recarga el modulo solo si el cuelgue sigue ahi.
+#
+# El mismo idiom que power-profile-sync.service: estar en WantedBy=suspend.target y
+# con After=suspend.target hace que la unit corra al DESPERTAR de la suspension, no
+# al entrar en ella.
+Description=Revive el bluetooth al despertar de la suspension
+After=suspend.target bluetooth.service
+
+[Service]
+Type=oneshot
+# Dejar que el controlador termine de despertar antes de tocarlo.
+ExecStartPre=/usr/bin/sleep 2
+ExecStart=/usr/local/bin/bluetooth-reset --resume
+
+[Install]
+WantedBy=suspend.target

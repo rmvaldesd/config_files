@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# bluetooth-reset-2 -- reset de SEGUNDO nivel del bluetooth.
+#
+# bluetooth-reset recarga el modulo btusb. Eso alcanza para el cuelgue "clasico" de
+# suspend/resume, pero NO cuando el controlador quedo con el LE scan pegado y el
+# kernel reporta "Firmware already loaded": el modulo se desenlaza y se vuelve a
+# enlazar sin que el dispositivo USB se re-enumere, asi que el estado pegado vive en
+# el firmware y sobrevive al reload.
+#
+# La firma de ese caso (verificada 2026-08-19 en un ThinkPad con radio Intel):
+#
+#   - 'Discovering: yes' sin que ningun cliente pida scan,
+#   - 'scan off' falla con org.bluez.Error.Failed,
+#   - 'power off' la baja pero 'power on' la vuelve a subir al instante,
+#   - 'bluetooth-reset' no la limpia porque el firmware no se vuelve a bajar.
+#
+# Este script baja a la USB: desautoriza el dispositivo
+# ('echo 0 > .../authorized'), lo que fuerza un reset de silicio del radio, y el
+# bootloader de Intel vuelve a bajar el firmware al reautorizar. Es el mismo efecto
+# que un reboot, pero sin reboot.
+#
+# Igual que bluetooth-reset, corta todo el bluetooth unos segundos: si el teclado y
+# el mouse son bluetooth, durante ese rato hay que usar los del equipo.
+#
+#   bluetooth-reset-2            # reset de silicio por USB (pide sudo)
+#   bluetooth-reset-2 --check    # solo diagnostica, no toca nada
+
+set -e
+
+modo=completo
+case "${1:-}" in
+    --check|-n) modo=check ;;
+    "")         ;;
+    *)          echo "Uso: $(basename "$0") [--check]"; exit 1 ;;
+esac
+
+ok()   { printf '   \033[32m✔\033[0m %s\n' "$*"; }
+info() { printf '   \033[33m→\033[0m %s\n' "$*"; }
+mal()  { printf '   \033[31m✘\033[0m %s\n' "$*"; }
+
+activo() { systemctl is-active "$1" 2>/dev/null || true; }
+
+escaneando() { bluetoothctl show 2>/dev/null | grep -q 'Discovering: yes'; }
+
+# El dispositivo USB del controlador, tipo 3-10 para un radio en el puerto 10 de la
+# USB 3 (ThinkPad). Se deduce de /sys, no se hardcodea.
+usb_dev() {
+    local p
+    p=$(readlink -f /sys/class/bluetooth/hci0/device 2>/dev/null || true)
+    [ -n "$p" ] || return 1
+    # .../usb3/3-10/3-10:1.0  ->  3-10
+    echo "$p" | grep -oE '/usb[0-9]+/[0-9]+-[0-9.]+' | head -1 | sed 's#.*/##'
+}
+
+autorizado() {
+    local dev; dev="$(usb_dev)" || return 1
+    [ -f "/sys/bus/usb/devices/$dev/authorized" ]
+}
+
+# --- Diagnostico ---------------------------------------------------------------
+
+diagnosticar() {
+    printf '\n\033[1mEstado del bluetooth\033[0m\n'
+
+    local bt; bt="$(activo bluetooth.service)"
+    [ "$bt" = active ] && ok "bluetooth.service: $bt" || mal "bluetooth.service: $bt"
+
+    if [ -e /sys/class/bluetooth/hci0 ]; then
+        local dev; dev="$(usb_dev 2>/dev/null || true)"
+        if [ -n "$dev" ]; then
+            ok "controlador hci0 presente (radio USB: $dev)"
+        else
+            mal "controlador hci0 presente pero no es USB -- este script no aplica"
+            return 1
+        fi
+        if [ -f "/sys/bus/usb/devices/$dev/authorized" ]; then
+            ok "ruta de autorizacion USB presente (/sys/bus/usb/devices/$dev/authorized)"
+        else
+            mal "no existe /sys/bus/usb/devices/$dev/authorized"
+            return 1
+        fi
+    else
+        mal "no hay /sys/class/bluetooth/hci0 -- el controlador no existe para el kernel"
+        return 1
+    fi
+
+    if escaneando; then
+        mal "'Discovering: yes' -- firma del cuelgue si nadie pidio scan"
+    else
+        ok "no hay discovery colgado"
+    fi
+
+    return 0
+}
+
+if [ "$modo" = check ]; then
+    if diagnosticar; then
+        printf '\nModo --check: no se toco nada.\n'
+        printf 'Si el discovery esta colgado de verdad (bluetooth-reset no alcanzo),\n'
+        printf 'corre sin argumentos: fuerza el reset de silicio por USB.\n'
+    fi
+    exit 0
+fi
+
+# --- Hace falta root para tocar /sys ------------------------------------------
+
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo -- "$0" "$@"
+fi
+
+# --- Reset de silicio ----------------------------------------------------------
+
+# Desautorizar el dispositivo USB lo desconecta de verdad a nivel de puerto: el radio
+# se apaga y el bootloader de Intel baja el firmware de cero al reautorizarlo. Es lo
+# unico, aparte de reboot, que limpia un scan pegado que sobrevivio al reload.
+reset_usb() {
+    local dev; dev="$(usb_dev)"
+    info "desautorizando el radio USB $dev (reset de silicio; el bluetooth se corta unos segundos)"
+
+    systemctl stop bluetooth.service
+    echo 0 > "/sys/bus/usb/devices/$dev/authorized"
+    sleep 2
+    echo 1 > "/sys/bus/usb/devices/$dev/authorized"
+    # El firmware tarda un momento en dejarse cargar y en aparecer hci0; arrancar el
+    # daemon antes lo dejaria sin controlador.
+    sleep 4
+    rfkill unblock bluetooth 2>/dev/null || true
+    systemctl start bluetooth.service
+    sleep 2
+    ok "radio USB $dev reautorizado y firmware recargado"
+}
+
+printf '\n\033[1mReset de silicio del bluetooth (nivel 2)\033[0m\n'
+if ! autorizado; then
+    mal "el controlador no es un dispositivo USB (o falta la ruta de autorizacion)."
+    echo "   Este script aplica a radios Intel/btusb por USB. Para esos casos usa: bluetooth-reset"
+    exit 1
+fi
+reset_usb
+
+# --- Verificacion --------------------------------------------------------------
+
+diagnosticar || true
+
+if escaneando; then
+    printf '\n\033[1mEl discovery sigue colgado tras el reset de silicio.\033[0m\n'
+    echo "Ya no queda nada por hacer en software: reinicia (o suspende y despierta)."
+    echo "Revisa:  journalctl -k -b | grep -i bluetooth"
+    exit 1
+fi
+
+printf '\n\033[1mListo.\033[0m El scan quedo apagado: el discovery funciona normal.\n'

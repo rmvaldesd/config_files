@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# Revive el controlador bluetooth cuando queda colgado, tipicamente despues de un
+# suspend/resume.
+#
+#   bluetooth-reset            # reset completo (a mano, cuando el bluetooth esta muerto)
+#   bluetooth-reset --resume   # lo llama bluetooth-resume.service al despertar
+#   bluetooth-reset --check    # solo diagnostica, no toca nada
+#
+# POR QUE NO ALCANZA CON REINICIAR EL SERVICIO (diagnostico 2026-08-19, ThinkPad con
+# btusb/btintel + Hyprland):
+#
+#   Despues de un resume (s2idle) el journal muestra "Controller resume with wake event
+#   0x0" y todo PARECE sano: bluetooth.service active, 'Powered: yes', y el radio
+#   recibe de verdad (ve decenas de dispositivos con RSSI bueno). Pero ningun
+#   emparejado se reconecta y un 'connect' a mano resuelve el GATT y se cae al instante.
+#
+#   La firma real del cuelgue es 'Discovering: yes' PEGADO en on sin que ningun cliente
+#   haya pedido scan (no hay blueman ni applet corriendo, y 'scan off' no lo baja). Un
+#   scan permanentemente activo se come la reconexion de los perifericos LE.
+#
+#   Ese estado vive en el controlador/driver, DEBAJO del daemon. Por eso no lo arregla
+#   ni 'systemctl restart bluetooth.service' ni un power off/on por mgmt
+#   ('bluetoothctl power off; power on'): las dos cosas trabajan por encima. Ambas
+#   verificadas a mano ese dia, y las dos dejaron los 5 emparejados en Connected: no.
+#   Lo unico que limpia el estado es recargar el modulo, que vuelve a bajar el firmware.
+#
+# El reset por modulo CORTA todo el bluetooth por un par de segundos: si el teclado y
+# el mouse son bluetooth, durante ese rato hay que usar los del equipo.
+
+set -e
+
+modo=completo
+case "${1:-}" in
+    --resume)   modo=resume ;;
+    --check|-n) modo=check  ;;
+    "")         ;;
+    *)          echo "Uso: $(basename "$0") [--resume|--check]"; exit 1 ;;
+esac
+
+ok()   { printf '   \033[32m✔\033[0m %s\n' "$*"; }
+info() { printf '   \033[33m→\033[0m %s\n' "$*"; }
+mal()  { printf '   \033[31m✘\033[0m %s\n' "$*"; }
+
+# systemctl is-active devuelve != 0 cuando la respuesta es "inactive", que aca es una
+# respuesta valida y no un error. Con 'set -e' hay que envolverlo.
+activo() { systemctl is-active "$1" 2>/dev/null || true; }
+
+# 'Discovering: yes' sobre un daemon RECIEN arrancado es la firma del cuelgue: un
+# bluetoothd nuevo no inicia discovery por su cuenta, asi que si el controlador dice que
+# esta escaneando, el estado quedo pegado abajo.
+escaneando() { bluetoothctl show 2>/dev/null | grep -q 'Discovering: yes'; }
+
+# El driver USB del controlador. Se detecta en vez de hardcodear btusb porque el mismo
+# script tiene que servir en un equipo con otra radio.
+modulo_bt() {
+    local drv
+    drv=$(basename "$(readlink -f /sys/class/bluetooth/hci0/device/driver 2>/dev/null)" 2>/dev/null || true)
+    case "$drv" in
+        ""|.|/) echo btusb ;;
+        *)      echo "$drv" ;;
+    esac
+}
+
+# --- Diagnostico ---------------------------------------------------------------
+
+diagnosticar() {
+    printf '\n\033[1mEstado del bluetooth\033[0m\n'
+
+    local bt; bt="$(activo bluetooth.service)"
+    [ "$bt" = active ] && ok "bluetooth.service: $bt" || mal "bluetooth.service: $bt"
+
+    if [ -e /sys/class/bluetooth/hci0 ]; then
+        ok "controlador hci0 presente (driver: $(modulo_bt))"
+    else
+        mal "no hay /sys/class/bluetooth/hci0 -- el controlador no existe para el kernel"
+        return
+    fi
+
+    if rfkill list bluetooth 2>/dev/null | grep -q 'blocked: yes'; then
+        mal "rfkill esta bloqueando el bluetooth"
+    else
+        ok "rfkill sin bloqueos"
+    fi
+
+    if escaneando; then
+        mal "'Discovering: yes' -- firma del cuelgue si nadie pidio scan"
+    else
+        ok "no hay discovery colgado"
+    fi
+
+    # bluetoothctl colorea algunas lineas, y el escape va ANTES de "Device": sin
+    # limpiarlo el ^Device del grep no matchea y el conteo sale en 0 siempre.
+    local n
+    n=$(bluetoothctl devices Connected 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -c '^Device ' || true)
+    if [ "${n:-0}" -gt 0 ]; then
+        ok "$n dispositivo(s) conectado(s)"
+    else
+        info "ningun dispositivo conectado"
+    fi
+}
+
+if [ "$modo" = check ]; then
+    diagnosticar
+    printf '\nModo --check: no se toco nada.\n'
+    exit 0
+fi
+
+# --- Hace falta root para modprobe --------------------------------------------
+
+# Se re-ejecuta con sudo en vez de fallar, asi 'bluetooth-reset' a secas funciona desde
+# una terminal cualquiera. El --resume ya corre como root desde systemd y no entra aca.
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo -- "$0" "$@"
+fi
+
+# --- Reset ---------------------------------------------------------------------
+
+# Recarga el driver: es lo unico que limpia el estado pegado del controlador.
+reset_modulo() {
+    local mod; mod="$(modulo_bt)"
+    info "recargando el modulo $mod (el bluetooth se corta unos segundos)"
+
+    systemctl stop bluetooth.service
+    modprobe -r "$mod"
+    sleep 2
+    modprobe "$mod"
+    # El firmware se baja de nuevo al cargar el modulo y tarda un momento en dejar el
+    # hci0 usable; arrancar el daemon antes de eso lo deja sin controlador.
+    sleep 3
+    rfkill unblock bluetooth 2>/dev/null || true
+    systemctl start bluetooth.service
+    sleep 2
+    ok "modulo $mod recargado"
+}
+
+if [ "$modo" = resume ]; then
+    # Al despertar se prueba primero lo barato. Reiniciar el daemon es suficiente para
+    # los cuelgues que SI viven en userspace y evita rebajar el firmware en cada resume.
+    printf '\n\033[1mResume: revisando el bluetooth\033[0m\n'
+    systemctl restart bluetooth.service
+    sleep 3
+
+    if escaneando; then
+        mal "discovery colgado sobre un daemon nuevo -- el controlador quedo pegado"
+        reset_modulo
+    else
+        ok "el reinicio del daemon dejo el controlador sano"
+    fi
+else
+    # A mano se va directo al reset por modulo: si el usuario lo esta corriendo es
+    # porque ya vio el bluetooth muerto, y el camino barato es justo el que no sirve.
+    printf '\n\033[1mReset completo del bluetooth\033[0m\n'
+    reset_modulo
+fi
+
+# --- Verificacion --------------------------------------------------------------
+
+diagnosticar
+
+if escaneando; then
+    printf '\n\033[1mEl discovery sigue colgado.\033[0m Si nadie pidio scan, el reset no alcanzo.\n'
+    echo "Revisa:  journalctl -k -b | grep -i bluetooth"
+    exit 1
+fi
+
+printf '\n\033[1mListo.\033[0m Los emparejados encendidos deberian reconectarse en unos segundos.\n'
