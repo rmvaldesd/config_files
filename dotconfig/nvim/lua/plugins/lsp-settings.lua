@@ -18,6 +18,44 @@ return {
     vim.keymap.set("n", "<space>dn", vim.diagnostic.goto_next, opts("[Lsp] - diagnostics go next"))
     vim.keymap.set("n", "<space>dsl", vim.diagnostic.setloclist, opts("[Lsp] - diagnostics open float"))
 
+    -- ---------------------- Inlay hints (virtual text con tipos) ----------
+    -- Apagados por defecto: gopls y otros servers los generan y ensucian la
+    -- linea. `vim.g.inlay_hints_enabled` es el estado global; on_attach lo lee
+    -- para que los buffers nuevos respeten lo ultimo que elegiste.
+    vim.g.inlay_hints_enabled = false
+
+    local function inlay_hints_supported(bufnr)
+      for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+        if client:supports_method("textDocument/inlayHint") then
+          return true
+        end
+      end
+      return false
+    end
+
+    -- Aplica el estado global a todos los buffers con un LSP que soporte hints.
+    local function apply_inlay_hints(enabled)
+      vim.g.inlay_hints_enabled = enabled
+      for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(bufnr) and inlay_hints_supported(bufnr) then
+          pcall(vim.lsp.inlay_hint.enable, enabled, { bufnr = bufnr })
+        end
+      end
+    end
+
+    vim.api.nvim_create_user_command("InlayHintsToggle", function()
+      apply_inlay_hints(not vim.g.inlay_hints_enabled)
+      vim.notify("Inlay hints " .. (vim.g.inlay_hints_enabled and "ON" or "OFF"))
+    end, { desc = "Toggle LSP inlay hints (todos los buffers)" })
+
+    vim.api.nvim_create_user_command("InlayHintsEnable", function()
+      apply_inlay_hints(true)
+    end, { desc = "Enable LSP inlay hints" })
+
+    vim.api.nvim_create_user_command("InlayHintsDisable", function()
+      apply_inlay_hints(false)
+    end, { desc = "Disable LSP inlay hints" })
+
     local on_attach = function(client, bufnr)
       vim.api.nvim_buf_set_option(bufnr, "omnifunc", "v:lua.vim.lsp.omnifunc")
 
@@ -32,9 +70,8 @@ return {
       vim.keymap.set("n", "gi", vim.lsp.buf.implementation, bufopts(bufnr, "[Lsp] - [g]o to [i]mplementation"))
       vim.keymap.set("n", "gs", vim.lsp.buf.signature_help, bufopts(bufnr, "[Lsp] - [g]o [s]ignature help"))
       vim.keymap.set("n", "gr", vim.lsp.buf.references, bufopts(bufnr, "[Lsp] - [g]o to [r]eferences"))
-      vim.keymap.set("n", "<space>th", function()
-        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = bufnr }), { bufnr = bufnr })
-      end, bufopts(bufnr, "[Lsp] - [t]oggle inlay [h]ints"))
+      vim.keymap.set("n", "<space>th", "<cmd>InlayHintsToggle<CR>",
+        bufopts(bufnr, "[Lsp] - [t]oggle inlay [h]ints"))
       vim.keymap.set(
         "n",
         "<space>wa",
@@ -58,9 +95,9 @@ return {
         vim.lsp.buf.format({ async = true })
       end, bufopts(bufnr, "[Lsp] - [f]ormat document"))
 
-      -- Turn inlay hints on by default when the server provides them.
+      -- Respetar el estado global (por defecto OFF). Toggle: :InlayHintsToggle
       if client:supports_method("textDocument/inlayHint") then
-        vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
+        vim.lsp.inlay_hint.enable(vim.g.inlay_hints_enabled, { bufnr = bufnr })
       end
     end
 
