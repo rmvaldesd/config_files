@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+# gpumemwatch — registra memoria / GPU / térmica para comparar drivers i915 vs xe.
+# Uso: gpumemwatch sample | report | install | uninstall | status | mark <nota>
+set -uo pipefail
+
+DATA_DIR="${GPUMEMWATCH_DIR:-$HOME/.local/share/gpumemwatch}"
+CSV="$DATA_DIR/metrics.csv"
+NOTES="$DATA_DIR/notes.log"
+UNIT_DIR="$HOME/.config/systemd/user"
+INTERVAL="${GPUMEMWATCH_INTERVAL:-5min}"
+
+HDR="ts_epoch,ts_iso,driver,kernel,boot_id,uptime_s,mem_total_kb,mem_avail_kb,mem_free_kb,cached_kb,shmem_kb,slab_kb,sreclaim_kb,sunreclaim_kb,kstack_kb,pagetables_kb,vmalloc_kb,unevict_kb,swap_used_kb,drm_total_kb,drm_resident_kb,drm_procs,tlb_timeouts,gpu_errors,temp_pkg_c,temp_cpu_c,fan_rpm,load1,top_rss_kb,top_comm"
+
+# ---------- descubrimiento de sensores (una vez por ejecución) ----------
+find_hwmon() { # $1 = name buscado -> imprime ruta
+  local h n
+  for h in /sys/class/hwmon/hwmon*; do
+    n=$(cat "$h/name" 2>/dev/null) || continue
+    [ "$n" = "$1" ] && { echo "$h"; return 0; }
+  done
+  return 1
+}
+
+temp_pkg() { # Package id 0 desde coretemp
+  local h f lbl
+  h=$(find_hwmon coretemp) || { echo ""; return; }
+  for f in "$h"/temp*_label; do
+    lbl=$(cat "$f" 2>/dev/null)
+    if [ "$lbl" = "Package id 0" ]; then
+      awk '{printf "%.1f", $1/1000}' "${f%_label}_input" 2>/dev/null; return
+    fi
+  done
+  echo ""
+}
+
+temp_cpu() { # sensor CPU del ThinkPad, con fallback a acpitz
+  local h
+  h=$(find_hwmon thinkpad) || h=$(find_hwmon acpitz_0) || { echo ""; return; }
+  awk '{printf "%.1f", $1/1000}' "$h/temp1_input" 2>/dev/null || echo ""
+}
+
+fan_rpm() { # primer fan con lectura > 0
+  local h f v
+  for h in $(find_hwmon thinkpad) $(find_hwmon acpi_fan) /sys/class/hwmon/hwmon*; do
+    [ -d "$h" ] || continue
+    for f in "$h"/fan*_input; do
+      v=$(cat "$f" 2>/dev/null) || continue
+      [[ "$v" =~ ^[0-9]+$ ]] && [ "$v" -gt 0 ] && { echo "$v"; return; }
+    done
+  done
+  echo 0
+}
+
+gpu_driver() {
+  local d
+  d=$(readlink -f /sys/class/drm/card0/device/driver 2>/dev/null) && basename "$d" && return
+  lspci -nnk -s 00:02.0 2>/dev/null | awk -F': ' '/Kernel driver in use/{print $2}' || echo unknown
+}
+
+# ---------- memoria DRM agregada vía fdinfo ----------
+# Nota: buffers compartidos entre procesos pueden contarse más de una vez.
+# Sirve como indicador de tendencia relativa, no como cifra absoluta exacta.
+drm_mem() {
+  local pid
+  for pid in $(ls /proc 2>/dev/null | grep -E '^[0-9]+$'); do
+    [ -r "/proc/$pid/fdinfo" ] || continue
+    grep -hsE '^drm-(driver|total-|resident-)' "/proc/$pid/fdinfo"/* 2>/dev/null \
+      | sed "s/^/$pid /"
+  done | awk '
+    # campos tipo: "<pid> drm-total-system:\t1234 KiB"  (o B/MiB/GiB)
+    /drm-driver/ { seen[$1]=1; next }
+    {
+      key=$2; val=$3; unit=$4
+      m = (unit ~ /MiB/) ? 1024 : (unit ~ /GiB/) ? 1048576 : (unit ~ /KiB/) ? 1 : 1/1024
+      if (val ~ /^[0-9]+$/) {
+        if (key ~ /^drm-total-/    && key !~ /cycles|engine/) tot += val*m
+        if (key ~ /^drm-resident-/ && key !~ /cycles|engine/) res += val*m
+      }
+    }
+    END { printf "%d %d %d", tot+0, res+0, length(seen) }'
+}
+
+# ---------- contadores de error del kernel en el boot actual ----------
+kernel_counts() {
+  local tlb err
+  tlb=$(journalctl -k -b 0 -g "TLB invalidation fence timeout" -o cat 2>/dev/null | wc -l)
+  err=$(journalctl -k -b 0 -o cat 2>/dev/null | grep -cE '(xe|i915) 0000:00:02\.0.*\*ERROR\*')
+  echo "${tlb:-0} ${err:-0}"
+}
+
+# ---------- muestra ----------
+cmd_sample() {
+  mkdir -p "$DATA_DIR"
+  [ -s "$CSV" ] || echo "$HDR" > "$CSV"
+
+  local mt mf ma ca sh sl sr su ks pt vm un st sf swu
+  while IFS=: read -r k v; do
+    v=${v% kB}; v=${v//[[:space:]]/}
+    case "$k" in
+      MemTotal) mt=$v ;; MemFree) mf=$v ;; MemAvailable) ma=$v ;;
+      Cached) ca=$v ;; Shmem) sh=$v ;; Slab) sl=$v ;;
+      SReclaimable) sr=$v ;; SUnreclaim) su=$v ;; KernelStack) ks=$v ;;
+      PageTables) pt=$v ;; VmallocUsed) vm=$v ;; Unevictable) un=$v ;;
+      SwapTotal) st=$v ;; SwapFree) sf=$v ;;
+    esac
+  done < /proc/meminfo
+  swu=$(( ${st:-0} - ${sf:-0} ))
+
+  read -r dt dr dp < <(drm_mem)
+  read -r tlb gerr < <(kernel_counts)
+
+  local up load1 boot top_rss top_comm
+  up=$(awk '{printf "%d", $1}' /proc/uptime)
+  load1=$(awk '{print $1}' /proc/loadavg)
+  boot=$(cut -c1-8 /proc/sys/kernel/random/boot_id 2>/dev/null)
+  read -r top_rss top_comm < <(ps -eo rss=,comm= --sort=-rss 2>/dev/null | head -1)
+
+  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+    "$(date +%s)" "$(date -Iseconds)" "$(gpu_driver)" "$(uname -r)" "${boot:-?}" "$up" \
+    "${mt:-0}" "${ma:-0}" "${mf:-0}" "${ca:-0}" "${sh:-0}" "${sl:-0}" "${sr:-0}" "${su:-0}" \
+    "${ks:-0}" "${pt:-0}" "${vm:-0}" "${un:-0}" "$swu" \
+    "${dt:-0}" "${dr:-0}" "${dp:-0}" "$tlb" "$gerr" \
+    "$(temp_pkg)" "$(temp_cpu)" "$(fan_rpm)" "$load1" \
+    "${top_rss:-0}" "${top_comm:-?}" >> "$CSV"
+}
+
+cmd_mark() {
+  mkdir -p "$DATA_DIR"
+  printf '%s  %s\n' "$(date -Iseconds)" "$*" >> "$NOTES"
+  echo "anotado en $NOTES"
+}
+
+# ---------- reporte ----------
+cmd_report() {
+  [ -s "$CSV" ] || { echo "Sin datos aún: $CSV no existe. Corre 'gpumemwatch install'."; return 1; }
+  local n; n=$(( $(wc -l < "$CSV") - 1 ))
+  [ "$n" -lt 2 ] && { echo "Solo $n muestra(s). Se necesitan al menos 2."; return 1; }
+
+  awk -F, -v OFS='' '
+    function slope(n,sx,sy,sxy,sxx,   den) {   # pendiente/hora; den es local
+      den = n*sxx - sx*sx
+      return (den == 0) ? 0 : (n*sxy - sx*sy) / den
+    }
+    function mb(kb) { return kb/1024 }
+    function acc(d, t, y, pfx) {   # acumula sumas para un campo
+      N[d pfx]++; SX[d pfx]+=t; SY[d pfx]+=y; SXY[d pfx]+=t*y; SXX[d pfx]+=t*t
+    }
+    NR==1 { next }
+    {
+      drv=$3; ts=$1
+      if (!(drv in first) || ts < first[drv]) first[drv]=ts
+      if (!(drv in last)  || ts > last[drv])  last[drv]=ts
+      cnt[drv]++
+      kern[drv]=$4
+
+      t = ts/3600.0
+      acc(drv,t,mb($8),":avail");  acc(drv,t,mb($11),":shmem")
+      acc(drv,t,mb($14),":sunrec"); acc(drv,t,mb($20),":drmtot")
+      acc(drv,t,mb($19),":swap")
+
+      # valores primero/último por driver
+      if (ts==first[drv]) { f_avail[drv]=mb($8); f_shmem[drv]=mb($11); f_sunrec[drv]=mb($14); f_drm[drv]=mb($20) }
+      if (ts==last[drv])  { l_avail[drv]=mb($8); l_shmem[drv]=mb($11); l_sunrec[drv]=mb($14); l_drm[drv]=mb($20) }
+
+      # TLB acumulado por (driver,boot): guardamos min y max
+      bk=drv SUBSEP $5
+      if (!(bk in bmin) || $23 < bmin[bk]) bmin[bk]=$23
+      if (!(bk in bmax) || $23 > bmax[bk]) bmax[bk]=$23
+      if (!(bk in emin) || $24 < emin[bk]) emin[bk]=$24
+      if (!(bk in emax) || $24 > emax[bk]) emax[bk]=$24
+      bdrv[bk]=drv
+      if ($25+0 > maxtemp[drv]) maxtemp[drv]=$25+0
+      if ($27+0 > maxfan[drv])  maxfan[drv]=$27+0
+      sumtemp[drv]+=$25; sumload[drv]+=$28
+    }
+    END {
+      for (bk in bdrv) { d=bdrv[bk]; tlb[d]+=bmax[bk]-bmin[bk]; gerr[d]+=emax[bk]-emin[bk]; boots[d]++ }
+
+      printf "\n=== gpumemwatch: comparación por driver ===\n"
+      for (d in cnt) {
+        hrs = (last[d]-first[d])/3600.0
+        printf "\n──────── driver: %s  (kernel %s) ────────\n", d, kern[d]
+        printf "  muestras: %d   ventana: %.1f h   arranques: %d\n", cnt[d], hrs, boots[d]
+        printf "  %-22s %10s %10s %12s\n", "métrica", "inicio", "final", "tendencia"
+        printf "  %-22s %10.0f %10.0f %+11.1f MB/h\n", "MemAvailable (MB)", f_avail[d], l_avail[d], slope(N[d":avail"],SX[d":avail"],SY[d":avail"],SXY[d":avail"],SXX[d":avail"])
+        printf "  %-22s %10.0f %10.0f %+11.1f MB/h\n", "Shmem (MB) [GEM]", f_shmem[d], l_shmem[d], slope(N[d":shmem"],SX[d":shmem"],SY[d":shmem"],SXY[d":shmem"],SXX[d":shmem"])
+        printf "  %-22s %10.0f %10.0f %+11.1f MB/h\n", "SUnreclaim (MB)", f_sunrec[d], l_sunrec[d], slope(N[d":sunrec"],SX[d":sunrec"],SY[d":sunrec"],SXY[d":sunrec"],SXX[d":sunrec"])
+        printf "  %-22s %10.0f %10.0f %+11.1f MB/h\n", "DRM total (MB)", f_drm[d], l_drm[d], slope(N[d":drmtot"],SX[d":drmtot"],SY[d":drmtot"],SXY[d":drmtot"],SXX[d":drmtot"])
+        printf "  %-22s %10s %10s %+11.1f MB/h\n", "Swap usado (MB)", "-", "-", slope(N[d":swap"],SX[d":swap"],SY[d":swap"],SXY[d":swap"],SXX[d":swap"])
+        printf "  errores GPU: %d TLB timeouts, %d *ERROR* totales", tlb[d], gerr[d]
+        if (hrs > 0.5) printf "   (%.2f TLB/h)", tlb[d]/hrs
+        printf "\n"
+        printf "  térmica: pico %.0f°C paquete, pico %.0f RPM, temp media %.0f°C, load media %.2f\n", maxtemp[d], maxfan[d], sumtemp[d]/cnt[d], sumload[d]/cnt[d]
+      }
+      printf "\nLectura: una fuga se ve como Shmem, SUnreclaim o DRM total subiendo\n"
+      printf "de forma sostenida (tendencia claramente positiva) mientras MemAvailable baja.\n"
+      printf "MemAvailable por sí solo es ruidoso: lo mueve el caché y las apps abiertas.\n"
+      printf "DRM total suma buffers compartidos más de una vez: úsalo como tendencia, no como cifra absoluta.\n\n"
+    }' "$CSV"
+
+  if [ -s "$NOTES" ]; then
+    echo "=== notas ==="; cat "$NOTES"; echo
+  fi
+}
+
+# ---------- instalación del timer de usuario ----------
+cmd_install() {
+  mkdir -p "$UNIT_DIR" "$DATA_DIR"
+  cat > "$UNIT_DIR/gpumemwatch.service" <<EOF
+[Unit]
+Description=Muestra métricas de memoria/GPU/térmica (gpumemwatch)
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/gpumemwatch sample
+Nice=10
+IOSchedulingClass=idle
+EOF
+  cat > "$UNIT_DIR/gpumemwatch.timer" <<EOF
+[Unit]
+Description=Muestreo periódico de gpumemwatch
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=$INTERVAL
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+  systemctl --user daemon-reload
+  systemctl --user enable --now gpumemwatch.timer
+  "$0" sample
+  echo
+  echo "Instalado. Muestreo cada $INTERVAL."
+  echo "  datos:   $CSV"
+  echo "  reporte: gpumemwatch report"
+  echo
+  echo "Para que siga corriendo aunque cierres sesión:  sudo loginctl enable-linger $USER"
+}
+
+cmd_uninstall() {
+  systemctl --user disable --now gpumemwatch.timer 2>/dev/null
+  rm -f "$UNIT_DIR/gpumemwatch.service" "$UNIT_DIR/gpumemwatch.timer"
+  systemctl --user daemon-reload
+  echo "Timer desinstalado. Los datos se conservan en $DATA_DIR"
+}
+
+cmd_status() {
+  systemctl --user status gpumemwatch.timer --no-pager 2>/dev/null | head -12
+  echo
+  if [ -s "$CSV" ]; then
+    echo "muestras: $(( $(wc -l < "$CSV") - 1 ))   driver actual: $(gpu_driver)"
+    echo "última:"; tail -1 "$CSV" | tr ',' '\n' | paste -d'=' <(echo "$HDR" | tr ',' '\n') - | column -t -s'='
+  else
+    echo "aún sin datos"
+  fi
+}
+
+case "${1:-}" in
+  sample)    cmd_sample ;;
+  report)    cmd_report ;;
+  install)   cmd_install ;;
+  uninstall) cmd_uninstall ;;
+  status)    cmd_status ;;
+  mark)      shift; cmd_mark "$@" ;;
+  *) cat <<EOF
+gpumemwatch — compara i915 vs xe con datos reales
+
+  gpumemwatch install       instala el timer de usuario (cada $INTERVAL)
+  gpumemwatch sample        toma una muestra ahora
+  gpumemwatch report        compara los datos por driver
+  gpumemwatch status        estado del timer y última muestra
+  gpumemwatch mark <nota>   deja una nota con fecha (ej: "cambié a i915")
+  gpumemwatch uninstall     quita el timer (conserva los datos)
+
+Datos: $CSV
+EOF
+     [ -n "${1:-}" ] && exit 1 || exit 0 ;;
+esac

@@ -115,6 +115,9 @@ paquetes_sistema=(
     mesa               # Controladores de código abierto para aceleración gráfica 3D (Intel/AMD).
     intel-media-driver # Driver VA-API para GPUs Intel modernas (Broadwell en adelante); habilita la aceleración por hardware de video (decodificación/codificación) para mpv, Firefox, etc.
     libva-utils        # Herramientas de diagnóstico de VA-API (vainfo) para verificar que la aceleración de video por hardware esté activa.
+    pciutils           # Trae 'lspci'. Imprescindible para saber QUÉ driver reclamó realmente la iGPU: 'lspci -nnk -s 00:02.0' muestra el "Kernel driver in use" (i915 vs xe). En Meteor Lake ambos módulos reclaman el device y no se puede asumir cuál ganó.
+    intel-gpu-tools    # Trae 'intel_gpu_top' y utilidades de diagnóstico de la iGPU. Es la herramienta para ver ocupación de los engines (render/blitter/video) y correlacionar pegones del escritorio con carga real de GPU.
+    fwupd              # Actualizador de firmware desde Linux ('fwupdmgr get-updates' / 'update'). En este ThinkPad importa de verdad: varios bugs de la iGPU Meteor Lake (los 'TLB invalidation fence timeout' del driver xe que congelan la pantalla ~1s) se mitigan con PCODE nuevo que llega por BIOS, y esto evita tener que bootear a Windows para actualizarlo.
     networkmanager     # Demonio encargado de gestionar las conexiones a internet (Ethernet y Wi-Fi).
     bluez              # Pila oficial del protocolo Bluetooth en Linux.
     bluez-utils        # Herramientas de línea de comandos para emparejar y gestionar dispositivos Bluetooth.
@@ -276,6 +279,7 @@ sudo systemctl enable ly@tty1.service                     # Pantalla de login TU
 sudo systemctl enable --now fstrim.timer             # TRIM semanal del SSD; mantiene el rendimiento del disco a largo plazo.
 sudo systemctl enable --now ufw.service              # Arranca el firewall en cada boot.
 sudo systemctl enable --now power-profiles-daemon.service  # Demonio de perfiles de energía. Sin 'enable' explícito sólo se activaría por D-Bus bajo demanda y no estaría listo al bootear.
+sudo systemctl enable --now fwupd-refresh.timer       # Baja periódicamente los metadatos de LVFS. Se habilita el .timer y NO fwupd.service a propósito: el demonio se levanta por D-Bus cuando corres 'fwupdmgr'. Sin este timer, 'fwupdmgr get-updates' no ve nada hasta que hagas un 'fwupdmgr refresh' a mano.
 
 # --- Impresión (avahi descubre la impresora en la red, cups la gestiona) ---
 # systemd-resolved TAMBIÉN implementa mDNS y por defecto lo trae activado. Con los dos
@@ -574,6 +578,9 @@ bash "$HOME/config_files/scripts/install-fonts.sh"
 #   hypridle-profile  cambia entre los perfiles de bloqueo home/office. El symlink del
 #                 perfil activo lo dejó unas líneas más arriba esta misma sección, así
 #                 que al terminar el instalador los perfiles quedan andando solos.
+#   gpumemwatch   muestrea memoria/errores/térmica de la GPU para comparar i915 vs xe.
+#                 Acá sólo se enlaza; el timer de usuario que lo corre cada 5 min lo
+#                 levanta la sección 15, que necesita este symlink ya creado.
 #
 # Va como script aparte y en un loop, y no como cinco 'ln' acá, para que sumar un
 # ejecutable a bin_configs/ no requiera acordarse de tocar este archivo. El script
@@ -721,6 +728,74 @@ else
     echo "AVISO: falló la instalación de gopls. Reintenta luego con: go install golang.org/x/tools/gopls@latest"
 fi
 
+# ==========================================
+# 15. DRIVER DE LA iGPU, MONITOREO Y FIRMWARE
+# ==========================================
+# Va al final porque el archivo de cmdline viene del repo clonado en la sección 8, y
+# porque 'gpumemwatch' necesita el symlink que crea la sección 9.
+echo "-> Fijando el driver de la iGPU y el monitoreo de GPU..."
+
+# --- Driver de la iGPU -------------------------------------------------------
+# Se COPIA y no se enlaza, por el mismo motivo que power-profile-sync en la sección 10:
+# esto lo lee mkinitcpio corriendo como root al generar la UKI, y no debe depender de
+# que /home (subvolumen btrfs @home) esté montado ni vivir en una ruta escribible por
+# el usuario. Consecuencia: si editás el archivo en el repo, hay que volver a correr
+# esta sección para que el sistema lo tome.
+#
+# El archivo trae la explicación completa adentro, incluido el detalle de que para
+# volver a i915 hay que INVERTIR las banderas y no borrarlo.
+sudo install -Dm644 "$HOME/config_files/etc/cmdline.d/xe-graphics.conf" \
+    /etc/cmdline.d/xe-graphics.conf
+
+# La UKI lleva el cmdline embebido, así que el archivo de arriba no tiene ningún efecto
+# hasta regenerarla. Sin esto el driver recién queda fijado tras la próxima actualización
+# de kernel, que es justo el tipo de sorpresa diferida que conviene evitar.
+#
+# El error se tolera a propósito: 'mkinitcpio -P' puede fallar por /boot con poco espacio
+# o por un preset ajeno, y con set -e eso abortaría una instalación ya completa. El
+# sistema arranca igual con la UKI vieja; sólo no queda fijado el driver.
+echo "-> Regenerando la UKI para embeber el cmdline nuevo..."
+if sudo mkinitcpio -P; then
+    echo "-> UKI regenerada. El driver queda fijado en el próximo boot."
+else
+    echo "AVISO: falló 'mkinitcpio -P'. El sistema arranca con la UKI anterior."
+    echo "       Reintenta luego con: sudo mkinitcpio -P"
+fi
+
+# --- Monitoreo de la GPU -----------------------------------------------------
+# 'gpumemwatch' ya quedó enlazado en /usr/local/bin por la sección 9 (vive en
+# bin_configs/). Acá sólo se levanta su timer de usuario, que muestrea cada 5 min a
+# ~/.local/share/gpumemwatch/metrics.csv. Es lo que alimenta 'gpumemwatch report',
+# el comando con el que se compara i915 contra xe antes de tocar el driver.
+#
+# El linger es imprescindible y es fácil de olvidar: sin él systemd mata las units de
+# usuario al cerrar sesión, así que el timer dejaría huecos en la serie justo cuando la
+# máquina está sin sesión abierta.
+sudo loginctl enable-linger "$USER"
+
+# Error tolerado: si el timer no arranca, se pierden métricas pero no la instalación.
+if command -v gpumemwatch > /dev/null && gpumemwatch install; then
+    echo "-> Timer de gpumemwatch activo. Ver estado con: gpumemwatch status"
+else
+    echo "AVISO: no se pudo activar el timer de gpumemwatch."
+    echo "       Reintenta luego con: gpumemwatch install"
+fi
+
+# --- Firmware / BIOS ---------------------------------------------------------
+# Sólo INFORMA, no flashea. Actualizar la BIOS a mitad de una instalación desatendida
+# puede pedir reboot en el peor momento y es difícil de revertir, así que la decisión
+# queda para vos. Importa acá porque varios bugs de la iGPU Meteor Lake se mitigan con
+# PCODE nuevo, que llega justamente por BIOS.
+#
+# El 'refresh' va explícito además del fwupd-refresh.timer de la sección 7: el timer
+# recién dispara más tarde, y sin metadatos 'get-updates' no reporta nada.
+echo "-> Buscando actualizaciones de firmware (sólo informa, no las aplica)..."
+if sudo fwupdmgr refresh --force > /dev/null 2>&1 && sudo fwupdmgr get-updates; then
+    echo "-> Hay firmware pendiente. Aplicalo cuando quieras con: sudo fwupdmgr update"
+else
+    echo "-> Sin actualizaciones de firmware pendientes (o sin red / equipo no soportado)."
+fi
+
 echo "---"
 echo "=== ¡Instalación completada con éxito! ==="
 echo "Tu sistema cuenta con yay instalado y listo para usar."
@@ -822,7 +897,44 @@ exit 0
 # bin_configs/power-profile-sync y volvé a correr la sección 10.
 #
 # ------------------------------------------------------------------------------
-# 9. IMPRESIÓN WIFI (paquetes en la sección 5, servicios en la sección 7)
+# 9. DRIVER DE LA iGPU: i915 vs xe (configurado en la sección 15)
+# ------------------------------------------------------------------------------
+# La iGPU es una Intel Meteor Lake-P (8086:7d45). Dos drivers del kernel la soportan,
+# i915 (el viejo) y xe (el nuevo), y en kernel 7.x LOS DOS reclaman el device: xe gana
+# por defecto. /etc/cmdline.d/xe-graphics.conf fija esa elección explícitamente para que
+# una actualización de kernel no la invierta en silencio.
+#
+# LA TRAMPA: para volver a i915 hay que INVERTIR las banderas del archivo, NO borrarlo.
+# Si lo borrás, xe sigue ganando por default y el cambio no hace nada:
+#
+#   xe.force_probe=!7d45 i915.force_probe=7d45     # y después: sudo mkinitcpio -P
+#
+# Acordate de que la UKI lleva el cmdline embebido: sin 'mkinitcpio -P' editar el
+# archivo no tiene ningún efecto. Y verificá el resultado en vez de asumirlo:
+#
+#   cat /proc/cmdline
+#   lspci -nnk -s 00:02.0        # la línea "Kernel driver in use" es la que manda
+#
+# EL BUG CONOCIDO de xe acá son los 'TLB invalidation fence timeout' que pegan la
+# pantalla ~1 segundo (visibles con 'journalctl -k | grep TLB'). El driver le pide al
+# GuC invalidar la TLB, el GuC no contesta, y a los HZ/4 = 250ms + latencia de la cola
+# CTB el driver firma la fence con -ETIME y libera al compositor. NO hay reset de GPU:
+# por eso no hay corrupción ni se cae la sesión. Frecuencia medida: ~0.23/hora.
+#
+# NO es obvio que i915 sea mejor: la variante del mismo bug en i915 es PEOR (cuelgue
+# duro tras resume de s2idle, pantalla negra con el kernel vivo). Upstream no lo arregló;
+# los parches viven en el árbol de Intel. Antes de cambiar el driver, mirá los datos:
+#
+#   gpumemwatch report           # compara las eras de cada driver (memoria, errores, térmica)
+#   intel_gpu_top                # ocupación de los engines, para correlacionar pegones
+#
+# Otra vía de mitigación es firmware: parte de estos bugs se arreglan con PCODE nuevo
+# que llega por BIOS. La sección 15 avisa si hay algo pendiente; aplicarlo es manual:
+#
+#   sudo fwupdmgr refresh && sudo fwupdmgr update
+#
+# ------------------------------------------------------------------------------
+# 10. IMPRESIÓN WIFI (paquetes en la sección 5, servicios en la sección 7)
 # ------------------------------------------------------------------------------
 # Para añadir la impresora: ejecutá 'system-config-printer' y entrá en "Añadir".
 # Debería aparecer sola bajo "Impresoras de red". La otra vía es http://localhost:631.
