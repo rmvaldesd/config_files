@@ -193,10 +193,20 @@ hl.config({
 
 		-- Change transparency of focused and unfocused windows
 		active_opacity = 1.0,
-		inactive_opacity = 0.9, -- rango válido 0.0-1.0 (el 20.0 anterior se truncaba a 1.0 y no tenía efecto)
+		-- inactive_opacity ANTES estaba en 0.9 (rango válido 0.0-1.0; el 20.0 previo se
+		-- truncaba a 1.0 y no tenía efecto). Se subió a 1.0 porque en esta máquina era
+		-- la causa principal del lag al cambiar de workspace: el blur de Hyprland se
+		-- aplica DETRÁS de las ventanas que tienen transparencia, así que con 0.9 TODAS
+		-- las ventanas menos la enfocada eran candidatas a blur y el costo escalaba con
+		-- la cantidad de ventanas abiertas. Con 1.0 el costo del blur pasa a ser fijo.
+		-- Si querés recuperar el efecto, el precio es ese lag; no hay punto medio barato.
+		inactive_opacity = 1.0,
 
+		-- Sombras apagadas: cuestan fill rate en el borde de cada ventana, y en la iGPU
+		-- Arc del Ultra 7 165U a 1920x1200@60 con scale 1.5 no hay margen de frame que
+		-- regalar. Es la concesión estética más barata de revertir (enabled = true).
 		shadow = {
-			enabled = true,
+			enabled = false,
 			range = 4,
 			render_power = 3,
 			color = 0xee1a1a1a,
@@ -204,9 +214,14 @@ hl.config({
 
 		blur = {
 			enabled = true,
-			size = 3,
+			size = 2, -- era 3
 			passes = 1,
 			vibrancy = 0.1696,
+			-- xray: bluerea el snapshot del fondo en vez del contenido vivo que hay
+			-- detrás, o sea que no se recalcula cuando esa ventana de atrás se redibuja.
+			new_optimizations = true,
+			xray = true,
+			popups = false,
 		},
 	},
 
@@ -238,9 +253,16 @@ hl.animation({ leaf = "layersIn", enabled = true, speed = 4, bezier = "easeOutQu
 hl.animation({ leaf = "layersOut", enabled = true, speed = 1.5, bezier = "linear", style = "fade" })
 hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 1.79, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 1.39, bezier = "almostLinear" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 1.94, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesIn", enabled = true, speed = 1.21, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesOut", enabled = true, speed = 1.94, bezier = "almostLinear", style = "fade" })
+-- Los tres 'workspaces*' bajaron de speed 1.94/1.21/1.94 a 1.0. El 'speed' de
+-- Hyprland es la DURACIÓN en décimas de segundo, o sea que 1.94 eran ~190 ms.
+-- Mientras corre la animación Hyprland renderiza los DOS workspaces a la vez (el
+-- que sale y el que entra), cada uno con su blur y su alpha blending; si cambiás
+-- de workspace más rápido que la animación, nunca salís de ese estado caro y
+-- además cada animación interrumpida se reinicia. Con 1.0 son ~100 ms.
+-- Si aún así se siente pesado al cambiar rápido: enabled = false en los tres.
+hl.animation({ leaf = "workspaces", enabled = true, speed = 1.0, bezier = "almostLinear", style = "fade" })
+hl.animation({ leaf = "workspacesIn", enabled = true, speed = 1.0, bezier = "almostLinear", style = "fade" })
+hl.animation({ leaf = "workspacesOut", enabled = true, speed = 1.0, bezier = "almostLinear", style = "fade" })
 hl.animation({ leaf = "zoomFactor", enabled = true, speed = 7, bezier = "quick" })
 
 -- Ref https://wiki.hypr.land/Configuring/Basics/Workspace-Rules/
@@ -282,6 +304,25 @@ hl.config({
 	},
 })
 
+-----------------
+----  DEBUG  ----
+-----------------
+
+-- overlay = true dibuja el HUD de frametimes de Hyprland (tiempo de render por
+-- monitor). Está activado A PROPÓSITO y de forma TEMPORAL, para medir el efecto
+-- de los ajustes de blur/sombras/animaciones de este archivo en vez de adivinar:
+-- cambiá de workspace rápido y mirá si el frametime pasa de 16 ms (60 Hz => 16.6
+-- ms de presupuesto). Complemento: 'sudo intel_gpu_top' para frecuencia real.
+-- Si el overlay se queda DEBAJO de 16 ms y aún así ves tirones, el problema no
+-- es el compositor sino el driver: ahí mirá 'gpumemwatch report' y los TLB
+-- invalidation fence timeout de xe (ver etc/cmdline.d).
+-- ACORDATE DE APAGARLO cuando termines de medir.
+hl.config({
+	debug = {
+		overlay = true,
+	},
+})
+
 ----------------
 ----  MISC  ----
 ----------------
@@ -290,6 +331,12 @@ hl.config({
 	misc = {
 		force_default_wallpaper = -1, -- Set to 0 or 1 to disable the anime mascot wallpapers
 		disable_hyprland_logo = false, -- If true disables the random hyprland logo / anime girl background. :(
+
+		-- Redibujar en cada paso intermedio de un resize o de un drag con mouse es
+		-- trabajo por frame que no aporta nada: la ventana igual termina donde la
+		-- soltás. Apagarlas no cambia el resultado, solo saca frames del camino.
+		animate_manual_resizes = false,
+		animate_mouse_windowdragging = false,
 	},
 })
 
