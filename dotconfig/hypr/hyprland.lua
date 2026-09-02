@@ -188,7 +188,10 @@ hl.config({
 	},
 
 	decoration = {
-		rounding = 2,
+		-- rounding = 0 para alinear con el default de Omarchy. Con 0, rounding_power
+		-- queda inerte (no hay esquina que curvar); se deja por si volvés a subir
+		-- rounding. Esto es estetico, no de rendimiento.
+		rounding = 0,
 		rounding_power = 2,
 
 		-- Change transparency of focused and unfocused windows
@@ -212,12 +215,24 @@ hl.config({
 			color = 0xee1a1a1a,
 		},
 
+		-- Blur APAGADO, igual que el default de Omarchy 4 (branch 'quattro').
+		--
+		-- No costaba nada ya: el blur de Hyprland solo trabaja donde hay algo
+		-- TRANSLUCIDO detras de lo cual blurear, y en este escritorio no queda nada
+		-- translucido -- inactive_opacity esta en 1.0, foot no define 'alpha' y los
+		-- colores de waybar estan todos en alpha 1. Estaba prendido sin efecto.
+		-- Se apaga para no dejar una opcion muerta que aparente hacer algo.
+		--
+		-- Los parametros de abajo quedan inertes con enabled = false; se conservan
+		-- para que volver a prenderlo sea cambiar una sola linea. OJO si lo prendes:
+		-- vuelve a costar recien cuando algo se vuelva translucido (p.ej. ponerle
+		-- 'alpha' a foot), y ahi el costo escala con la cantidad de esas ventanas.
 		blur = {
-			enabled = true,
+			enabled = false,
 			size = 2, -- era 3
 			passes = 1,
 			vibrancy = 0.1696,
-			-- xray: bluerea el snapshot del fondo en vez del contenido vivo que hay
+			-- xray: blurea el snapshot del fondo en vez del contenido vivo que hay
 			-- detrás, o sea que no se recalcula cuando esa ventana de atrás se redibuja.
 			new_optimizations = true,
 			xray = true,
@@ -253,16 +268,26 @@ hl.animation({ leaf = "layersIn", enabled = true, speed = 4, bezier = "easeOutQu
 hl.animation({ leaf = "layersOut", enabled = true, speed = 1.5, bezier = "linear", style = "fade" })
 hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 1.79, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 1.39, bezier = "almostLinear" })
--- Los tres 'workspaces*' bajaron de speed 1.94/1.21/1.94 a 1.0. El 'speed' de
--- Hyprland es la DURACIÓN en décimas de segundo, o sea que 1.94 eran ~190 ms.
--- Mientras corre la animación Hyprland renderiza los DOS workspaces a la vez (el
--- que sale y el que entra), cada uno con su blur y su alpha blending; si cambiás
--- de workspace más rápido que la animación, nunca salís de ese estado caro y
--- además cada animación interrumpida se reinicia. Con 1.0 son ~100 ms.
--- Si aún así se siente pesado al cambiar rápido: enabled = false en los tres.
-hl.animation({ leaf = "workspaces", enabled = true, speed = 1.0, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesIn", enabled = true, speed = 1.0, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesOut", enabled = true, speed = 1.0, bezier = "almostLinear", style = "fade" })
+-- Animaciones de workspace APAGADAS, igual que Omarchy 4 (que trae
+-- 'hl.animation({ leaf = "workspaces", enabled = false })' en su looknfeel.lua).
+--
+-- POR QUE: mientras corre la animacion, Hyprland renderiza los DOS workspaces a
+-- la vez -- el que sale y el que entra. Cambiando de workspace mas rapido que la
+-- animacion nunca se sale de ese estado caro, y encima cada animacion
+-- interrumpida se reinicia. Venian en speed 1.94/1.21/1.94 (~190 ms; el 'speed'
+-- de Hyprland es la duracion en decimas de segundo), pasaron por 1.0 (~100 ms) y
+-- ahora quedan apagadas: el cambio de workspace es instantaneo y no hay frame
+-- que presupuestar.
+--
+-- PARA VOLVER ATRAS: enabled = true, speed = 1.0 en los tres. El fade era lo
+-- unico que se pierde; las animaciones de abrir/cerrar ventana siguen intactas.
+hl.animation({ leaf = "workspaces", enabled = false })
+hl.animation({ leaf = "workspacesIn", enabled = false })
+hl.animation({ leaf = "workspacesOut", enabled = false })
+
+-- fadeSwitch (el fade al cambiar el foco entre ventanas) tambien apagado, que es
+-- lo otro que Omarchy desactiva explicitamente en su lista de animaciones.
+hl.animation({ leaf = "fadeSwitch", enabled = false })
 hl.animation({ leaf = "zoomFactor", enabled = true, speed = 7, bezier = "quick" })
 
 -- Ref https://wiki.hypr.land/Configuring/Basics/Workspace-Rules/
@@ -301,6 +326,27 @@ hl.config({
 hl.config({
 	scrolling = {
 		fullscreen_on_one_column = true,
+	},
+})
+
+--------------------
+----  XWAYLAND  ----
+--------------------
+
+-- force_zero_scaling = true es default de Omarchy. NO es una opcion de
+-- rendimiento: hace que las apps X11 se rendericen SIN escalar. Xorg no sabe
+-- escalar, asi que en un panel con scale 1.5 como este las apps XWayland salen
+-- pixeladas/borrosas; con esto salen NITIDAS, pero mas CHICAS, porque nadie las
+-- escala. La compensacion va del lado de X, no de Hyprland: Xft.dpi en
+-- ~/.Xresources, o GDK_DPI_SCALE / QT_FONT_DPI segun el toolkit.
+--
+-- Hoy no cambia nada visible: no hay un solo cliente XWayland corriendo (foot y
+-- firefox son Wayland nativo, 'hyprctl clients' los reporta con xwayland: 0).
+-- Aplica el dia que abras una app X11. Si te sale demasiado chica y no querés
+-- pelear con el DPI de X, poné false y volvés al comportamiento anterior.
+hl.config({
+	xwayland = {
+		force_zero_scaling = true,
 	},
 })
 
