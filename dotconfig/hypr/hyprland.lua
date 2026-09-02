@@ -309,17 +309,34 @@ hl.config({
 -----------------
 
 -- overlay = true dibuja el HUD de frametimes de Hyprland (tiempo de render por
--- monitor). Está activado A PROPÓSITO y de forma TEMPORAL, para medir el efecto
--- de los ajustes de blur/sombras/animaciones de este archivo en vez de adivinar:
--- cambiá de workspace rápido y mirá si el frametime pasa de 16 ms (60 Hz => 16.6
--- ms de presupuesto). Complemento: 'sudo intel_gpu_top' para frecuencia real.
--- Si el overlay se queda DEBAJO de 16 ms y aún así ves tirones, el problema no
--- es el compositor sino el driver: ahí mirá 'gpumemwatch report' y los TLB
--- invalidation fence timeout de xe (ver etc/cmdline.d).
--- ACORDATE DE APAGARLO cuando termines de medir.
+-- monitor). Queda en false: es una herramienta de medición, no algo para tener
+-- puesto todo el día. Se usó una vez para verificar los ajustes de blur/sombras/
+-- animaciones de este archivo y el lag al cambiar de workspace se fue, así que
+-- cumplió su función.
+--
+-- CUÁNDO VOLVER A PRENDERLO: si el lag reaparece. Poné overlay = true, cambiá de
+-- workspace rápido y leé el frametime contra el presupuesto de 16.6 ms (panel de
+-- 60 Hz). Cómo interpretarlo:
+--
+--   > 16 ms  => es el compositor. Queda margen apagando los tres leaves
+--              'workspaces*' (enabled = false) y/o blur.enabled = false.
+--   < 16 ms  => el compositor NO es el cuello de botella; es más abajo. Ahí van
+--              las pruebas de energía, que son de sesión y se revierten al
+--              reiniciar (el GT de render idlea en RC6 por debajo de su min_freq,
+--              así que una ráfaga corta espera la rampa del GuC):
+--
+--                powerprofilesctl set performance
+--                echo 1200 | sudo tee \
+--                  /sys/class/drm/card0/device/tile0/gt0/freq0/min_freq
+--
+--              Y si tampoco es eso, recién ahí el driver: 'gpumemwatch report' y
+--              los TLB invalidation fence timeout de xe (ver etc/cmdline.d).
+--
+-- Complemento en cualquier caso: 'sudo intel_gpu_top' para ocupación y
+-- frecuencia real de la iGPU.
 hl.config({
 	debug = {
-		overlay = true,
+		overlay = false,
 	},
 })
 
