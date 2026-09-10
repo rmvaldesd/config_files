@@ -33,6 +33,27 @@ reintentos=0
 # crash-loop, es una barra que anda mal de a ratos, y matarla del todo sería peor.
 UMBRAL_ESTABLE=300    # 5 minutos
 
+# --- Config generada ----------------------------------------------------
+# Waybar lee JSON y no puede leer ~/.local_host_settings, así que su alto no puede
+# vivir ahí de forma directa. render_config() toma el template versionado
+# (config.jsonc del repo, que por el symlink es ~/.config/waybar/config.jsonc) y le
+# inyecta WAYBAR_HEIGHT de settings. La salida va a ~/.cache (FUERA del directorio
+# vigilado) para que el propio render no dispare el inotifywatch de abajo y entre en
+# un loop consigo mismo.
+config_template="$HOME/.config/waybar/config.jsonc"
+config_salida="${XDG_CACHE_HOME:-$HOME/.cache}/waybar/config.jsonc"
+
+render_config() {
+  local height
+  height=$(awk -F= '$1=="WAYBAR_HEIGHT" {print $2}' "$HOME/.local_host_settings" 2>/dev/null)
+  case "$height" in
+    ''|*[!0-9]*) height=34 ;;   # multineumónico del default del template
+  esac
+  mkdir -p "$(dirname "$config_salida")" || return 1
+  sed "s/^\([[:space:]]*\)\"height\": *[0-9][0-9]*\(,*\)[[:space:]]*$/\1\"height\": $height\2/" \
+    "$config_template" > "$config_salida" || return 1
+}
+
 # Marca que la salida es intencional (fin de sesión), no una caída. Sin esto, el
 # 'wait' de abajo retorna cuando Hyprland mata a waybar al cerrar sesión y el script
 # la relanzaría en pleno logout.
@@ -57,6 +78,7 @@ vigilar_config() {
         # El '|| break' corta el loop si inotifywait falla de verdad (el directorio
         # desapareció); si no, un error permanente giraría en vacío para siempre.
         wait "$hijo" || break
+        render_config
         killall -SIGUSR2 waybar
     done
 }
@@ -78,7 +100,13 @@ trap 'terminando=1; kill "$watcher" $waybar_pid 2>/dev/null' TERM INT HUP
 # --- 2. Supervisión -----------------------------------------------------------
 while :; do
     arranque=$(date +%s)
-    waybar &
+    # Se arranca SIEMPRE desde la config generada: si el render falla (template
+    # ausente) cae a la config del repo, que es la que está versionada.
+    if render_config; then
+        waybar -c "$config_salida" &
+    else
+        waybar &
+    fi
     waybar_pid=$!
 
     # Bloquea hasta que waybar termine, por la razón que sea. Como este script es su

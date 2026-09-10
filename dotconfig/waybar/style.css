@@ -18,7 +18,7 @@
      así se ve idéntico en Arch y Fedora sin depender de los paquetes de cada distro.
      Las familias Font Awesome quedan solo como fallback (v7 en Arch, v6 en Fedora). */
   font-family: "JetBrains Mono", "Symbols Nerd Font", "Symbols Nerd Font Mono", "Font Awesome 7 Free", "Font Awesome 7 Brands", "Font Awesome 6 Free", "Font Awesome 6 Brands", sans-serif;
-  font-size: 12px;
+  font-size: 13px;
   /* IMPRESCINDIBLE para una barra baja: GTK le impone a cada widget un alto mínimo
      propio y sin esto la barra no baja de ~40px por más que se recorten paddings. */
   min-height: 0;

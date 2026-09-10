@@ -79,7 +79,7 @@ hl.monitor(
     output = settings("PRIMARY_MONITOR", "eDP-1"),
     mode = settings("PRIMARY_MODE", "preferred"),
     position = "auto",
-    scale = settings("PRIMARY_SCALE", "1.5"),
+    scale = settings_num("PRIMARY_SCALE", 1.5),
   },
   {
     output = settings("EXTERNAL_MONITOR", "DP-1"),
