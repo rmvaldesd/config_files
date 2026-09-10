@@ -176,8 +176,9 @@ paquetes_utilidades=(
     # quedan afuera a propósito; si algún día aparece uno: 'pacman -Si xarchiver' lista en
     # "Optional Deps" qué paquete instalar para cada uno.
     imv               # Visor de imágenes nativo de Wayland, controlado por teclado (n/p para navegar, +/- zoom, q para salir). Es el habitual en setups de Hyprland/sway por ser mínimo. Queda como predeterminado para imágenes sin pasos extra: las asociaciones vienen dentro del mimeapps.list que enlaza la sección 9.
-    zathura           # Visor de documentos minimalista con teclas tipo vim (j/k para desplazar, / para buscar, q para salir). Queda asociado a PDF vía mimeapps.list.
-    zathura-pdf-poppler # OBLIGATORIO: zathura por sí solo NO abre ningún archivo, necesita un plugin de backend. Se elige poppler sobre mupdf porque este último arrastra tesseract con sus datos de OCR, innecesario para leer PDFs.
+zathura           # Visor de documentos minimalista con teclas tipo vim (j/k para desplazar, / para buscar, q para salir). Queda como alternativa en "Abrir con" para PDF vía mimeapps.list; el abridor por defecto es evince.
+     zathura-pdf-poppler # OBLIGATORIO: zathura por sí solo NO abre ningún archivo, necesita un plugin de backend. Se elige poppler sobre mupdf porque este último arrastra tesseract con sus datos de OCR, innecesario para leer PDFs.
+     evince            # Lector de PDF con interfaz gráfica (paneles, miniaturas, búsqueda, anotaciones de texto). Queda como predeterminado para PDF vía mimeapps.list, reemplazando a zathura; su .desktop es org.gnome.Evince.desktop.
     mpv               # Reproductor de video y audio, nativo de Wayland y controlado por teclado (espacio pausa, flechas saltan, f pantalla completa, q sale). Queda asociado a los formatos de video vía mimeapps.list, y su config (dotconfig/mpv/mpv.conf, enlazada en la sección 9) le prende el perfil de calidad y la decodificación por hardware, que mpv trae apagada de fábrica. Si alguna vez querés una interfaz gráfica, celluloid y haruna son frontends sobre este mismo motor.
     libreoffice-fresh # Suite ofimática. La variante 'fresh' trae las versiones nuevas; 'libreoffice-still' es la conservadora, si preferís estabilidad sobre funciones. No se instala el paquete de idioma (libreoffice-fresh-es) porque el locale de este equipo es en_US.
     gimp              # Editor de imágenes. NO se asocia a los tipos de imagen a propósito: esos abren con imv, que es el visor; solo .xcf (image/x-xcf) abre directo en GIMP, porque ningún visor lo lee. Para el resto, GIMP queda en el menú "Abrir con" de Thunar.
@@ -587,6 +588,27 @@ bash "$HOME/config_files/scripts/install-fonts.sh"
 # excluye power-profile-sync, que la sección 10 instala COPIADO y no enlazado.
 bash "$HOME/config_files/scripts/link-bins.sh"
 
+# Ajustes por-máquina de Hyprland (monitores, layout, mouse). ~/.local_host_settings
+# NO está en el repo: es estado de esta máquina. El repo trae la plantilla con los
+# defaults; si acá no existe el archivo todavía (primer arranque / clon nuevo) se copia
+# y se deja en literal para que se edite a mano. Un clon existente NO toca el archivo:
+# así las ediciones de cada equipo se respetan y no se pisan al actualizar el repo.
+#
+# hyprland.lua lo lee en cada arranque y en cada 'hyprctl reload'. Para que un cambio
+# aplique: editá el archivo → hyprctl reload.
+settings_origen="$HOME/config_files/templates/local_host_settings"
+settings_destino="$HOME/.local_host_settings"
+if [ -f "$settings_origen" ]; then
+    if [ ! -f "$settings_destino" ]; then
+        cp "$settings_origen" "$settings_destino"
+        echo "-> Creado ~/.local_host_settings desde la plantilla (editá este archivo para configurar monitores y mouse de ESTA máquina; tus cambios no afectan al otro equipo)."
+    else
+        echo "-> ~/.local_host_settings ya existe; no se sobrescribe (ajustes locales respetados)."
+    fi
+else
+    echo "WARN: no se encontró $settings_origen; ~/.local_host_settings usará los defaults de hyprland.lua."
+fi
+
 # ==========================================
 # 10. CAMBIO AUTOMÁTICO DE PERFIL DE ENERGÍA
 # ==========================================
@@ -795,6 +817,44 @@ if sudo fwupdmgr refresh --force > /dev/null 2>&1 && sudo fwupdmgr get-updates; 
 else
     echo "-> Sin actualizaciones de firmware pendientes (o sin red / equipo no soportado)."
 fi
+
+echo "---"
+
+# ==========================================
+# 16. DESHABILITAR XFCONF (arrastre de Thunar)
+# ==========================================
+# Thunar trae libxfce4ui → xfconf, que levanta xfconfd. En un entorno Hyprland
+# ese daemon ES EL ÚNICO que registra los atajos de teclado de XFCE, y como
+# 'Print' / 'Shift+Print' / 'Alt+Print' quedan bindeados a xfce4-screenshooter,
+# roban la tecla antes de que hyprshot (el tool correcto en Wayland) la vea.
+# xfce4-screenshooter captura a través de XWayland; a scale >1 el buffer es
+# menor y la captura sale borrosa.
+#
+# Thunar funciona perfectamente sin xfconfd: sólo pierde la persistencia de
+# ajustes de UI (tamaño del side pane, posición del toolbar), que en una
+# instalación fresca no hay nada que recordar.
+#
+# Se detiene el servicio y se enmascara para que no arranque de nuevo.
+# Es idempotente: si xfconfd no está corriendo o ya está enmascarado, no falla.
+echo "-> Deshabilitando xfconfd (no necesario en Hyprland, causa capturas borrosas)..."
+if systemctl --user is-active --quiet xfconfd.service 2>/dev/null; then
+    systemctl --user stop xfconfd.service
+fi
+if ! systemctl --user is-enabled --quiet xfconfd.service 2>/dev/null; then
+    # Ya estaba detenido o no existe; enmascarar de todas formas para que
+    # thunar no lo levante de nuevo por D-Bus.
+    systemctl --user mask xfconfd.service 2>/dev/null || true
+else
+    systemctl --user mask xfconfd.service
+fi
+# Limpieza de los bindeos ya existentes en xfconf (si los hay).
+# Los tres son idempotentes: si la clave no existe, el '-r' falla en silencio.
+if command -v xfconf-query &>/dev/null; then
+    xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/default/Print" -r 2>/dev/null || true
+    xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/default/<Shift>Print" -r 2>/dev/null || true
+    xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/default/<Alt>Print" -r 2>/dev/null || true
+fi
+echo "-> xfconfd deshabilitado. Thunar sigue funcionando; los atajos de Print los maneja hyprshot."
 
 echo "---"
 echo "=== ¡Instalación completada con éxito! ==="

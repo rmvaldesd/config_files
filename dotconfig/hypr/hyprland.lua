@@ -14,30 +14,85 @@
 -- Create your files separately and then require them like this:
 -- require("myColors")
 
+-- ── Local machine settings ──────────────────────────────────────────────────
+-- ~/.local_host_settings lives OUTSIDE the repo (gitignored / never committed).
+-- Each machine has its own copy; the installer creates it from the template the
+-- very first time and never overwrites it again.  Edit it + hyprctl reload.
+-- Missing keys fall back to the hardcoded defaults below so the config still
+-- works even without the file.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+local function read_settings()
+  local s = {}
+  local path = os.getenv("HOME") .. "/.local_host_settings"
+  local f = io.open(path, "r")
+  if not f then return s end
+  for raw in f:lines() do
+    local line = raw:match("^%s*(.-)%s*$")
+    if line ~= "" and not line:match("^#") then
+      local k, v = line:match("^(.-)=(.*)$")
+      if k then
+        k = k:match("^%s*(.-)%s*$")
+        v = v:match("^%s*(.-)%s*$")
+        s[k] = v
+      end
+    end
+  end
+  f:close()
+  return s
+end
+
+local _cfg = read_settings()
+
+local function settings(key, default)
+  local v = _cfg[key]
+  if v and v ~= "" then return v end
+  return default
+end
+
+local function settings_bool(key, default)
+  local v = _cfg[key]
+  if v then
+    v = v:lower()
+    if v == "true"  or v == "1" or v == "yes" then return true  end
+    if v == "false" or v == "0" or v == "no"  then return false end
+  end
+  return default
+end
+
+local function settings_num(key, default)
+  local v = _cfg[key]
+  if v and v ~= "" then
+    local n = tonumber(v)
+    if n then return n end
+  end
+  return default
+end
+
 ------------------
 ---- MONITORS ----
 ------------------
 
 -- See https://wiki.hypr.land/Configuring/Basics/Monitors/
 hl.monitor(
-	{
-		output = "",
-		mode = "preferred",
-		position = "auto",
-		scale = "auto",
-	},
-	{
-		output = "DP-1",
-		mode = "2560x1080@60",
-		position = "auto-right",
-		scale = "auto",
-	}
-	-- {
-	--   output = "HDMI-A-1",
-	--   mode = "3840x2160@60",
-	--   position = "auto-right",
-	--   scale = "auto",
-	-- }
+  {
+    output = settings("PRIMARY_MONITOR", "eDP-1"),
+    mode = settings("PRIMARY_MODE", "preferred"),
+    position = "auto",
+    scale = settings("PRIMARY_SCALE", "1.5"),
+  },
+  {
+    output = settings("EXTERNAL_MONITOR", "DP-1"),
+    mode = settings("EXTERNAL_MODE", "2560x1080@59.98"),
+    position = settings("EXTERNAL_POSITION", "auto-right"),
+    scale = settings_num("EXTERNAL_SCALE", 1),
+  }
+-- {
+--   output = "HDMI-A-1",
+--   mode = "3840x2160@60",
+--   position = "auto-right",
+--   scale = "auto",
+-- }
 )
 
 ---------------------
@@ -69,7 +124,7 @@ local browser = "firefox"
 --   --actions-on-enter ...   Enter copia, sin tener que buscar el botón.
 --   --early-exit copy        cierra satty apenas copió, en vez de quedar abierto.
 local screenshot = "hyprshot -m region -z --raw | satty --filename - "
-	.. "--copy-command wl-copy --actions-on-enter save-to-clipboard --early-exit copy"
+    .. "--copy-command wl-copy --actions-on-enter save-to-clipboard --early-exit copy"
 
 -- SHIFT + Print: región directo al portapapeles, sin pasar por satty.
 local screenshotCopy = "hyprshot -m region -z --clipboard-only"
@@ -90,8 +145,8 @@ local screenshotMonitor = "hyprshot -m output -m active --clipboard-only"
 -- Usa glow si esta instalado (renderiza las tablas) y cae a less si no, asi el
 -- atajo nunca queda roto.
 local ayuda = "foot --title=ayuda-atajos -e sh -c "
-	.. "'D=$HOME/config_files/docs/hyprland/README.md; "
-	.. 'if command -v glow >/dev/null 2>&1; then glow -p "$D"; else less "$D"; fi\''
+    .. "'D=$HOME/config_files/docs/hyprland/README.md; "
+    .. 'if command -v glow >/dev/null 2>&1; then glow -p "$D"; else less "$D"; fi\''
 
 ---- AUTOSTART ----
 -------------------
@@ -102,23 +157,23 @@ local ayuda = "foot --title=ayuda-atajos -e sh -c "
 -- Or execute your favorite apps at launch like this:
 --
 hl.on("hyprland.start", function()
-	-- GTK 4 Apps
-	hl.exec_cmd('gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"')
-	-- GTK 3 Apps
-	hl.exec_cmd('gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"')
+  -- GTK 4 Apps
+  hl.exec_cmd('gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"')
+  -- GTK 3 Apps
+  hl.exec_cmd('gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"')
 
-	hl.exec_cmd(terminal)
-	-- Fondo de pantalla. La elección al azar entre las imágenes de
-	-- config_files/wallpapers la hace hyprpaper.conf con 'order = random'.
-	hl.exec_cmd("hyprpaper")
-	-- auto-reload.sh LANZA waybar además de vigilarla y recargarla, así que acá no va
-	-- un 'hl.exec_cmd("waybar")' aparte: serían dos barras superpuestas, y la que
-	-- supervisa el script no sería la visible. Ver el encabezado de auto-reload.sh.
-	hl.exec_cmd("~/.config/waybar/auto-reload.sh")
-	hl.exec_cmd("hypridle")
-	hl.exec_cmd("mako")
-	hl.exec_cmd("/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1")
-	hl.exec_cmd("wl-paste --watch cliphist store")
+  hl.exec_cmd(terminal)
+  -- Fondo de pantalla. La elección al azar entre las imágenes de
+  -- config_files/wallpapers la hace hyprpaper.conf con 'order = random'.
+  hl.exec_cmd("hyprpaper")
+  -- auto-reload.sh LANZA waybar además de vigilarla y recargarla, así que acá no va
+  -- un 'hl.exec_cmd("waybar")' aparte: serían dos barras superpuestas, y la que
+  -- supervisa el script no sería la visible. Ver el encabezado de auto-reload.sh.
+  hl.exec_cmd("~/.config/waybar/auto-reload.sh")
+  hl.exec_cmd("hypridle")
+  hl.exec_cmd("mako")
+  hl.exec_cmd("/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1")
+  hl.exec_cmd("wl-paste --watch cliphist store")
 end)
 
 -------------------------------
@@ -127,8 +182,8 @@ end)
 
 -- See https://wiki.hypr.land/Configuring/Advanced-and-Cool/Environment-variables/
 
-hl.env("XCURSOR_SIZE", "24")
-hl.env("HYPRCURSOR_SIZE", "24")
+hl.env("XCURSOR_SIZE", settings("CURSOR_SIZE", "24"))
+hl.env("HYPRCURSOR_SIZE", settings("CURSOR_SIZE", "24"))
 -- Qt Apps (Requires qt5ct/qt6ct)
 hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("ELECTRON_OZONE_PLATFORM_HINT", "wayland")
@@ -157,92 +212,92 @@ hl.env("ELECTRON_ENABLE_WAYLAND", 1)
 
 -- Refer to https://wiki.hypr.land/Configuring/Basics/Variables/
 hl.config({
-	general = {
-		gaps_in = 2,
-		gaps_out = 5,
+  general = {
+    gaps_in = 2,
+    gaps_out = 5,
 
-		border_size = 2,
+    border_size = 2,
 
-		col = {
-			-- Bordes monocromos sobre la escala Tailwind Zinc del resto del tema (waybar,
-			-- rofi, mako). El activo va de zinc-400 a zinc-600: sin color propio, el borde
-			-- se lee como profundidad en vez de como decoración, y el acento cyan (#75f1fa)
-			-- queda reservado para los componentes que sí comunican estado.
-			-- El default de fábrica de Hyprland (33ccff -> 00ff99) se descartó porque ese
-			-- verde no aparecía en ninguna otra parte del entorno.
-			-- Arranca en zinc-300 y no en zinc-400: con el inactivo en zinc-700, partir de
-			-- zinc-400 dejaba sólo dos escalones de diferencia y en las ventanas donde el
-			-- degradado llegaba a su extremo oscuro costaba distinguir cuál tenía el foco.
-			active_border = { colors = { "rgba(d4d4d8ee)", "rgba(52525bee)" }, angle = 45 },
-			-- zinc-700, el mismo gris de los bordes de mako.
-			inactive_border = "rgba(3f3f46aa)",
-		},
+    col = {
+      -- Bordes monocromos sobre la escala Tailwind Zinc del resto del tema (waybar,
+      -- rofi, mako). El activo va de zinc-400 a zinc-600: sin color propio, el borde
+      -- se lee como profundidad en vez de como decoración, y el acento cyan (#75f1fa)
+      -- queda reservado para los componentes que sí comunican estado.
+      -- El default de fábrica de Hyprland (33ccff -> 00ff99) se descartó porque ese
+      -- verde no aparecía en ninguna otra parte del entorno.
+      -- Arranca en zinc-300 y no en zinc-400: con el inactivo en zinc-700, partir de
+      -- zinc-400 dejaba sólo dos escalones de diferencia y en las ventanas donde el
+      -- degradado llegaba a su extremo oscuro costaba distinguir cuál tenía el foco.
+      active_border = { colors = { "rgba(d4d4d8ee)", "rgba(52525bee)" }, angle = 45 },
+      -- zinc-700, el mismo gris de los bordes de mako.
+      inactive_border = "rgba(3f3f46aa)",
+    },
 
-		-- Set to true to enable resizing windows by clicking and dragging on borders and gaps
-		resize_on_border = false,
+    -- Set to true to enable resizing windows by clicking and dragging on borders and gaps
+    resize_on_border = false,
 
-		-- Please see https://wiki.hypr.land/Configuring/Advanced-and-Cool/Tearing/ before you turn this on
-		allow_tearing = false,
+    -- Please see https://wiki.hypr.land/Configuring/Advanced-and-Cool/Tearing/ before you turn this on
+    allow_tearing = false,
 
-		layout = "dwindle",
-	},
+    layout = "dwindle",
+  },
 
-	decoration = {
-		-- rounding = 0 para alinear con el default de Omarchy. Con 0, rounding_power
-		-- queda inerte (no hay esquina que curvar); se deja por si volvés a subir
-		-- rounding. Esto es estetico, no de rendimiento.
-		rounding = 0,
-		rounding_power = 2,
+  decoration = {
+    -- rounding = 0 para alinear con el default de Omarchy. Con 0, rounding_power
+    -- queda inerte (no hay esquina que curvar); se deja por si volvés a subir
+    -- rounding. Esto es estetico, no de rendimiento.
+    rounding = 0,
+    rounding_power = 2,
 
-		-- Change transparency of focused and unfocused windows
-		active_opacity = 1.0,
-		-- inactive_opacity ANTES estaba en 0.9 (rango válido 0.0-1.0; el 20.0 previo se
-		-- truncaba a 1.0 y no tenía efecto). Se subió a 1.0 porque en esta máquina era
-		-- la causa principal del lag al cambiar de workspace: el blur de Hyprland se
-		-- aplica DETRÁS de las ventanas que tienen transparencia, así que con 0.9 TODAS
-		-- las ventanas menos la enfocada eran candidatas a blur y el costo escalaba con
-		-- la cantidad de ventanas abiertas. Con 1.0 el costo del blur pasa a ser fijo.
-		-- Si querés recuperar el efecto, el precio es ese lag; no hay punto medio barato.
-		inactive_opacity = 1.0,
+    -- Change transparency of focused and unfocused windows
+    active_opacity = 1.0,
+    -- inactive_opacity ANTES estaba en 0.9 (rango válido 0.0-1.0; el 20.0 previo se
+    -- truncaba a 1.0 y no tenía efecto). Se subió a 1.0 porque en esta máquina era
+    -- la causa principal del lag al cambiar de workspace: el blur de Hyprland se
+    -- aplica DETRÁS de las ventanas que tienen transparencia, así que con 0.9 TODAS
+    -- las ventanas menos la enfocada eran candidatas a blur y el costo escalaba con
+    -- la cantidad de ventanas abiertas. Con 1.0 el costo del blur pasa a ser fijo.
+    -- Si querés recuperar el efecto, el precio es ese lag; no hay punto medio barato.
+    inactive_opacity = 1.0,
 
-		-- Sombras apagadas: cuestan fill rate en el borde de cada ventana, y en la iGPU
-		-- Arc del Ultra 7 165U a 1920x1200@60 con scale 1.5 no hay margen de frame que
-		-- regalar. Es la concesión estética más barata de revertir (enabled = true).
-		shadow = {
-			enabled = false,
-			range = 4,
-			render_power = 3,
-			color = 0xee1a1a1a,
-		},
+    -- Sombras apagadas: cuestan fill rate en el borde de cada ventana, y en la iGPU
+    -- Arc del Ultra 7 165U a 1920x1200@60 con scale 1.5 no hay margen de frame que
+    -- regalar. Es la concesión estética más barata de revertir (enabled = true).
+    shadow = {
+      enabled = settings_bool("SHADOWS_ENABLED", false),
+      range = 4,
+      render_power = 3,
+      color = 0xee1a1a1a,
+    },
 
-		-- Blur APAGADO, igual que el default de Omarchy 4 (branch 'quattro').
-		--
-		-- No costaba nada ya: el blur de Hyprland solo trabaja donde hay algo
-		-- TRANSLUCIDO detras de lo cual blurear, y en este escritorio no queda nada
-		-- translucido -- inactive_opacity esta en 1.0, foot no define 'alpha' y los
-		-- colores de waybar estan todos en alpha 1. Estaba prendido sin efecto.
-		-- Se apaga para no dejar una opcion muerta que aparente hacer algo.
-		--
-		-- Los parametros de abajo quedan inertes con enabled = false; se conservan
-		-- para que volver a prenderlo sea cambiar una sola linea. OJO si lo prendes:
-		-- vuelve a costar recien cuando algo se vuelva translucido (p.ej. ponerle
-		-- 'alpha' a foot), y ahi el costo escala con la cantidad de esas ventanas.
-		blur = {
-			enabled = false,
-			size = 2, -- era 3
-			passes = 1,
-			vibrancy = 0.1696,
-			-- xray: blurea el snapshot del fondo en vez del contenido vivo que hay
-			-- detrás, o sea que no se recalcula cuando esa ventana de atrás se redibuja.
-			new_optimizations = true,
-			xray = true,
-			popups = false,
-		},
-	},
+    -- Blur APAGADO, igual que el default de Omarchy 4 (branch 'quattro').
+    --
+    -- No costaba nada ya: el blur de Hyprland solo trabaja donde hay algo
+    -- TRANSLUCIDO detras de lo cual blurear, y en este escritorio no queda nada
+    -- translucido -- inactive_opacity esta en 1.0, foot no define 'alpha' y los
+    -- colores de waybar estan todos en alpha 1. Estaba prendido sin efecto.
+    -- Se apaga para no dejar una opcion muerta que aparente hacer algo.
+    --
+    -- Los parametros de abajo quedan inertes con enabled = false; se conservan
+    -- para que volver a prenderlo sea cambiar una sola linea. OJO si lo prendes:
+    -- vuelve a costar recien cuando algo se vuelva translucido (p.ej. ponerle
+    -- 'alpha' a foot), y ahi el costo escala con la cantidad de esas ventanas.
+    blur = {
+      enabled = settings_bool("BLUR_ENABLED", false),
+      size = 2, -- era 3
+      passes = 1,
+      vibrancy = 0.1696,
+      -- xray: blurea el snapshot del fondo en vez del contenido vivo que hay
+      -- detrás, o sea que no se recalcula cuando esa ventana de atrás se redibuja.
+      new_optimizations = true,
+      xray = true,
+      popups = false,
+    },
+  },
 
-	animations = {
-		enabled = true,
-	},
+  animations = {
+    enabled = true,
+  },
 })
 
 -- Default curves and animations, see https://wiki.hypr.land/Configuring/Advanced-and-Cool/Animations/
@@ -281,9 +336,9 @@ hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 1.39, bezier = "a
 --
 -- PARA VOLVER ATRAS: enabled = true, speed = 1.0 en los tres. El fade era lo
 -- unico que se pierde; las animaciones de abrir/cerrar ventana siguen intactas.
-hl.animation({ leaf = "workspaces", enabled = false })
-hl.animation({ leaf = "workspacesIn", enabled = false })
-hl.animation({ leaf = "workspacesOut", enabled = false })
+hl.animation({ leaf = "workspaces", enabled = settings_bool("WORKSPACE_ANIMATIONS", false) })
+hl.animation({ leaf = "workspacesIn", enabled = settings_bool("WORKSPACE_ANIMATIONS", false) })
+hl.animation({ leaf = "workspacesOut", enabled = settings_bool("WORKSPACE_ANIMATIONS", false) })
 
 -- fadeSwitch (el fade al cambiar el foco entre ventanas) tambien apagado, que es
 -- lo otro que Omarchy desactiva explicitamente en su lista de animaciones.
@@ -310,23 +365,23 @@ hl.animation({ leaf = "zoomFactor", enabled = true, speed = 7, bezier = "quick" 
 
 -- See https://wiki.hypr.land/Configuring/Layouts/Dwindle-Layout/ for more
 hl.config({
-	dwindle = {
-		preserve_split = true, -- You probably want this
-	},
+  dwindle = {
+    preserve_split = true, -- You probably want this
+  },
 })
 
 -- See https://wiki.hypr.land/Configuring/Layouts/Master-Layout/ for more
 hl.config({
-	master = {
-		new_status = "master",
-	},
+  master = {
+    new_status = "master",
+  },
 })
 
 -- See https://wiki.hypr.land/Configuring/Layouts/Scrolling-Layout/ for more
 hl.config({
-	scrolling = {
-		fullscreen_on_one_column = true,
-	},
+  scrolling = {
+    fullscreen_on_one_column = true,
+  },
 })
 
 --------------------
@@ -345,9 +400,9 @@ hl.config({
 -- Aplica el dia que abras una app X11. Si te sale demasiado chica y no querés
 -- pelear con el DPI de X, poné false y volvés al comportamiento anterior.
 hl.config({
-	xwayland = {
-		force_zero_scaling = true,
-	},
+  xwayland = {
+    force_zero_scaling = true,
+  },
 })
 
 -----------------
@@ -381,9 +436,9 @@ hl.config({
 -- Complemento en cualquier caso: 'sudo intel_gpu_top' para ocupación y
 -- frecuencia real de la iGPU.
 hl.config({
-	debug = {
-		overlay = false,
-	},
+  debug = {
+    overlay = false,
+  },
 })
 
 ----------------
@@ -391,16 +446,16 @@ hl.config({
 ----------------
 
 hl.config({
-	misc = {
-		force_default_wallpaper = -1, -- Set to 0 or 1 to disable the anime mascot wallpapers
-		disable_hyprland_logo = false, -- If true disables the random hyprland logo / anime girl background. :(
+  misc = {
+    force_default_wallpaper = -1,  -- Set to 0 or 1 to disable the anime mascot wallpapers
+    disable_hyprland_logo = false, -- If true disables the random hyprland logo / anime girl background. :(
 
-		-- Redibujar en cada paso intermedio de un resize o de un drag con mouse es
-		-- trabajo por frame que no aporta nada: la ventana igual termina donde la
-		-- soltás. Apagarlas no cambia el resultado, solo saca frames del camino.
-		animate_manual_resizes = false,
-		animate_mouse_windowdragging = false,
-	},
+    -- Redibujar en cada paso intermedio de un resize o de un drag con mouse es
+    -- trabajo por frame que no aporta nada: la ventana igual termina donde la
+    -- soltás. Apagarlas no cambia el resultado, solo saca frames del camino.
+    animate_manual_resizes = settings_bool("ANIMATE_RESIZES", false),
+    animate_mouse_windowdragging = settings_bool("ANIMATE_RESIZES", false),
+  },
 })
 
 ---------------
@@ -408,36 +463,36 @@ hl.config({
 ---------------
 
 hl.config({
-	input = {
-		kb_layout = "latam,es",
-		--kb_layout    = "es",
-		kb_variant = "",
-		kb_model = "",
-		kb_options = "grp:alt_shift_toggle",
-		kb_rules = "",
+  input = {
+    kb_layout = settings("KB_LAYOUT", "latam,es"),
+    --kb_layout    = "es",
+    kb_variant = settings("KB_VARIANT", ""),
+    kb_model = settings("KB_MODEL", ""),
+    kb_options = settings("KB_OPTIONS", "grp:alt_shift_toggle"),
+    kb_rules = "",
 
-		left_handed = false,
-		follow_mouse = 1,
+    left_handed = settings_bool("LEFT_HANDED", true),
+    follow_mouse = 1,
 
-		sensitivity = 0, -- -1.0 - 1.0, 0 means no modification.
+    sensitivity = settings_num("MOUSE_SENSITIVITY", 0), -- -1.0 - 1.0, 0 means no modification.
 
-		touchpad = {
-			natural_scroll = true,
-		},
-	},
+    touchpad = {
+      natural_scroll = settings_bool("TOUCHPAD_NATURAL_SCROLL", true),
+    },
+  },
 })
 
 hl.gesture({
-	fingers = 3,
-	direction = "horizontal",
-	action = "workspace",
+  fingers = 3,
+  direction = "horizontal",
+  action = "workspace",
 })
 
 -- Example per-device config
 -- See https://wiki.hypr.land/Configuring/Advanced-and-Cool/Devices/ for more
 hl.device({
-	name = "epic-mouse-v1",
-	sensitivity = -0.5,
+  name = settings("MOUSE_DEVICE_NAME", "epic-mouse-v1"),
+  sensitivity = settings_num("MOUSE_DEVICE_SENSITIVITY", -0.5),
 })
 
 ---------------------
@@ -451,8 +506,8 @@ local secondMod = "SUPER + SHIFT"
 local closeWindowBind = hl.bind(secondMod .. " + C", hl.dsp.window.close())
 -- closeWindowBind:set_enabled(false)
 hl.bind(
-	secondMod .. " + M",
-	hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'")
+  secondMod .. " + M",
+  hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'")
 )
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
@@ -503,8 +558,8 @@ hl.bind(mainMod .. " + D", hl.dsp.dpms({ action = "on" }))
 
 -- Historial del portapapeles (cliphist): elegir una entrada con rofi y copiarla
 hl.bind(
-	secondMod .. " + V",
-	hl.dsp.exec_cmd("cliphist list | rofi -dmenu -p 'Portapapeles' | cliphist decode | wl-copy")
+  secondMod .. " + V",
+  hl.dsp.exec_cmd("cliphist list | rofi -dmenu -p 'Portapapeles' | cliphist decode | wl-copy")
 )
 
 -- Selector de ventanas del workspace ACTUAL. Va a un script (bin_configs/pick-window)
@@ -535,15 +590,15 @@ hl.bind(mainMod .. " + F", hl.dsp.exec_cmd("find-file"))
 hl.bind("SUPER + R", hl.dsp.submap("resize"))
 -- Definición del submapa "resize"
 hl.define_submap("resize", function()
-	-- Ajustar tamaño de ventana activa (manteniendo presionado con repeating = true)
-	hl.bind("L", hl.dsp.window.resize({ x = 10, y = 0, relative = true }), { repeating = true })
-	hl.bind("H", hl.dsp.window.resize({ x = -10, y = 0, relative = true }), { repeating = true })
-	hl.bind("K", hl.dsp.window.resize({ x = 0, y = -10, relative = true }), { repeating = true })
-	hl.bind("J", hl.dsp.window.resize({ x = 0, y = 10, relative = true }), { repeating = true })
+  -- Ajustar tamaño de ventana activa (manteniendo presionado con repeating = true)
+  hl.bind("L", hl.dsp.window.resize({ x = 10, y = 0, relative = true }), { repeating = true })
+  hl.bind("H", hl.dsp.window.resize({ x = -10, y = 0, relative = true }), { repeating = true })
+  hl.bind("K", hl.dsp.window.resize({ x = 0, y = -10, relative = true }), { repeating = true })
+  hl.bind("J", hl.dsp.window.resize({ x = 0, y = 10, relative = true }), { repeating = true })
 
-	-- Salir del submapa al presionar Enter o Escape
-	hl.bind("Return", hl.dsp.submap("reset"))
-	hl.bind("escape", hl.dsp.submap("reset"))
+  -- Salir del submapa al presionar Enter o Escape
+  hl.bind("Return", hl.dsp.submap("reset"))
+  hl.bind("escape", hl.dsp.submap("reset"))
 end)
 
 -- Mover el WORKSPACE ACTIVO de una pantalla a otra. 'M' de monitor: SUPER + M
@@ -562,49 +617,49 @@ end)
 hl.bind(mainMod .. " + M", hl.dsp.submap("monitor"))
 
 hl.define_submap("monitor", function()
-	-- Las direcciones son las mismas que en el resto de la config: H/L para
-	-- izquierda/derecha, K/J para arriba/abajo. Las flechas hacen exactamente lo
-	-- mismo, por si en el momento salen antes que las letras.
-	--
-	-- El monitor se elige por DIRECCION (l/r/u/d) y no por indice relativo
-	-- (+1/-1) porque el indice da la vuelta: en dos pantallas, empujar a la
-	-- derecha desde la de la derecha te devolveria a la izquierda. Con la
-	-- direccion no pasa nada y Hyprland avisa "Monitor not found", que es lo que
-	-- uno espera al empujar contra el borde.
-	--
-	-- Sin 'workspace' en la tabla, el dispatcher usa el workspace activo.
-	hl.bind("H", hl.dsp.workspace.move({ monitor = "l" }))
-	hl.bind("L", hl.dsp.workspace.move({ monitor = "r" }))
-	hl.bind("K", hl.dsp.workspace.move({ monitor = "u" }))
-	hl.bind("J", hl.dsp.workspace.move({ monitor = "d" }))
+  -- Las direcciones son las mismas que en el resto de la config: H/L para
+  -- izquierda/derecha, K/J para arriba/abajo. Las flechas hacen exactamente lo
+  -- mismo, por si en el momento salen antes que las letras.
+  --
+  -- El monitor se elige por DIRECCION (l/r/u/d) y no por indice relativo
+  -- (+1/-1) porque el indice da la vuelta: en dos pantallas, empujar a la
+  -- derecha desde la de la derecha te devolveria a la izquierda. Con la
+  -- direccion no pasa nada y Hyprland avisa "Monitor not found", que es lo que
+  -- uno espera al empujar contra el borde.
+  --
+  -- Sin 'workspace' en la tabla, el dispatcher usa el workspace activo.
+  hl.bind("H", hl.dsp.workspace.move({ monitor = "l" }))
+  hl.bind("L", hl.dsp.workspace.move({ monitor = "r" }))
+  hl.bind("K", hl.dsp.workspace.move({ monitor = "u" }))
+  hl.bind("J", hl.dsp.workspace.move({ monitor = "d" }))
 
-	hl.bind("Left", hl.dsp.workspace.move({ monitor = "l" }))
-	hl.bind("Right", hl.dsp.workspace.move({ monitor = "r" }))
-	hl.bind("Up", hl.dsp.workspace.move({ monitor = "u" }))
-	hl.bind("Down", hl.dsp.workspace.move({ monitor = "d" }))
+  hl.bind("Left", hl.dsp.workspace.move({ monitor = "l" }))
+  hl.bind("Right", hl.dsp.workspace.move({ monitor = "r" }))
+  hl.bind("Up", hl.dsp.workspace.move({ monitor = "u" }))
+  hl.bind("Down", hl.dsp.workspace.move({ monitor = "d" }))
 
-	-- Salir del submapa al presionar Enter o Escape.
-	--
-	-- Al salir se renumeran los workspaces (bin_configs/sort-workspaces): mover uno de
-	-- pantalla NO le cambia el numero, asi que despues de reacomodar dos o tres quedan
-	-- intercalados (izquierda 1,3,5 / derecha 2,4,6) y eso se ve en la barra y se camina
-	-- con la navegacion relativa. Salir del submapa es exactamente el momento en que
-	-- terminaste de acomodar, asi que es donde corresponde ordenar.
-	--
-	-- El separador es ';' y no '&&' a proposito: si sort-workspaces no esta instalado --
-	-- vive en bin_configs y necesita link-bins.sh -- igual tenes que poder salir del
-	-- submapa.
-	local salir = [[sort-workspaces; hyprctl dispatch 'hl.dsp.submap("reset")']]
-	hl.bind("Return", hl.dsp.exec_cmd(salir))
-	hl.bind("escape", hl.dsp.exec_cmd(salir))
+  -- Salir del submapa al presionar Enter o Escape.
+  --
+  -- Al salir se renumeran los workspaces (bin_configs/sort-workspaces): mover uno de
+  -- pantalla NO le cambia el numero, asi que despues de reacomodar dos o tres quedan
+  -- intercalados (izquierda 1,3,5 / derecha 2,4,6) y eso se ve en la barra y se camina
+  -- con la navegacion relativa. Salir del submapa es exactamente el momento en que
+  -- terminaste de acomodar, asi que es donde corresponde ordenar.
+  --
+  -- El separador es ';' y no '&&' a proposito: si sort-workspaces no esta instalado --
+  -- vive en bin_configs y necesita link-bins.sh -- igual tenes que poder salir del
+  -- submapa.
+  local salir = [[sort-workspaces; hyprctl dispatch 'hl.dsp.submap("reset")']]
+  hl.bind("Return", hl.dsp.exec_cmd(salir))
+  hl.bind("escape", hl.dsp.exec_cmd(salir))
 end)
 
 -- Switch workspaces with mainMod + [0-9]
 -- Move active window to a workspace with mainMod + SHIFT + [0-9]
 for i = 1, 10 do
-	local key = i % 10 -- 10 maps to key 0
-	hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
-	hl.bind(secondMod .. " + " .. key, hl.dsp.window.move({ workspace = i }))
+  local key = i % 10 -- 10 maps to key 0
+  hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = i }))
+  hl.bind(secondMod .. " + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
 -- Example special workspace (scratchpad)
@@ -634,10 +689,10 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- Capturas de pantalla. Van en la tecla Print porque SUPER+S ya está tomado por el scratchpad "magic".
 -- Los comandos están definidos arriba, en el bloque MY PROGRAMS.
-hl.bind("Print", hl.dsp.exec_cmd(screenshot)) -- región + anotar + portapapeles
-hl.bind("SHIFT + Print", hl.dsp.exec_cmd(screenshotCopy)) -- región -> portapapeles
-hl.bind("CONTROL + Print", hl.dsp.exec_cmd(screenshotSave)) -- región -> ~/Pictures + portapapeles
-hl.bind("ALT + Print", hl.dsp.exec_cmd(screenshotWindow)) -- ventana activa -> portapapeles
+hl.bind("Print", hl.dsp.exec_cmd(screenshot))                      -- región + anotar + portapapeles
+hl.bind("SHIFT + Print", hl.dsp.exec_cmd(screenshotCopy))          -- región -> portapapeles
+hl.bind("CONTROL + Print", hl.dsp.exec_cmd(screenshotSave))        -- región -> ~/Pictures + portapapeles
+hl.bind("ALT + Print", hl.dsp.exec_cmd(screenshotWindow))          -- ventana activa -> portapapeles
 hl.bind(mainMod .. " + Print", hl.dsp.exec_cmd(screenshotMonitor)) -- monitor completo -> portapapeles
 
 -- Ayuda: referencia de atajos. 'A' de ayuda.
@@ -718,24 +773,24 @@ hl.bind(thirdMod .. " + SHIFT + J", hl.dsp.exec_cmd("move-workspace right"))
 
 -- Laptop multimedia keys for volume and LCD brightness
 hl.bind(
-	"XF86AudioRaiseVolume",
-	hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"),
-	{ locked = true, repeating = true }
+  "XF86AudioRaiseVolume",
+  hl.dsp.exec_cmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+"),
+  { locked = true, repeating = true }
 )
 hl.bind(
-	"XF86AudioLowerVolume",
-	hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),
-	{ locked = true, repeating = true }
+  "XF86AudioLowerVolume",
+  hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),
+  { locked = true, repeating = true }
 )
 hl.bind(
-	"XF86AudioMute",
-	hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),
-	{ locked = true, repeating = true }
+  "XF86AudioMute",
+  hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"),
+  { locked = true, repeating = true }
 )
 hl.bind(
-	"XF86AudioMicMute",
-	hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),
-	{ locked = true, repeating = true }
+  "XF86AudioMicMute",
+  hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"),
+  { locked = true, repeating = true }
 )
 hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%+"), { locked = true, repeating = true })
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl -e4 -n2 set 5%-"), { locked = true, repeating = true })
@@ -756,27 +811,27 @@ hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true 
 -- Example window rules that are useful
 
 local suppressMaximizeRule = hl.window_rule({
-	-- Ignore maximize requests from all apps. You'll probably like this.
-	name = "suppress-maximize-events",
-	match = { class = ".*" },
+  -- Ignore maximize requests from all apps. You'll probably like this.
+  name = "suppress-maximize-events",
+  match = { class = ".*" },
 
-	suppress_event = "maximize",
+  suppress_event = "maximize",
 })
 -- suppressMaximizeRule:set_enabled(false)
 
 hl.window_rule({
-	-- Fix some dragging issues with XWayland
-	name = "fix-xwayland-drags",
-	match = {
-		class = "^$",
-		title = "^$",
-		xwayland = true,
-		float = true,
-		fullscreen = false,
-		pin = false,
-	},
+  -- Fix some dragging issues with XWayland
+  name = "fix-xwayland-drags",
+  match = {
+    class = "^$",
+    title = "^$",
+    xwayland = true,
+    float = true,
+    fullscreen = false,
+    pin = false,
+  },
 
-	no_focus = true,
+  no_focus = true,
 })
 
 -- Layer rules also return a handle.
@@ -789,19 +844,19 @@ hl.window_rule({
 
 -- Hyprland-run windowrule
 hl.window_rule({
-	name = "move-hyprland-run",
-	match = { class = "hyprland-run" },
+  name = "move-hyprland-run",
+  match = { class = "hyprland-run" },
 
-	move = "20 monitor_h-120",
-	float = true,
+  move = "20 monitor_h-120",
+  float = true,
 })
 
 -- La ventana de ayuda (SUPER + A) sale flotante en vez de sumarse al mosaico.
 hl.window_rule({
-	name = "ayuda-flotante",
-	match = { title = "^ayuda-atajos$" },
+  name = "ayuda-flotante",
+  match = { title = "^ayuda-atajos$" },
 
-	float = true,
+  float = true,
 })
 
 -- Las TUI que abren los clics de Waybar (volumen, bluetooth, red, CPU, memoria) son
@@ -815,10 +870,10 @@ hl.window_rule({
 -- Sin 'center' ni 'size' a propósito: se deja que Hyprland las ubique y que cada una
 -- conserve el tamaño que pide.
 hl.window_rule({
-	name = "waybar-tui-flotantes",
-	match = { title = "^(wiremix|bluetui|nmtui|htop|rclone-sync|rclone-log)$" },
+  name = "waybar-tui-flotantes",
+  match = { title = "^(wiremix|bluetui|nmtui|htop|rclone-sync|rclone-log)$" },
 
-	float = true,
+  float = true,
 })
 
 -- btop va aparte porque necesita mucho más espacio que las otras: con el tamaño por
@@ -833,11 +888,11 @@ hl.window_rule({
 -- Píxeles lógicos (y no físicos) significa que el recuento de caracteres se mantiene
 -- entre monitores con distinta escala, que es lo que le importa a btop.
 hl.window_rule({
-	name = "btop-flotante-grande",
-	match = { title = "^btop$" },
+  name = "btop-flotante-grande",
+  match = { title = "^btop$" },
 
-	float = true,
-	size = { 1024, 680 },
+  float = true,
+  size = { 1024, 680 },
 })
 
 -- ram-top (el clic en el modulo de memoria de la barra) va aparte por el mismo motivo
@@ -849,11 +904,11 @@ hl.window_rule({
 -- Vale la misma advertencia de arriba: 'size' solo acepta una tabla de dos numeros en
 -- pixeles logicos. Las variantes con porcentajes se aceptan sin error y no hacen nada.
 hl.window_rule({
-	name = "ram-top-flotante",
-	match = { title = "^ram-top$" },
+  name = "ram-top-flotante",
+  match = { title = "^ram-top$" },
 
-	float = true,
-	size = { 1200, 720 },
+  float = true,
+  size = { 1200, 720 },
 })
 
 -- Zoom popup windows disappear on Hyprland due to focus behavior: the popup
@@ -862,17 +917,17 @@ hl.window_rule({
 -- while visible so the exit/confirm buttons stay clickable.
 -- See https://github.com/hyprwm/Hyprland/issues/4809
 hl.window_rule({
-	name = "zoom-menu-stay-focused",
-	match = { class = "^zoom$", title = "^menu window$" },
+  name = "zoom-menu-stay-focused",
+  match = { class = "^zoom$", title = "^menu window$" },
 
-	stay_focused = true,
+  stay_focused = true,
 })
 
 hl.window_rule({
-	name = "zoom-confirm-stay-focused",
-	match = { class = "^zoom$", title = "^confirm window$" },
+  name = "zoom-confirm-stay-focused",
+  match = { class = "^zoom$", title = "^confirm window$" },
 
-	stay_focused = true,
+  stay_focused = true,
 })
 
 -- Zoom a veces minimiza a la bandeja en vez de salir: la ventana desaparece pero el

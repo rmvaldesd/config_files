@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------
+# Per-machine settings. NOT versioned.
+#
+# Edit these values: they are local and do NOT affect the other
+# machine that clones the same repo. Hyprland reads them at every
+# startup and on every "hyprctl reload".
+#
+# To apply a change: edit this file -> hyprctl reload
+# ---------------------------------------------------------------
+
+# ---- Monitors ----
+
+# Internal display (only relevant if more than one is connected).
+PRIMARY_MONITOR=eDP-1
+# Scaling factor (DPI) of the internal display.
+PRIMARY_SCALE=1.5
+
+# External monitor (empty if none; the rest below are then ignored).
+EXTERNAL_MONITOR=DP-1
+# Resolution and refresh rate, same syntax as Hyprland's hints (e.g. "2560x1080@59.98").
+EXTERNAL_MODE=2560x1080@59.98
+# Position relative to the primary: auto / auto-right / auto-left / x y.
+EXTERNAL_POSITION=auto-right
+# Scaling factor of the external display.
+EXTERNAL_SCALE=1
+
+# ---- Mouse / Keyboard ----
+
+# Swap left/right mouse buttons (for left-handed use).
+LEFT_HANDED=true
+# XKB layouts, comma-separated; toggle between them with the key combo in KB_OPTIONS.
+KB_LAYOUT=latam,es
+# XKB layout variant (usually empty: "", or e.g. "dvorak").
+KB_VARIANT=
+# XKB option that switches layout on a key combo (e.g. grp:alt_shift_toggle).
+KB_OPTIONS=grp:alt_shift_toggle
+# XKB keyboard model (usually empty; e.g. "thinkpad60" for some ThinkPads).
+KB_MODEL=
+
+# ---- Effects (perf trade-offs on this iGPU; false = disabled) ----
+
+# Window drop shadows.
+SHADOWS_ENABLED=false
+# Background blur behind translucent windows.
+BLUR_ENABLED=false
+# Animate workspace switching (offsets the cost when switching fast).
+WORKSPACE_ANIMATIONS=false
+# Redraw frames while resizing/dragging windows.
+ANIMATE_RESIZES=false
+
+# ---- Mouse: cursor and touchpad ----
+
+# Cursor size in pixels (HiDPI displays want a bigger one).
+CURSOR_SIZE=24
+# Whether touchpad scrolling is "natural" (two-finger swipe acts as scroll-up).
+TOUCHPAD_NATURAL_SCROLL=true
+# Global pointer sensitivity, -1.0 to 1.0; 0 = unchanged.
+MOUSE_SENSITIVITY=0
+# Per-device override: exact device name as reported by Hyprland.
+MOUSE_DEVICE_NAME=epic-mouse-v1
+# Sensitivity for that specific device only, -1.0 to 1.0.
+MOUSE_DEVICE_SENSITIVITY=-0.5
