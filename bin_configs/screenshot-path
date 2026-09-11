@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Captura una región de pantalla, la guarda en ~/Pictures/screenshots y copia al
+# portapapeles la RUTA del archivo (texto), no la imagen.
+#
+# Invocado por el bind CONTROL+Print en hyprland.lua (screenshotSave). Reemplaza a
+# 'hyprshot -m region -o ...' para ese bind puntual: hyprshot siempre copia la imagen
+# al portapapeles cuando guarda a disco (no tiene una opción para copiar solo la
+# ruta), así que acá se arma la captura a mano con grim+slurp+hyprpicker, igual que
+# hace hyprshot por dentro, pero de forma síncrona para evitar carreras entre el
+# guardado del archivo y el copiado al portapapeles.
+
+set -e
+
+destino="$HOME/Pictures/screenshots"
+mkdir -p "$destino"
+archivo="$destino/$(date +'%Y-%m-%d-%H%M%S_hyprshot.png')"
+
+# -z (congelar): sin esto, menús desplegados y tooltips desaparecen apenas se mueve
+# el mouse para seleccionar la región (misma razón que en los binds de hyprshot).
+# Se salta si hyprpicker no está instalado, igual que hace hyprshot por su cuenta.
+picker_pid=""
+if command -v hyprpicker >/dev/null 2>&1; then
+    hyprpicker -r -z &
+    picker_pid=$!
+    sleep 0.2
+fi
+
+geometria=$(slurp -d)
+
+if [ -z "$geometria" ]; then
+    [ -n "$picker_pid" ] && kill "$picker_pid" 2>/dev/null
+    exit 0
+fi
+
+grim -g "$geometria" "$archivo"
+if [ -n "$picker_pid" ]; then
+    kill "$picker_pid" 2>/dev/null || true
+fi
+
+wl-copy "$archivo"
+notify-send "Screenshot guardada" "${archivo}\nRuta copiada al portapapeles" \
+    -i "$archivo" -a Hyprshot

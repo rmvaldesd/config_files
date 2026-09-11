@@ -129,9 +129,11 @@ local screenshot = "hyprshot -m region -z --raw | satty --filename - "
 -- SHIFT + Print: región directo al portapapeles, sin pasar por satty.
 local screenshotCopy = "hyprshot -m region -z --clipboard-only"
 
--- CONTROL + Print: región a ~/Pictures/screenshots y además al portapapeles.
--- El propio hyprshot hace mkdir -p del directorio, así que no hace falta crearlo.
-local screenshotSave = "hyprshot -m region -z -o $HOME/Pictures/screenshots"
+-- CONTROL + Print: región a ~/Pictures/screenshots, y la RUTA del archivo (no la
+-- imagen) al portapapeles. hyprshot no tiene una opción para eso (siempre copia la
+-- imagen cuando guarda a disco), así que usa un script propio: ver
+-- config_files/bin_configs/screenshot-path.
+local screenshotSave = "screenshot-path"
 
 -- ALT + Print: la ventana enfocada completa, sin seleccionar con el mouse.
 local screenshotWindow = "hyprshot -m window -m active --clipboard-only"

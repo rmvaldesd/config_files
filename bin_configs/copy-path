@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Copia al portapapeles la ruta absoluta de uno o más archivos.
+#
+#   copy-path imagen.jpg              -> copia /home/rodrigo/.../imagen.jpg
+#   copy-path a.jpg b.jpg             -> copia las dos rutas, una por línea
+#
+# No exige que el archivo exista: sirve igual para referenciar una ruta a algo que
+# todavía no se creó. Si no existe, avisa por stderr pero copia la ruta de todos modos.
+
+set -e
+
+if [ "$#" -eq 0 ]; then
+    echo "Uso: copy-path <archivo> [archivo...]" >&2
+    exit 1
+fi
+
+rutas=""
+for archivo in "$@"; do
+    if [ ! -e "$archivo" ]; then
+        echo "AVISO: no existe: $archivo" >&2
+    fi
+    ruta=$(realpath -m -- "$archivo")
+    rutas="${rutas:+$rutas$'\n'}$ruta"
+done
+
+printf '%s' "$rutas" | wl-copy
+printf '%s\n' "$rutas"
