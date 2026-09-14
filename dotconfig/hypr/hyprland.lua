@@ -588,6 +588,12 @@ hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("pick-window --all"))
 -- que saca el menú de rofi; corrido a mano en una terminal saca fzf con preview.
 hl.bind(mainMod .. " + F", hl.dsp.exec_cmd("find-file"))
 
+-- Dictado por voz (voxtype). 'T' de 'transcribir'.
+-- Toggle: una pulsación arranca a grabar, otra para y transcribe.
+-- Da por hecho que el demonio corre y que el bind del compositor es la única
+-- vía de activación (ver config.toml: [hotkey] enabled = false, state_file = "auto").
+hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("voxtype record toggle"))
+
 -- Activar el submapa al pulsar Mod + R
 hl.bind("SUPER + R", hl.dsp.submap("resize"))
 -- Definición del submapa "resize"
@@ -854,11 +860,15 @@ hl.window_rule({
 })
 
 -- La ventana de ayuda (SUPER + A) sale flotante en vez de sumarse al mosaico.
+-- Con 'size' y 'center' para que abra amplia y centrada: la referencia usa
+-- glow y necesita ancho para no renglonear el texto a lo loco.
 hl.window_rule({
   name = "ayuda-flotante",
   match = { title = "^ayuda-atajos$" },
 
   float = true,
+  center = true,
+  size = "(monitor_w*0.65) (monitor_h*0.7)",
 })
 
 -- Las TUI que abren los clics de Waybar (volumen, bluetooth, red, CPU, memoria) son

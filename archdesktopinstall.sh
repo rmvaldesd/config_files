@@ -156,6 +156,7 @@ paquetes_utilidades=(
     grim              # Herramienta para tomar capturas de pantalla en Wayland.
     slurp             # Permite seleccionar una región de la pantalla con el ratón (se usa en combinación con grim).
     wl-clipboard      # Utilidad para gestionar el portapapeles (copiar/pegar) desde la terminal en Wayland.
+    wtype             # Inyecta texto en Wayland simulando tecleo. Es el backend de escritura del dictado por voz (voxtype): sin él voxtype no puede tipear la transcripción sobre la app activa.
     polkit-gnome      # Agente de autenticación gráfica; levanta la ventana flotante para pedir tu clave sudo.
     thunar            # Gestor de archivos gráfico y ligero del entorno XFCE.
     tumbler           # Extensión para Thunar que permite generar miniaturas (thumbnails) de imágenes y videos.
@@ -707,9 +708,32 @@ echo "-> Instalando paquetes desde AUR..."
 paquetes_aur=(
     sublime-text-4   # Editor gráfico. No está en repos oficiales: el paquete de AUR descarga el binario oficial de sublimehq. Queda asociado a los archivos de texto y código vía mimeapps.list; neovim sigue siendo el editor de terminal.
     zoom             # Cliente oficial de videollamadas. El arreglo para que arranque en Wayland nativo (no XWayland) va aparte en la sección 9, sobre ~/.config/zoomus.conf; ver docs/linux/zoom.md.
+    voxtype-bin      # Dictado por voz push-to-talk optimizado para Wayland (daemon + OSD + backends CPU/GPU). Es el binario precompilado del AUR; la config vive en ~/.config/voxtype/config.toml (no versionada en el repo) y el modelo se baja con 'voxtype setup --download'. La activación se maneja desde Hyprland (bind SUPER+T -> 'voxtype record toggle'), con el hotkey interno desactivado en la config. La integración con Waybar es el módulo 'custom/voxtype' de dotconfig/waybar.
 )
 yay -S --needed --noconfirm "${paquetes_aur[@]}" || \
     echo "AVISO: falló la instalación desde AUR; el resto del entorno quedó completo. Reintenta luego con: yay -S ${paquetes_aur[*]}"
+
+# El daemon de voxtype (dictado por voz) corre como servicio de USUARIO, igual que los de
+# PipeWire: necesita la sesión y el bucle de audio del usuario, no los del sistema.
+# La unit viene en el paquete con 'preset: enabled', pero se habilita e inicia acá en forma
+# explícita para no depender de los presets de cada paquete. El guard cubre el caso de que
+# la instalación AUR de arriba haya fallado: sin binario no hay nada que habilitar.
+if command -v voxtype &>/dev/null; then
+    systemctl --user enable --now voxtype.service
+
+    # Modelo Whisper del dictado. 'setup --download' es idempotente: si la primera vez
+    # el archivo ya existe lo confirma, si no lo baja (~141 MB hacia ~/.local/share/voxtype/models).
+    #
+    # '--model base.en' es importante: la config que voxtype genera de cero trae
+    # 'model = "base"' (el multilingüe, ~142 MB más), y el daemon CRASHEA con "Model
+    # 'base' not found" si solo está bajada la variante base.en. Por eso, además del
+    # download, se fija el modelo en la config del usuario a mano: 'voxtype config set'
+    # NO acepta la clave 'model' (ver 'voxtype config schema'), así que va sed directo
+    # sobre la línea de modelo. Si ya está en base.en el sed no toca nada.
+    voxtype setup --download --model base.en --no-post-install
+    sed -i 's/^model = "base"$/model = "base.en"/' ~/.config/voxtype/config.toml
+    systemctl --user restart voxtype.service
+fi
 
 # ==========================================
 # 13. CLAUDE CODE

@@ -89,6 +89,7 @@ window#waybar {
    -------------------------------------------------------------------------- */
 #custom-submap,
 #custom-language,
+#custom-voxtype,
 #volume,
 #battery,
 #power-profiles-daemon,
@@ -175,6 +176,25 @@ window#waybar {
 #battery.warning,
 #battery.critical {
   color: @urgent;
+}
+
+/* Estado de voxtype (dictado por voz). Un solo icono que cambia de color: gris
+   apagado cuando no hay nada que ver (idle/stopped), cyan mientras transcribe
+   (progreso, igual que el resto de la config) y coral mientras graba, que es el
+   estado que hay que poder ver de reojo. Las clases salen del JSON de
+   'voxtype status --follow' y waybar las aplica a #custom-voxtype tal cual. */
+#custom-voxtype.idle,
+#custom-voxtype.stopped {
+  color: @dark-5;
+}
+
+#custom-voxtype.transcribing {
+  color: @highlight;
+}
+
+#custom-voxtype.recording {
+  color: @urgent;
+  font-weight: 700;
 }
 
 #network.disconnected,

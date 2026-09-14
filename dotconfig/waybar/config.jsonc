@@ -18,6 +18,7 @@
   "modules-right": [
     "tray",
     "custom/submap",
+    "custom/voxtype",
     "custom/language",
     "group/volume",
     "battery",
@@ -330,5 +331,23 @@
     "format": "{}",
     "on-click": "exec foot --title=rclone-sync -e ~/config_files/scripts/rclone-sync menu",
     "on-click-right": "exec foot --title=rclone-log -e ~/config_files/scripts/rclone-sync log"
+  },
+  // Estado del dictado por voz (voxtype). El icono cambia según el estado (idle /
+  // grabando / transcribiendo / detenido): 'voxtype status --follow --format json'
+  // emite el JSON en vivo y waybar pinta el fondo según las clases de style.css.
+  // El on-click reinicia el daemon, que es el fix cuando el dictado se queda colgado.
+  "custom/voxtype": {
+    "exec": "voxtype status --follow --format json",
+    "return-type": "json",
+    "restart-interval": 5,
+    "format": "{icon}",
+    "format-icons": {
+      "idle": "\uf130",
+      "recording": "\uf111",
+      "transcribing": "\uf110",
+      "stopped": "\uf131"
+    },
+    "tooltip": true,
+    "on-click": "systemctl --user restart voxtype"
   }
 }
