@@ -26,8 +26,6 @@ EXTERNAL_SCALE=1
 
 # ---- Mouse / Keyboard ----
 
-# Swap left/right mouse buttons (for left-handed use).
-LEFT_HANDED=true
 # XKB layouts, comma-separated; toggle between them with the key combo in KB_OPTIONS.
 KB_LAYOUT=latam,es
 # XKB layout variant (usually empty: "", or e.g. "dvorak").
@@ -56,7 +54,17 @@ CURSOR_SIZE=24
 TOUCHPAD_NATURAL_SCROLL=true
 # Global pointer sensitivity, -1.0 to 1.0; 0 = unchanged.
 MOUSE_SENSITIVITY=0
-# Per-device override: exact device name as reported by Hyprland.
-MOUSE_DEVICE_NAME=epic-mouse-v1
-# Sensitivity for that specific device only, -1.0 to 1.0.
-MOUSE_DEVICE_SENSITIVITY=-0.5
+
+# ---- Mouse: per-device overrides ----
+# Only the devices listed below get these settings; all others stay default.
+# Add as many devices as you want by repeating the MOUSE_DEVICE_<n>_ group
+# (1, 2, 3...) with NAME + only the options you want. Empty/missing NAME = ignored.
+# Name must match exactly what Hyprland reports (`hyprctl devices -j`), or you
+# can pin a specific physical unit with "address:...".
+MOUSE_DEVICE_1_NAME=logitech-mx-anywhere-3s
+MOUSE_DEVICE_1_LEFT_HANDED=true
+MOUSE_DEVICE_1_SENSITIVITY=-0.5
+# Optional per-device options: NATURAL_SCROLL, ACCEL_PROFILE (flat/adaptive),
+# SCROLL_METHOD (on_button_down/on_button_up/edge/no_scroll), ENABLED.
+# MOUSE_DEVICE_2_NAME=other-device-here
+# MOUSE_DEVICE_2_LEFT_HANDED=false

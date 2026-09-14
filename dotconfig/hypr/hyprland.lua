@@ -473,7 +473,6 @@ hl.config({
     kb_options = settings("KB_OPTIONS", "grp:alt_shift_toggle"),
     kb_rules = "",
 
-    left_handed = settings_bool("LEFT_HANDED", true),
     follow_mouse = 1,
 
     sensitivity = settings_num("MOUSE_SENSITIVITY", 0), -- -1.0 - 1.0, 0 means no modification.
@@ -490,12 +489,45 @@ hl.gesture({
   action = "workspace",
 })
 
--- Example per-device config
--- See https://wiki.hypr.land/Configuring/Advanced-and-Cool/Devices/ for more
-hl.device({
-  name = settings("MOUSE_DEVICE_NAME", "epic-mouse-v1"),
-  sensitivity = settings_num("MOUSE_DEVICE_SENSITIVITY", -0.5),
-})
+-- Per-device overrides: MOUSE_DEVICE_<n>_<option> in ~/.local_host_settings.
+-- Generic plumbing only: no device name/handedness is hardcoded here, so each
+-- machine configures its own devices in its local settings file.
+-- Supported options: NAME (required), LEFT_HANDED, SENSITIVITY,
+-- NATURAL_SCROLL, ACCEL_PROFILE, SCROLL_METHOD, ENABLED.
+-- Device name must match `hyprctl devices -j` exactly, or use "address:..." to
+-- pin a specific physical unit. See https://wiki.hypr.land/Configuring/Advanced-and-Cool/Devices/
+local device_conv = {
+  name = "raw", left_handed = "bool", sensitivity = "num",
+  natural_scroll = "bool", enabled = "bool",
+  accel_profile = "raw", scroll_method = "raw",
+}
+local device_groups, device_indexes = {}, {}
+for key, value in pairs(_cfg) do
+  local idx, opt = key:match("^MOUSE_DEVICE_(%d+)_(.+)$")
+  if idx and device_conv[opt:lower()] then
+    idx = tonumber(idx)
+    if not device_groups[idx] then
+      device_groups[idx] = {}
+      device_indexes[#device_indexes + 1] = idx
+    end
+    device_groups[idx][opt:lower()] = value
+  end
+end
+table.sort(device_indexes)
+for _, idx in ipairs(device_indexes) do
+  local group = device_groups[idx]
+  local prefix = "MOUSE_DEVICE_" .. idx .. "_"
+  if group.name and group.name ~= "" then
+    local device = { name = group.name }
+    if group.left_handed    then device.left_handed    = settings_bool(prefix .. "LEFT_HANDED", false) end
+    if group.sensitivity    then device.sensitivity    = settings_num(prefix .. "SENSITIVITY", 0) end
+    if group.natural_scroll then device.natural_scroll = settings_bool(prefix .. "NATURAL_SCROLL", false) end
+    if group.accel_profile  then device.accel_profile  = settings(prefix .. "ACCEL_PROFILE") end
+    if group.scroll_method  then device.scroll_method  = settings(prefix .. "SCROLL_METHOD") end
+    if group.enabled        then device.enabled        = settings_bool(prefix .. "ENABLED", true) end
+    hl.device(device)
+  end
+end
 
 ---------------------
 ---- KEYBINDINGS ----
