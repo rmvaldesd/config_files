@@ -1,3 +1,10 @@
+# A diferencia del de teams-for-linux, este NO es un override: el paquete glow no trae
+# ningún .desktop (es un binario de terminal a secas), así que mimeapps.list apunta a
+# éste para 'text/markdown'.
+#
+# El Exec envuelve glow en ghostty porque glow es una TUI y el .desktop lo invoca un
+# entorno gráfico (Thunar, xdg-open) que no le da terminal. Es el mismo truco que el
+# atajo SUPER + A de hyprland.lua, sin el fallback a less: acá glow es el punto.
 [Desktop Entry]
 Name=Glow
 GenericName=Visor de Markdown

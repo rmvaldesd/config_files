@@ -467,31 +467,29 @@ fi
 ln -sfn "$HOME/config_files/launchers/teams-for-linux.config.json" "$HOME/.config/teams-for-linux/config.json"
 echo "-> Enlazado: ~/.config/teams-for-linux/config.json -> ~/config_files/launchers/teams-for-linux.config.json"
 
-# Enlaza el .desktop de teams-for-linux, que lo arranca en Wayland NATIVO. El del
-# paquete trae '--ozone-platform=x11', y con eDP-1 a escala 2 XWayland se renderiza a
-# 1x estirado a 2x: todo borroso. Mismo problema y misma clase de arreglo que Spotify
-# (docs/linux/spotify.md); el porqué de este vive en docs/linux/teams.md.
+# Enlaza los .desktop del repo (teams-for-linux, glow, bluetui, ...) en
+# ~/.local/share/applications. applications/ mapea ahí, y ese directorio gana a
+# /usr/share/applications cuando el archivo se llama igual: así los overrides sobreviven
+# a los upgrades del paquete, que reescriben el de /usr/share.
 #
-# applications/ del repo mapea a ~/.local/share/applications, que tiene prioridad sobre
-# /usr/share/applications cuando el archivo se llama igual. Así el override sobrevive a
-# los upgrades del paquete, que reescriben el de /usr/share.
-if [ -e "$HOME/.local/share/applications/teams-for-linux.desktop" ] && [ ! -L "$HOME/.local/share/applications/teams-for-linux.desktop" ]; then
-    respaldo="$HOME/.local/share/applications/teams-for-linux.desktop.bak.$(date +%Y%m%d%H%M%S)"
-    mv "$HOME/.local/share/applications/teams-for-linux.desktop" "$respaldo"
-    echo "-> El .desktop de teams-for-linux ya existía; respaldado como $respaldo"
-fi
-mkdir -p "$HOME/.local/share/applications"
-ln -sfn "$HOME/config_files/applications/teams-for-linux.desktop" \
-    "$HOME/.local/share/applications/teams-for-linux.desktop"
-echo "-> Enlazado: ~/.local/share/applications/teams-for-linux.desktop -> ~/config_files/applications/teams-for-linux.desktop"
+# El loop mecánico vive en scripts/link-applications.sh (crea el symlink, respalda el
+# .desktop suelto que encuentre y refresca mimeinfo.cache), el mismo patrón que
+# link-bins.sh: idempotente y reutilizable suelto para enganchar un .desktop nuevo sin
+# reinstalar:
+#   bash ~/config_files/scripts/link-applications.sh
+bash "$HOME/config_files/scripts/link-applications.sh"
 
-# El override es una copia COMPLETA del .desktop del paquete con una sola línea
-# cambiada (el Exec), así que también congela los demás campos: Icon, StartupWMClass,
-# el handler de x-scheme-handler/msteams y Categories. Si un upgrade de teams-for-linux
-# cambia alguno de esos, nuestra copia lo pisaría en silencio y nadie se enteraría.
-# Este chequeo compara todo MENOS el Exec (la línea que cambiamos a propósito) y avisa.
-# El '!' delante del diff lo pone en contexto de condición, así que el 'set -e' de arriba
-# no aborta el instalador cuando hay diferencias.
+# El de teams-for-linux es un OVERRIDE: lo arranca en Wayland NATIVO. El del paquete
+# trae '--ozone-platform=x11', y con eDP-1 a escala 2 XWayland se renderiza a 1x
+# estirado a 2x: todo borroso. El porqué está en docs/linux/teams.md.
+#
+# Nuestra copia es COMPLETA del .desktop del paquete con una sola línea cambiada (el
+# Exec), así que también congela los demás campos: Icon, StartupWMClass, el handler de
+# x-scheme-handler/msteams y Categories. Si un upgrade de teams-for-linux cambia alguno
+# de esos, nuestra copia lo pisaría en silencio y nadie se enteraría. Este chequeo
+# compara todo MENOS el Exec (la línea que cambiamos a propósito) y avisa. El '!' delante
+# del diff lo pone en contexto de condición, así que el 'set -e' de arriba no aborta el
+# instalador cuando hay diferencias.
 desktop_paquete="/usr/share/applications/teams-for-linux.desktop"
 if [ -f "$desktop_paquete" ]; then
     if ! diff -q <(grep -v '^Exec=' "$desktop_paquete") \
@@ -500,25 +498,6 @@ if [ -f "$desktop_paquete" ]; then
         echo "   Compará y actualizá nuestra copia:"
         echo "   diff $desktop_paquete ~/config_files/applications/teams-for-linux.desktop"
     fi
-fi
-
-# Enlaza el .desktop de glow. A diferencia del de teams, este NO es un override: el
-# paquete glow no trae ninguno (es un binario de terminal a secas), así que sin este
-# archivo mimeapps.list no tendría a qué apuntar para 'text/markdown'.
-#
-# El Exec envuelve glow en ghostty porque glow es una TUI y el .desktop lo invoca un
-# entorno gráfico (Thunar, xdg-open) que no le da terminal. Es el mismo truco que el
-# atajo SUPER + A de hyprland.lua, sin el fallback a less: acá glow es el punto.
-mkdir -p "$HOME/.local/share/applications"
-ln -sfn "$HOME/config_files/applications/glow.desktop" \
-    "$HOME/.local/share/applications/glow.desktop"
-echo "-> Enlazado: ~/.local/share/applications/glow.desktop -> ~/config_files/applications/glow.desktop"
-
-# Refresca mimeinfo.cache para que queden registrados el handler de los links 'msteams:'
-# (los 'Join meeting' de Outlook) y el de text/markdown. Sin esto los .desktop igual
-# sirven para el lanzador, pero xdg-open no sabría qué app abre ese esquema ni ese tipo.
-if command -v update-desktop-database > /dev/null; then
-    update-desktop-database "$HOME/.local/share/applications"
 fi
 
 # Fuerza a Zoom a Wayland nativo (mismo síntoma que Spotify y teams-for-linux:

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Bluetui
+GenericName=Gestor de Bluetooth
+Comment=Administra dispositivos Bluetooth, dentro de una ventana de foot
+Exec=foot --title=bluetui -e bluetui
+Icon=bluetooth
+Terminal=false
+Type=Application
+Keywords=bluetooth;bluetoothctl;dispositivos
+Categories=Utility;Settings;ConsoleOnly
