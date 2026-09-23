@@ -253,6 +253,9 @@ zathura           # Visor de documentos minimalista con teclas tipo vim (j/k par
     # --- Lua para módulos custom de Waybar ---
     lua-dkjson        # Codificador/decodificador JSON puro en Lua; lo usa submap.lua para generar la salida JSON de waybar.
     lua-socket        # Extensión de sockets para Lua (Unix domain sockets); lo usa submap.lua para escuchar los eventos de Hyprland en .socket2.sock.
+    # --- Lua + ncurses para la TUI de monitores (bin_configs/monitor-setup) ---
+    lua54             # Intérprete Y cabeceras de Lua 5.4: provee /usr/bin/lua5.4 (el shebang de monitor-setup) y /usr/include/lua5.4. El binding C de la LTUI vendoreada se compila contra esas cabeceras; el paquete 'lua' no las trae.
+    ncurses           # Librería curses; el binding ltui/lcurses.so linkea '-lcurses'. Ya baja como dependencia de foot, se lista explícito para no depender de ese árbol.
 )
 sudo pacman -S --needed --noconfirm "${paquetes_utilidades[@]}"
 
@@ -562,11 +565,28 @@ bash "$HOME/config_files/scripts/install-fonts.sh"
 #   gpumemwatch   muestrea memoria/errores/térmica de la GPU para comparar i915 vs xe.
 #                 Acá sólo se enlaza; el timer de usuario que lo corre cada 5 min lo
 #                 levanta la sección 15, que necesita este symlink ya creado.
+#   monitor-setup TUI para configurar monitores externos por su EDID (bind SUPER+F2);
+#                 su binding C lo compila el paso de abajo, no viene en el repo.
+#   monitor-id    imprime la identidad EDID de cada monitor, lista para pegar como
+#                 perfil en ~/.local_host_monitors.
 #
 # Va como script aparte y en un loop, y no como cinco 'ln' acá, para que sumar un
 # ejecutable a bin_configs/ no requiera acordarse de tocar este archivo. El script
 # excluye power-profile-sync, que la sección 10 instala COPIADO y no enlazado.
 bash "$HOME/config_files/scripts/link-bins.sh"
+
+# Compila el binding C de la LTUI vendoreada (bin_configs/ltui/lcurses.so) que usa la
+# TUI 'monitor-setup'. El .so NO está en el repo (.gitignore): es específico de la
+# versión de Lua/ncurses de la máquina, así que se compila en cada instalación (es
+# rápido e idempotente). Necesita lua54 (cabeceras) + ncurses + gcc (base-devel, sección 1),
+# los tres instalados más arriba. Si fallara, el instalador NO se aborta: monitor-setup
+# queda sin arrancar hasta correr el script a mano.
+if bash "$HOME/config_files/scripts/build-ltui.sh"; then
+    echo "-> Binding de LTUI compilado (monitor-setup listo para SUPER+F2)."
+else
+    echo "WARN: no se pudo compilar bin_configs/ltui/lcurses.so; 'monitor-setup' no arrancará."
+    echo "      Reintentá a mano:  bash ~/config_files/scripts/build-ltui.sh"
+fi
 
 # Ajustes por-máquina de Hyprland (monitores, layout, mouse). ~/.local_host_settings
 # NO está en el repo: es estado de esta máquina. El repo trae la plantilla con los
@@ -587,6 +607,23 @@ if [ -f "$settings_origen" ]; then
     fi
 else
     echo "WARN: no se encontró $settings_origen; ~/.local_host_settings usará los defaults de hyprland.lua."
+fi
+
+# Monitores externos por EDID. Mismo modelo que los settings de arriba pero para
+# la lista de monitores: template en el repo, copia local en ~/.local_host_monitors
+# que NUNCA se sobrescribe. hyprland.lua la lee en cada arranque/reload; si falta,
+# los perfiles 'fallback' de hyprland.lua cubren cualquier monitor.
+monitors_origen="$HOME/config_files/templates/local_host_monitors"
+monitors_destino="$HOME/.local_host_monitors"
+if [ -f "$monitors_origen" ]; then
+    if [ ! -f "$monitors_destino" ]; then
+        cp "$monitors_origen" "$monitors_destino"
+        echo "-> Creado ~/.local_host_monitors desde la plantilla (editá este archivo para configurar los monitores externos de ESTA máquina)."
+    else
+        echo "-> ~/.local_host_monitors ya existe; no se sobrescribe (perfiles de monitor respetados)."
+    fi
+else
+    echo "WARN: no se encontró $monitors_origen; los monitores externos usan los defaults de hyprland.lua."
 fi
 
 # ==========================================

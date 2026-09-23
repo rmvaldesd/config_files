@@ -87,6 +87,22 @@ else
     echo "-> ~/.local_host_settings ya existe; no se sobrescribe (respeto ajustes locales)."
 fi
 
+# 3b) Mismo modelo para la lista de monitores externos (perfiles EDID). Plantilla
+#     del repo -> copia local que nunca se pisa.
+MON_TPL="$REPO/templates/local_host_monitors"
+if [ ! -f "$HOME/.local_host_monitors" ]; then
+    if [ -f "$MON_TPL" ]; then
+        cp "$MON_TPL" "$HOME/.local_host_monitors"
+        echo "-> Creado ~/.local_host_monitors desde la plantilla"
+        echo "   Enchufá cada monitor y corré 'monitor-id' para pegar su perfil acá."
+    else
+        echo "WARN: no existe la plantilla $MON_TPL y no hay ~/.local_host_monitors;"
+        echo "     los monitores externos usan los defaults de hyprland.lua."
+    fi
+else
+    echo "-> ~/.local_host_monitors ya existe; no se sobrescribe (perfiles de monitor respetados)."
+fi
+
 # 4) Recargar la sesión si Hyprland está corriendo.
 if pgrep -x Hyprland >/dev/null 2>&1; then
     if command -v hyprctl >/dev/null 2>&1; then
