@@ -1,0 +1,55 @@
+------------------------------------------------------------------------------
+-- MONITORES de ESTA máquina (externos y el panel interno). NO está en el repo.
+--
+-- El repo trae esta plantilla (templates/local_host_monitors); el instalador la
+-- copia a ~/.local_host_monitors SOLO si no existe, como hace con
+-- ~/.local_host_settings. Un equipo ya instalado no vuelve a tocar el archivo:
+-- esto es estado local tuyo, no versionado.
+--
+-- Por qué afuera del repo: la lista de monitores que enchufás Y los modos que
+-- les querés dar son tuyos (de tu dock, tus oficinas), no del repo compartido.
+--
+-- hyprland.lua la lee en cada arranque y en cada 'hyprctl reload'. Para aplicar
+-- un cambio: editá este archivo → hyprctl reload.
+--
+-- Cómo agregar un monitor nuevo (o el interno):
+--   1. Enchufalo y corré:   monitor-id           (imprime la línea lista para
+--      pegar acá abajo; '--ext' omite el panel interno)
+--   2. Agregá su bloque a 'external' con el modo y la escala que quieras.
+--   3. Recargá:             hyprctl reload
+--   (Más fácil: abrí 'monitor-setup' — SUPER+F2 — y guardá desde la TUI.)
+--
+-- La 'desc' sale del EDID físico del monitor, no de dónde esté el cable: un
+-- mismo monitor enchufado a DP-1, USB-C o HDMI-A-1 siempre tiene la misma
+-- 'desc', y así le cae SIEMPRE su resolución/escala aunque cambie de puerto.
+-- El panel interno (eDP-1) también tiene 'desc' y puede llevar perfil propio;
+-- si no lo tiene, manda PRIMARY_MODE / PRIMARY_SCALE de ~/.local_host_settings.
+--
+-- El bloque 'fallback' aplica a TODO monitor sin perfil propio, incluido uno
+-- NUEVO que nunca viste: 'preferred' usa su mejor modo de fábrica y
+-- 'auto-right' lo deja a la derecha del interno.
+------------------------------------------------------------------------------
+
+return {
+  fallback = {
+    mode     = "preferred",
+    position = "auto-right",
+    scale    = 1,
+  },
+
+  -- Un bloque por monitor físico. 'desc' es lo único que importa; 'name' es
+  -- solamente para reconocerlos en el diff. Si un monitor conectado matchea el
+  -- fallback en vez de su perfil, es porque falta su bloque acá o el 'desc:'
+  -- no coincide exacto (comparalo con 'monitor-id').
+  --
+  -- Campos opcionales por monitor (los pone la TUI 'monitor-setup'):
+  --   transform   rotación/flip 0..7 (0 = normal)
+  --   disabled    true deja el puerto apagado (se ignora el resto)
+  --   mirror      nombre del output a espejar, p.ej. "eDP-1"
+  --   workspaces  { 4, 5, 6 }  workspaces que viven en este monitor
+  external = {
+    -- { name = "UltraWide oficina",     desc = "desc:Del Inc. P2422H 0x00000000",     mode = "2560x1080@59.98", position = "auto-right", scale = 1 },
+    -- { name = "TV living",             desc = "desc:LG Electronics UHD 0x00000000",  mode = "3840x2160@60",   position = "auto-right", scale = 1.25 },
+    -- { name = "Vertical",              desc = "desc:Del Inc. P2422H 0x00000000",     mode = "preferred",      position = "auto-left",  scale = 1,      transform = 1, workspaces = { 4, 5, 6 } },
+  },
+}

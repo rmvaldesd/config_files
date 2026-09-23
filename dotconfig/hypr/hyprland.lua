@@ -80,20 +80,65 @@ hl.monitor(
     mode = settings("PRIMARY_MODE", "preferred"),
     position = "auto",
     scale = settings_num("PRIMARY_SCALE", 1.5),
-  },
-  {
-    output = settings("EXTERNAL_MONITOR", "DP-1"),
-    mode = settings("EXTERNAL_MODE", "2560x1080@59.98"),
-    position = settings("EXTERNAL_POSITION", "auto-right"),
-    scale = settings_num("EXTERNAL_SCALE", 1),
   }
--- {
---   output = "HDMI-A-1",
---   mode = "3840x2160@60",
---   position = "auto-right",
---   scale = "auto",
--- }
 )
+
+-- Perfiles de monitores por identidad EDID, no por puerto: se matchean
+-- con 'desc:' y no con el nombre del cable, así un mismo monitor enchufado a
+-- DP-1, USB-C o HDMI-A-1 siempre recibe su resolución/escala/posición. Aplica
+-- tanto a externos como al panel INTERNO (eDP-1): si le guardás un perfil, gana
+-- sobre PRIMARY_MODE/PRIMARY_SCALE de ~/.local_host_settings. La lista vive en
+-- ~/.local_host_monitors (AFUERA del repo, mismo modelo que ~/.local_host_settings:
+-- el instalador copia templates/local_host_monitors la primera vez y nunca vuelve
+-- a pisarla). Si el archivo falta, cae en los defaults de abajo y el config igual
+-- funciona. El perfil 'fallback' cubre cualquier monitor sin perfil propio,
+-- incluido uno NUEVO recién conectado. Agregar un monitor: enchuflo, 'monitor-id',
+-- pegar el bloque, reload.
+local function load_monitors()
+  local path = os.getenv("HOME") .. "/.local_host_monitors"
+  local f = io.open(path, "r")
+  if f then
+    f:close()
+    return dofile(path)
+  end
+  return { fallback = { mode = "preferred", position = "auto-right", scale = 1 }, external = {} }
+end
+
+local monitors = load_monitors()
+
+hl.monitor({
+  output = "",
+  mode = monitors.fallback.mode,
+  position = monitors.fallback.position,
+  scale = monitors.fallback.scale,
+})
+
+for _, monitor in ipairs(monitors.external) do
+  local rule = { output = monitor.desc }
+  if monitor.disabled then
+    -- a disabled profile keeps the port off; mode/position/scale are moot
+    rule.disabled = true
+  else
+    rule.mode = monitor.mode
+    rule.position = monitor.position
+    rule.scale = monitor.scale
+    if monitor.transform and monitor.transform ~= 0 then
+      rule.transform = monitor.transform
+    end
+    if monitor.mirror and monitor.mirror ~= "" then
+      rule.mirror = monitor.mirror
+    end
+  end
+  hl.monitor(rule)
+
+  -- workspaces owned by this monitor (EDID-matched, so they follow the monitor
+  -- across ports). Only when the monitor is actually enabled.
+  if not monitor.disabled then
+    for _, ws in ipairs(monitor.workspaces or {}) do
+      hl.workspace_rule({ workspace = ws, monitor = monitor.desc })
+    end
+  end
+end
 
 ---------------------
 ---- MY PROGRAMS ----
@@ -742,6 +787,17 @@ hl.bind(mainMod .. " + Print", hl.dsp.exec_cmd(screenshotMonitor)) -- monitor co
 -- estan en la misma posicion fisica en cualquier layout.
 hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(ayuda))
 
+-- Monitor Setup: perfil de monitores externos por EDID en una terminal flotante
+-- (bin_configs/monitor-setup). 'F2' esta en la primer fila de teclas de funcion,
+-- libre en este esquema; SUPER + F ya es find-file y se elige un F2 a proposito
+-- para que el launcher de aplicaciones no lo pise.
+-- '-W 110x28' fuerza el tamaño en columnas/filas para que la statusbar (96 cols
+-- de atajos) entre completa; el window rule flotante lo acomoda al monitor.
+-- La fuente va en size=10 (vs 12 del foot.ini) para que el flotante se lea bien.
+local monitorSetup =
+    "foot --title=monitor-setup '--font=JetBrainsMono Nerd Font:size=10' -W 110x28 -e monitor-setup"
+hl.bind(mainMod .. " + F2", hl.dsp.exec_cmd(monitorSetup))
+
 -- Tu nueva combinación base: SUPER + CONTROL
 local thirdMod = mainMod .. " + CONTROL"
 
@@ -901,6 +957,28 @@ hl.window_rule({
   float = true,
   center = true,
   size = "(monitor_w*0.65) (monitor_h*0.7)",
+})
+
+-- Monitor Setup (SUPER + F2) sale flotante centrada igual que la ayuda: la TUI
+-- muestra conectar/perfiles/draft y necesita pantalla real para que se lea de un
+-- vistazo, sin reacomodar el mosaico por la consulta. El match va por titulo
+-- ('monitor-setup', el --title= que le pasa el bind de arriba).
+--
+-- 'stay_focused' porque la ventana flotante pierde el foco apenas el mouse sale
+-- de ella y la TUI se queda dibujada sin escuchar teclas: q/Esc no la cierran.
+-- Mismo arreglo que los popups de Zoom (ver regla zoom-menu-stay-focused abajo).
+--
+-- NO hay regla de 'size' a proposito: el tamaño lo define foot con '-W 110x28'
+-- (celdas), que es lo unico que calza exacto con la TUI (la statusbar de ~100
+-- cols entra completa). Si Hyprland ademas forzara un size en píxeles logicos,
+-- las dos metricas no coinciden y quedan margenes negros asimetricos alrededor.
+hl.window_rule({
+  name = "monitor-setup-flotante",
+  match = { title = "^monitor-setup$" },
+
+  float = true,
+  center = true,
+  stay_focused = true,
 })
 
 -- Las TUI que abren los clics de Waybar (volumen, bluetooth, red, CPU, memoria) son

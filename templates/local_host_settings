@@ -15,14 +15,12 @@ PRIMARY_MONITOR=eDP-1
 # Scaling factor (DPI) of the internal display.
 PRIMARY_SCALE=1.5
 
-# External monitor (empty if none; the rest below are then ignored).
-EXTERNAL_MONITOR=DP-1
-# Resolution and refresh rate, same syntax as Hyprland's hints (e.g. "2560x1080@59.98").
-EXTERNAL_MODE=2560x1080@59.98
-# Position relative to the primary: auto / auto-right / auto-left / x y.
-EXTERNAL_POSITION=auto-right
-# Scaling factor of the external display.
-EXTERNAL_SCALE=1
+# External monitors NO se configuran acá: se identifican por su EDID ('desc:') y
+# viven en ~/.local_host_monitors, otro archivo local de ESTA máquina (el repo trae
+# la plantilla templates/local_host_monitors). Esa identidad es la misma sin importar
+# el puerto (DP-1, USB-C, HDMI). Las viejas claves EXTERNAL_MONITOR / EXTERNAL_MODE /
+# EXTERNAL_POSITION / EXTERNAL_SCALE quedaron en desuso.
+# Para sumar un monitor nuevo: enchuflo -> 'monitor-id' -> pegar el bloque.
 
 # ---- Mouse / Keyboard ----
 
