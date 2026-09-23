@@ -12,3 +12,6 @@ dotconfig/herdr/session.json
 # rclone bisync deja un hash del archivo de filtros JUNTO a él (así detecta que lo
 # editaste y pide un --resync). Es estado del workdir de esta máquina, no configuración.
 scripts/rclone-sync-filtros.txt.md5
+
+# LTUI binding local (se compila con scripts/build-ltui.sh)
+bin_configs/ltui/lcurses.so

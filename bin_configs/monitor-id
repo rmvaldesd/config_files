@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Lista la identidad EDID de cada monitor enchufado, lista para pegarla como
+# perfil 'desc:' en tu ~/.local_host_monitors (el archivo local de monitores;
+# el repo solo trae la plantilla templates/local_host_monitors).
+#
+#   monitor-id           # todos los monitores
+#   monitor-id --ext     # sólo los externos (omite eDP-1, LVDS-1, DSI-1)
+#
+# La 'desc:' sale del EDID real del monitor, no de dónde esté el cable: un mismo
+# monitor enchufado a DP-1, USB-C o HDMI-A-1 siempre reporta la misma descripción.
+# Con eso Hyprland le aplica su perfil (resolución, escala, posición) sin depender
+# del puerto. Ver templates/local_host_monitors para el flujo completo.
+
+set -e
+
+externos=""
+if [ "${1:-}" = "--ext" ]; then
+    externos=1
+fi
+
+hyprctl monitors -j | jq -r --argjson ext "${externos:-false}" '
+  .[]
+  | select(($ext | not) or (.name | test("^(eDP|LVDS|DSI)-") | not))
+  | "  { name = \"\(.name)\", desc = \"desc:\(.description)\", mode = \"preferred\", position = \"auto-right\", scale = \(.scale) },"
+'

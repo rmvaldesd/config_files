@@ -1,0 +1,1380 @@
+#!/usr/bin/env lua5.4
+-- monitor-setup - TUI to configure monitors (external and the internal panel) by
+-- EDID identity, built on the vendored LTUI (bin_configs/ltui/, Apache-2.0,
+-- github.com/tboox/ltui).
+--
+-- Lists every connected monitor, flags the ones with no profile yet (NEW), and
+-- lets you pick resolution, position, scale, rotation, workspaces and output mode
+-- to save into ~/.local_host_monitors (this machine's LOCAL monitor file, outside
+-- the repo). Saving runs a 'hyprctl reload', so the profile applies right away.
+-- 'd' removes a saved profile and 'R' re-reads the monitors. The internal display
+-- gets a profile like any other; it just has no "Position" row (it is the origin).
+--
+-- If ~/.local_host_monitors does not exist when the screen opens, it is created
+-- from the repo template (or with the default fallback if the template is also
+-- missing) - the first run never fails on the file. If the file exists but does
+-- not load, the problem is shown and saving is disabled, so a typo in the local
+-- file never eats the saved profiles (the previous copy stays as a .bak).
+--
+-- It opens in a centered floating terminal (window rule 'monitor-setup-flotante'
+-- and SUPER + F2 in hyprland.lua):
+--   foot --title=monitor-setup -e monitor-setup
+--
+-- 'desc:' comes from the monitor's physical EDID and does NOT depend on the
+-- port: DP-1, USB-C or HDMI-A-1 report the same value for the same monitor, so
+-- the profile follows it across ports. Every monitor without its own profile
+-- uses the 'fallback' block.
+--
+-- Requires: hyprctl + jq, lua 5.4 and the vendored LTUI. The C binding
+-- (bin_configs/ltui/lcurses.so) is built once with scripts/build-ltui.sh; LTUI
+-- itself does not build on Lua 5.4 without that step (uses luaL_checkint,
+-- removed in 5.4).
+
+-- --------------------------------------------------------------------------
+-- Resolve the repo dir (the script may be run through a /usr/local/bin symlink)
+-- --------------------------------------------------------------------------
+local function script_dir()
+    local p = arg and arg[0]
+    if p then
+        local handle = io.popen("readlink -f -- '" .. tostring(p):gsub("'", "'\\''") .. "' 2>/dev/null")
+        if handle then
+            local rp = handle:read("*l")
+            handle:close()
+            if rp and rp ~= "" then
+                p = rp
+            end
+        end
+        local d = tostring(p):match("^(.*)/[^/]*$")
+        if d and d ~= "" then
+            return d
+        end
+    end
+    local src = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+    return src:match("^(.*)/[^/]*$") or "."
+end
+
+local BIN_DIR = script_dir()
+package.path = BIN_DIR .. "/?.lua;" .. BIN_DIR .. "/?/init.lua;" .. package.path
+package.cpath = BIN_DIR .. "/?.so;" .. package.cpath
+
+local oklib, lib = pcall(require, "monitor-setup-lib")
+if not oklib then
+    io.stderr:write("ERROR: cannot load monitor-setup-lib.lua\n")
+    io.stderr:write(tostring(lib) .. "\n")
+    os.exit(1)
+end
+
+local oktui, ltui = pcall(require, "ltui")
+if not oktui then
+    io.stderr:write("ERROR: the vendored LTUI did not load.\n")
+    io.stderr:write("The C binding is missing or was built for another Lua.\n")
+    io.stderr:write("Build it once with:  bash " .. BIN_DIR .. "/../scripts/build-ltui.sh\n")
+    os.exit(1)
+end
+
+local view, rect, event, action = ltui.view, ltui.rect, ltui.event, ltui.action
+local application = ltui.application
+local choicedialog, textdialog = ltui.choicedialog, ltui.textdialog
+
+-- Rotation / flip (Hyprland 'transform' 0..7). ASCII only (byte-width safe).
+local TRANSFORMS = {
+    { v = 0, name = "Normal" },
+    { v = 1, name = "90 (portrait left)" },
+    { v = 2, name = "180 (upside down)" },
+    { v = 3, name = "270 (portrait right)" },
+    { v = 4, name = "Flipped" },
+    { v = 5, name = "Flipped + 90" },
+    { v = 6, name = "Flipped + 180" },
+    { v = 7, name = "Flipped + 270" },
+}
+
+local function transform_name(v)
+    v = tonumber(v) or 0
+    for _, t in ipairs(TRANSFORMS) do
+        if t.v == v then
+            return t.name
+        end
+    end
+    return "Normal"
+end
+
+-- The editable rows of the selected monitor, in order (navigated with j/k and
+-- opened with Enter; no per-field letter shortcut needed). The internal display
+-- has no "Position" row: it is the layout origin, so a relative position is moot.
+local OPTIONS_EXTERNAL = { "Resolution", "Position", "Scale", "Rotation", "Workspaces", "Output" }
+local OPTIONS_INTERNAL = { "Resolution", "Scale", "Rotation", "Workspaces", "Output" }
+
+-- Serialize the current draft of 'desc' into a hl.monitor({...}) Lua snippet,
+-- used for the live preview (applied with 'hyprctl eval').
+local function rule_lua(desc, d)
+    local fields = { 'output = "' .. tostring(desc):gsub('"', '\\"') .. '"' }
+    if d.disabled then
+        fields[#fields + 1] = "disabled = true"
+    else
+        fields[#fields + 1] = "disabled = false"
+        fields[#fields + 1] = 'mode = "' .. tostring(d.mode):gsub('"', '\\"') .. '"'
+        fields[#fields + 1] = 'position = "' .. tostring(d.position):gsub('"', '\\"') .. '"'
+        if type(d.scale) == "number" then
+            fields[#fields + 1] = "scale = " .. tostring(d.scale)
+        else
+            fields[#fields + 1] = 'scale = "' .. tostring(d.scale):gsub('"', '\\"') .. '"'
+        end
+        local tr = tonumber(d.transform) or 0
+        fields[#fields + 1] = "transform = " .. tostring(math.floor(tr))
+        if d.mirror and d.mirror ~= "" then
+            fields[#fields + 1] = 'mirror = "' .. tostring(d.mirror):gsub('"', '\\"') .. '"'
+        end
+    end
+    return "hl.monitor({ " .. table.concat(fields, ", ") .. " })"
+end
+
+-- --------------------------------------------------------------------------
+-- Helpers
+-- --------------------------------------------------------------------------
+
+-- Left-justify to n columns, cutting with an ellipsis when it does not fit.
+local function ellip(s, n)
+    s = tostring(s or "")
+    n = math.floor(n)
+    if n <= 0 then
+        return ""
+    end
+    if #s <= n then
+        return s
+    end
+    if n <= 3 then
+        return s:sub(1, n)
+    end
+    return s:sub(1, n - 3) .. "..."
+end
+
+local function pad(s, n)
+    s = ellip(s, n)
+    if #s < n then
+        return s .. string.rep(" ", n - #s)
+    end
+    return s
+end
+
+-- Connected-monitor signature: changes when a monitor is plugged/unplugged.
+local function monitor_signature(monitors)
+    local parts = {}
+    for _, m in ipairs(monitors) do
+        parts[#parts + 1] = m.name .. ":" .. m.desc
+    end
+    return table.concat(parts, "|")
+end
+
+-- Statusbar legend: only navigation + help (the feature keys live in the help).
+local function status_legend(w)
+    if w >= 54 then
+        return " [j/k] move   [tab] area   [enter] edit   [h] help   [q] quit"
+    end
+    return " [j/k] move   [h] help   [q] quit"
+end
+
+local HELP_TEXT = [[monitor-setup shortcuts
+
+Navigate
+  j / k              move up/down (in the monitor list, or in the option rows)
+  tab                switch between the monitor list and the option rows
+  left / right       go straight to the monitor list / the option rows
+  enter              on a monitor: move to its options
+                     on an option: open its editor
+  h                  this help
+  q                  quit (any live preview is reverted first)
+
+Options of the selected monitor (navigate with j/k, open with enter)
+  Resolution         the modes the monitor reports
+  Position           right / left / above / below the built-in
+                     (not shown for the internal display: it is the origin)
+  Scale              1 / 1.25 / 1.5 / 1.75 / 2 / auto
+  Rotation           transform 0..7 (for portrait / pivoted monitors)
+  Workspaces         workspace numbers owned by this monitor (e.g. 4 5 6)
+  Output             normal / disabled / mirror another output
+
+Other
+  a                  save into ~/.local_host_monitors and apply (hyprctl reload)
+  u                  undo the live preview (back to the saved profile)
+  d                  remove the saved profile of this monitor
+  R                  refresh: re-read the connected monitors and profiles
+
+In the pickers, j / k (or the arrows) move and <enter> selects; <esc> goes back.
+The options also have single-letter shortcuts: r p s t w o.
+
+Editing a value applies it LIVE to the monitor right away (so you see the
+rotation/scale at once) with an auto-revert: press [a] to keep it, [u] to undo,
+or it reverts on its own after 15s. Nothing is written until you keep it.
+
+Inside the pickers, <Enter> or <Select> accepts, <Esc> goes back.
+
+Plugging or unplugging a monitor is detected automatically (about once a
+second, while this screen is open); [R] forces a re-read right away.
+
+  . Connected      the monitors Hyprland sees right now; the active mode is
+                   shown next to each one. Externals without a profile say NEW.
+  . Profiles       what is saved in ~/.local_host_monitors. Entries currently
+                   connected are shown in green; the rest are dimmed.
+  . Selected       the monitor you are editing (marked with '>' above) and the
+                   resolution / position / scale its profile will save.
+
+Monitors are identified by EDID (their 'desc:'), not by port: the same monitor
+on DP-1, USB-C or HDMI-A-1 always gets its profile. The 'fallback' block covers
+any new monitor. If the local file did not exist, the screen created it on open
+(from the repo template, or with the fallback).
+
+Editing by hand: ~/.local_host_monitors  ->  hyprctl reload
+]]
+HELP_TEXT = HELP_TEXT:gsub("\n$", "")
+
+-- --------------------------------------------------------------------------
+-- Main view: draws the whole screen on a single black canvas
+-- --------------------------------------------------------------------------
+local monitorview = view()
+
+function monitorview:init(name, bounds, app)
+    view.init(self, name, bounds)
+    self:background_set("black")
+    self:option_set("selectable", true)
+    self._APP = app
+    self._MONITORS = {}
+    self._LIST = {}
+    self._PROFILES = {}
+    self._PROFILES_ERR = nil
+    self._SEL = 0
+    self._FOCUS = "monitors" -- "monitors" or "options"
+    self._OPT = 1            -- highlighted option row (see OPTIONS)
+    self._DRAFT = { mode = "preferred", position = "auto-right", scale = 1, transform = 0, disabled = false, mirror = nil, workspaces = {} }
+    self._DIRTY = false
+    self._MSG = nil
+    self._PREVIEW = false
+    self._PREVIEW_UNTIL = 0
+end
+
+-- Populate after the monitors/profiles were read by the app. The navigable list
+-- holds EVERY monitor (internal included): the internal gets a profile by EDID
+-- too, exactly like the externals.
+function monitorview:_setup(monitors, profiles, perr)
+    self._MONITORS = monitors
+    self._LIST = {}
+    for i = 1, #monitors do
+        self._LIST[#self._LIST + 1] = i
+    end
+    self._PROFILES = profiles or {}
+    self._PROFILES_ERR = perr
+    -- clamp the option index to the list of options the current monitor has
+    local opts = self:_options()
+    if self._OPT > #opts then
+        self._OPT = #opts
+    end
+    self:invalidate()
+end
+
+function monitorview:_msg(text)
+    self._MSG = text
+    self:invalidate()
+end
+
+function monitorview:_sel_monitor()
+    local idx = self._LIST[self._SEL]
+    return idx and self._MONITORS[idx] or nil
+end
+
+-- The option rows for the currently selected monitor (internal vs external).
+function monitorview:_options()
+    local m = self:_sel_monitor()
+    if m and m.internal then
+        return OPTIONS_INTERNAL
+    end
+    return OPTIONS_EXTERNAL
+end
+
+-- Default position for a monitor without a profile: the internal is the layout
+-- origin ("auto"); an external defaults to the right of the built-in.
+local function default_position(m)
+    if m and m.internal then
+        return "auto"
+    end
+    return "auto-right"
+end
+
+function monitorview:_profile_for(desc)
+    for _, p in ipairs(self._PROFILES) do
+        if p.desc == desc then
+            return p
+        end
+    end
+    return nil
+end
+
+function monitorview:_connected(desc)
+    for _, m in ipairs(self._MONITORS) do
+        if m.desc == desc then
+            return true
+        end
+    end
+    return false
+end
+
+function monitorview:_readable_side(pos)
+    if pos == "auto-right" then return "right"
+    elseif pos == "auto-left" then return "left"
+    elseif pos == "auto-up" then return "above"
+    elseif pos == "auto-down" then return "below"
+    end
+    return tostring(pos or "?")
+end
+
+function monitorview:_load_draft()
+    local m = self:_sel_monitor()
+    if not m then
+        self._DRAFT = { mode = "preferred", position = "auto", scale = 1, transform = 0, disabled = false, mirror = nil, workspaces = {} }
+        self._DIRTY = false
+        return
+    end
+    local p = self:_profile_for(m.desc)
+    local ws = {}
+    if p and type(p.workspaces) == "table" then
+        for _, wnum in ipairs(p.workspaces) do
+            ws[#ws + 1] = wnum
+        end
+    end
+    self._DRAFT = {
+        mode = p and p.mode or "preferred",
+        position = p and p.position or default_position(m),
+        scale = p and p.scale or 1,
+        transform = (p and p.transform) or 0,
+        disabled = (p and p.disabled) or false,
+        mirror = p and p.mirror or nil,
+        workspaces = ws,
+    }
+    self._DIRTY = false
+end
+
+-- Human-readable output mode for the detail box.
+function monitorview:_output_mode()
+    if self._DRAFT.disabled then
+        return "disabled (port off)"
+    elseif self._DRAFT.mirror and self._DRAFT.mirror ~= "" then
+        return "mirror -> " .. self._DRAFT.mirror
+    end
+    return "normal"
+end
+
+function monitorview:_workspaces_text()
+    if type(self._DRAFT.workspaces) ~= "table" or #self._DRAFT.workspaces == 0 then
+        return "(none)"
+    end
+    local out = {}
+    for _, w in ipairs(self._DRAFT.workspaces) do
+        out[#out + 1] = tostring(w)
+    end
+    return table.concat(out, " ")
+end
+
+-- --------------------------------------------------------------------------
+-- Painting primitives
+-- --------------------------------------------------------------------------
+function monitorview:_put(y, x, s, color, extra, bg, nopad)
+    local h, w = self:height(), self:width()
+    if y < 0 or y >= h or x >= w then
+        return
+    end
+    s = tostring(s or "")
+    if x < 0 then
+        x = 0
+    end
+    if #s > w - x then
+        s = s:sub(1, w - x)
+    end
+    -- pad with spaces to the right edge: a redraw that is shorter than the
+    -- previous one must not leave the old tail on screen
+    local tail = nopad and "" or string.rep(" ", w - x - #s)
+    local attrs = { color or "white", bg or "onblack" }
+    if extra then
+        table.insert(attrs, extra)
+    end
+    self:canvas():attr(attrs):move(x, y):putstr(s .. tail)
+end
+
+-- Clear a run of columns with a background colour (for the selected-row bar).
+function monitorview:_fill(y, x, len, bg)
+    local h, w = self:height(), self:width()
+    if y < 0 or y >= h then
+        return
+    end
+    local x2 = math.min(x + len, w)
+    if x2 <= x then
+        return
+    end
+    self:canvas():attr({ "black", bg }):move(x, y):putstr(string.rep(" ", x2 - x))
+end
+
+function monitorview:_put_right(y, s, color, extra)
+    s = tostring(s or "")
+    local x = self:width() - #s - 2
+    if x < 0 then
+        x = 0
+    end
+    self:_put(y, x, s, color, extra)
+end
+
+function monitorview:_hrule(y, ch)
+    if y < 0 or y >= self:height() then
+        return
+    end
+    self:_put(y, 0, string.rep(ch or "-", self:width()), "white", "dim")
+end
+
+-- A section title in cyan with a dim rule filling the rest of the line.
+function monitorview:_section(y, title)
+    if y < 0 or y >= self:height() then
+        return y
+    end
+    self:_put(y, 1, title, "cyan", "bold")
+    local start = 1 + #title + 1
+    local w = self:width()
+    if start < w - 1 then
+        self:_put(y, start, string.rep("-", w - start - 1), "white", "dim")
+    end
+    return y + 1
+end
+
+function monitorview:_putwrap(y, x, s, color, extra)
+    local h, w = self:height(), self:width()
+    if y < 0 or y >= h or x < 0 or x >= w then
+        return 1
+    end
+    local avail = w - x
+    if avail < 1 then
+        return 1
+    end
+    s = tostring(s or "")
+    local rows = 0
+    while #s > 0 and y < h do
+        local piece = s:sub(1, avail)
+        if #s > avail then
+            local cut = nil
+            for i = #piece, 2, -1 do
+                if piece:sub(i, i) == " " then
+                    cut = i
+                    break
+                end
+            end
+            if cut then
+                piece = piece:sub(1, cut - 1)
+                s = s:sub(cut):gsub("^%s+", "")
+            else
+                s = s:sub(avail + 1)
+            end
+        else
+            s = ""
+        end
+        self:_put(y, x, piece, color, extra)
+        y = y + 1
+        rows = rows + 1
+    end
+    if rows == 0 then
+        return 1
+    end
+    return rows
+end
+
+-- --------------------------------------------------------------------------
+-- Sections
+-- --------------------------------------------------------------------------
+function monitorview:_draw_connected(y)
+    local w = self:width()
+    y = self:_section(y, "CONNECTED MONITORS")
+    if #self._MONITORS == 0 then
+        return y + self:_putwrap(y, 2, "(Hyprland reports no monitors)", "white", "dim")
+    end
+    -- every monitor is navigable (the internal too); _SEL indexes _MONITORS
+    for pos, m in ipairs(self._MONITORS) do
+        local active = lib.active_mode(m)
+        local selected = pos == self._SEL
+        local focused = selected and self._FOCUS == "monitors"
+        local has = self:_profile_for(m.desc) ~= nil
+        local marker = selected and ">" or (has and "*" or " ")
+        local tail
+        if m.internal then
+            tail = "internal"
+        elseif not has then
+            tail = "NEW"
+        elseif selected then
+            tail = "profile saved"
+        else
+            tail = ""
+        end
+        local left = marker .. " " .. pad(m.name, 10) .. " " .. pad(active, 16) .. " "
+        local namew = w - 2 - #left - ((tail ~= "") and (#tail + 2) or 0)
+        local row = left .. ellip(lib.display_name(m.desc), namew)
+        if focused then
+            self:_fill(y, 0, w, "onwhite")
+            self:_put(y, 1, row, "black", "bold", "onwhite")
+            if tail ~= "" then
+                self:_put(y, w - #tail - 2, tail, "black", "bold", "onwhite")
+            end
+        else
+            local color = selected and "yellow" or (m.internal and "white" or (has and "white" or "yellow"))
+            local extra = selected and "bold" or (m.internal and "dim" or (has and nil or "bold"))
+            self:_put(y, 1, row, color, extra)
+            if tail ~= "" then
+                self:_put(y, w - #tail - 2, tail, m.internal and "white" or "green", m.internal and "dim" or "bold")
+            end
+        end
+        y = y + 1
+    end
+    return y
+end
+
+function monitorview:_draw_profiles(y)
+    local w = self:width()
+    y = self:_section(y, "SAVED PROFILES (" .. #self._PROFILES .. ")")
+    if self._PROFILES_ERR then
+        y = y + self:_putwrap(y, 2, "! cannot read ~/.local_host_monitors:", "red", "bold")
+        y = y + self:_putwrap(y, 4, tostring(self._PROFILES_ERR), "red")
+        y = y + self:_putwrap(y, 2, "  fix it by hand; saving is disabled so it is not overwritten.", "red")
+        return y
+    end
+    if #self._PROFILES == 0 then
+        return y + self:_putwrap(y, 2, "(none - every external monitor uses the fallback block)", "white", "dim")
+    end
+    -- leave room for the detail box + footer; if the list is huge, say how many
+    -- entries were left out instead of drawing past the bottom edge
+    local total = #self._PROFILES
+    local room = self:height() - y - 15
+    if room < 1 then
+        room = 1
+    end
+    local shown = total
+    if total > room then
+        shown = room - 1
+        if shown < 1 then
+            shown = 1
+        end
+    end
+    for i = 1, shown do
+        local p = self._PROFILES[i]
+        local connected = self:_connected(p.desc)
+        local row = "* " .. pad(p.name, 38) .. " " .. pad(p.mode, 14) .. " " ..
+            pad(self:_readable_side(p.position), 6) .. " x" .. tostring(p.scale or 1)
+        self:_put(y, 1, ellip(row, w - 18), connected and "green" or "white", connected and "bold" or "dim")
+        local tag = connected and "(connected)" or "(not connected)"
+        self:_put(y, w - #tag - 2, tag, connected and "green" or "white", connected and "bold" or "dim")
+        y = y + 1
+    end
+    if total > shown then
+        self:_put(y, 1, "+ " .. (total - shown) .. " more (see the file)", "yellow", "dim")
+        y = y + 1
+    end
+    return y
+end
+
+-- One content line inside the detail box: "| <content> |". 'selected' paints a
+-- highlight bar across the row (for the focused option).
+function monitorview:_boxline(y, x, bw, content, color, extra, selected)
+    self:_put(y, x, "|", "cyan", "bold")
+    local inner = bw - 4
+    if selected then
+        self:_fill(y, x + 2, inner, "onwhite")
+    end
+    if content and #content > 0 then
+        if selected then
+            self:_put(y, x + 2, ellip(content, inner), "black", "bold", "onwhite", true)
+        else
+            self:_put(y, x + 2, ellip(content, inner), color or "white", extra)
+        end
+    end
+    self:_put(y, x + bw - 1, "|", "cyan", "bold")
+    return y + 1
+end
+
+function monitorview:_draw_detail(y)
+    local w = self:width()
+    local m = self:_sel_monitor()
+    local x, bw = 2, w - 4
+    if not m then
+        self:_put(y, 2, "No monitor selected.", "yellow", "bold")
+        y = y + 1
+        y = y + self:_putwrap(y, 2, "Press [R] to refresh; the connected monitors show up here.", "white", "dim")
+        return y
+    end
+
+    local active = lib.active_mode(m)
+    local title = m.internal and "SELECTED MONITOR  (internal)" or "SELECTED MONITOR"
+    local lead = "+ " .. title .. " "
+    local rest = bw - #lead - 1
+    if rest < 1 then
+        rest = 1
+    end
+    self:_put(y, x, lead .. string.rep("-", rest) .. "+", "cyan", "bold")
+    y = y + 1
+
+    y = self:_boxline(y, x, bw, pad(m.name, 10) .. " " .. pad(active, 16) .. " " .. lib.raw_desc(m.desc), "white", "bold")
+    y = self:_boxline(y, x, bw, "")
+    local mode = tostring(self._DRAFT.mode)
+    if mode == active then
+        mode = mode .. "  (active)"
+    end
+    local value_of = {
+        Resolution = mode,
+        Position = self:_readable_side(self._DRAFT.position),
+        Scale = tostring(self._DRAFT.scale),
+        Rotation = transform_name(self._DRAFT.transform),
+        Workspaces = self:_workspaces_text(),
+        Output = self:_output_mode(),
+    }
+    for i, label in ipairs(self:_options()) do
+        local sel = self._FOCUS == "options" and self._OPT == i
+        local marker = (self._FOCUS == "options") and (sel and ">" or " ") or " "
+        local text = marker .. " " .. pad(label, 13) .. (value_of[label] or "")
+        y = self:_boxline(y, x, bw, text, "white", nil, sel)
+    end
+    y = self:_boxline(y, x, bw, "")
+    local has = self:_profile_for(m.desc)
+    if has then
+        y = self:_boxline(y, x, bw, "Profile: saved - edit then press [a] to overwrite", "green")
+    else
+        y = self:_boxline(y, x, bw, "Profile: NEW - not saved yet (press [a] to save)", "yellow", "bold")
+    end
+
+    self:_put(y, x, "+" .. string.rep("-", bw - 2) .. "+", "cyan", "bold")
+    return y + 1
+end
+
+function monitorview:_draw_footer(y)
+    if self._WS_EDIT then
+        self:_put(y, 1, "workspaces: " .. self._WS_EDIT.text .. "_    ([enter] ok, [esc] cancel; space separated, e.g. 4 5 6)",
+            "yellow", "bold")
+        return y + 1
+    end
+    if self._PREVIEW then
+        local left = self:preview_seconds_left()
+        self:_put(y, 1, "* PREVIEW - [a] keep, [u] undo (auto-revert in " .. left .. "s)",
+            "yellow", "bold")
+    else
+        local dirty = self._DIRTY
+        self:_put(y, 1, dirty and "* unsaved changes" or "- no changes",
+            dirty and "red" or "white", dirty and "bold" or "dim")
+    end
+    y = y + 1
+    if self._MSG then
+        local m = tostring(self._MSG)
+        local color = "white"
+        if m:match("^saved") or m:match("removed") or m:match("^refreshed") or m:match("^preview reverted") then
+            color = "green"
+        elseif m:match("failed") or m:match("cannot") or m:match("refusing") or m:match("^!") then
+            color = "red"
+        end
+        y = y + self:_putwrap(y, 1, "> " .. m, color)
+    end
+    return y
+end
+
+function monitorview:on_draw(transparent)
+    view.on_draw(self, transparent)
+    self:_put(0, 1, "MONITOR SETUP", "cyan", "bold")
+    self:_put_right(0, "monitors by EDID (internal + external)", "white", "dim")
+    self:_hrule(1, "=")
+    local y = 2
+    y = self:_draw_connected(y)
+    y = y + 1
+    y = self:_draw_profiles(y)
+    y = y + 1
+    y = self:_draw_detail(y)
+    y = self:_draw_footer(y)
+end
+
+-- --------------------------------------------------------------------------
+-- Interactions
+-- --------------------------------------------------------------------------
+function monitorview:_move(d)
+    if self._FOCUS == "options" then
+        local n = #self:_options()
+        self._OPT = (self._OPT + d - 1) % n + 1
+        self:_msg(nil)
+        self:invalidate()
+        return true
+    end
+    local n = #self._LIST
+    if n == 0 then
+        self:_msg("no monitors reported")
+        return true
+    end
+    self._SEL = (self._SEL + d - 1) % n + 1
+    self:_load_draft()
+    local opts = self:_options()
+    if self._OPT > #opts then
+        self._OPT = #opts
+    end
+    self:_msg(nil)
+    self:invalidate()
+    return true
+end
+
+function monitorview:_switch_focus()
+    self._FOCUS = (self._FOCUS == "monitors") and "options" or "monitors"
+    self:invalidate()
+    return true
+end
+
+function monitorview:_focus(area)
+    if area and area ~= self._FOCUS then
+        self._FOCUS = area
+        self:invalidate()
+    end
+    return true
+end
+
+-- Enter: on the monitor list, move the focus to the options; on an option row,
+-- open its editor. No per-field letter shortcut is needed.
+function monitorview:_activate()
+    if self._FOCUS == "monitors" then
+        if #self._LIST == 0 then
+            self:_msg("no monitors reported")
+            return true
+        end
+        self._FOCUS = "options"
+        self:invalidate()
+        return true
+    end
+    local key = self:_options()[self._OPT]
+    if key == "Resolution" then
+        return self:_edit_resolution()
+    elseif key == "Position" then
+        return self:_edit_side()
+    elseif key == "Scale" then
+        return self:_edit_scale()
+    elseif key == "Rotation" then
+        return self:_edit_transform()
+    elseif key == "Workspaces" then
+        return self:_edit_workspaces()
+    elseif key == "Output" then
+        return self:_edit_output()
+    end
+    return true
+end
+
+function monitorview:_open_choice(title, values, selected, onselect)
+    local app = self._APP
+    local w = math.max(24, math.min(80, app:width() - 4))
+    local h = math.max(6, math.min(20, app:height() - 4))
+    local dlg = choicedialog:new("monitor-setup.choice." .. title, rect:new(0, 0, w, h), title)
+    dlg:text():text_set("Select an option then press <Enter> or <Select>; <Esc> to go back.")
+    dlg:choicebox():load(values, selected)
+    dlg:choicebox():action_set(action.ac_on_selected, function(_, index, value)
+        if onselect then
+            onselect(index, value)
+        end
+        dlg:quit()
+    end)
+    app:_open(dlg)
+    return true
+end
+
+function monitorview:_edit_resolution()
+    local m = self:_sel_monitor()
+    if not m then
+        self:_msg("no monitor selected")
+        return true
+    end
+    local active = lib.active_mode(m)
+    local vals = { "preferred" }
+    for _, mode in ipairs(lib.available_modes(m.name)) do
+        if mode ~= "preferred" then
+            table.insert(vals, mode)
+        end
+    end
+    local texts = {}
+    for i, v in ipairs(vals) do
+        if v == "preferred" then
+            texts[i] = "preferred (monitor's own best)"
+        elseif v == active then
+            texts[i] = v .. "   <- active"
+        else
+            texts[i] = v
+        end
+    end
+    local selected = 1
+    for i, v in ipairs(vals) do
+        if v == self._DRAFT.mode then
+            selected = i
+            break
+        end
+    end
+    return self:_open_choice("Resolution - " .. lib.display_name(m.desc), texts, selected,
+        function(index)
+            self._DRAFT.mode = vals[index]
+            self._DIRTY = true
+            self:invalidate()
+        end)
+end
+
+function monitorview:_edit_side()
+    local m = self:_sel_monitor()
+    if not m then
+        self:_msg("no monitor selected")
+        return true
+    end
+    local texts = { "Right   (right of the built-in)", "Left    (left of the built-in)", "Above   (above the built-in)", "Below   (below the built-in)" }
+    local vals = { "auto-right", "auto-left", "auto-up", "auto-down" }
+    local current = self._DRAFT.position
+    local selected = 1
+    for i, v in ipairs(vals) do
+        if v == current then
+            selected = i
+            break
+        end
+    end
+    return self:_open_choice("Position - " .. lib.display_name(m.desc), texts, selected,
+        function(index)
+            self._DRAFT.position = vals[index]
+            self._DIRTY = true
+            self:invalidate()
+        end)
+end
+
+function monitorview:_edit_scale()
+    local m = self:_sel_monitor()
+    if not m then
+        self:_msg("no monitor selected")
+        return true
+    end
+    local texts = { "1      (default)", "1.25", "1.5", "1.75", "2      (4K screens)", "auto   (let Hyprland pick)" }
+    local vals = { 1, 1.25, 1.5, 1.75, 2, "auto" }
+    local current = self._DRAFT.scale
+    local selected = 1
+    for i, v in ipairs(vals) do
+        if tostring(v) == tostring(current) then
+            selected = i
+            break
+        end
+    end
+    return self:_open_choice("Scale - " .. lib.display_name(m.desc), texts, selected,
+        function(index)
+            self._DRAFT.scale = vals[index]
+            self:_changed()
+        end)
+end
+
+function monitorview:_edit_transform()
+    local m = self:_sel_monitor()
+    if not m then
+        self:_msg("no monitor selected")
+        return true
+    end
+    local vals, texts = {}, {}
+    for i, t in ipairs(TRANSFORMS) do
+        vals[i] = t.v
+        texts[i] = tostring(t.v) .. "   " .. t.name
+    end
+    local current = tonumber(self._DRAFT.transform) or 0
+    local selected = 1
+    for i, v in ipairs(vals) do
+        if v == current then
+            selected = i
+            break
+        end
+    end
+    return self:_open_choice("Rotation - " .. lib.display_name(m.desc), texts, selected,
+        function(index)
+            self._DRAFT.transform = vals[index]
+            self:_changed()
+        end)
+end
+
+function monitorview:_edit_output()
+    local m = self:_sel_monitor()
+    if not m then
+        self:_msg("no monitor selected")
+        return true
+    end
+    local vals = {
+        { disabled = false, mirror = nil },
+        { disabled = true, mirror = nil },
+    }
+    local texts = {
+        "Normal (extend the desktop)",
+        "Disabled (turn this port off)",
+    }
+    for _, other in ipairs(self._MONITORS) do
+        if other.name ~= m.name then
+            vals[#vals + 1] = { disabled = false, mirror = other.name }
+            texts[#texts + 1] = "Mirror -> " .. other.name .. "  (" .. lib.display_name(other.desc) .. ")"
+        end
+    end
+    local selected = 1
+    if self._DRAFT.disabled then
+        selected = 2
+    elseif self._DRAFT.mirror and self._DRAFT.mirror ~= "" then
+        for i, v in ipairs(vals) do
+            if v.mirror == self._DRAFT.mirror then
+                selected = i
+                break
+            end
+        end
+    end
+    return self:_open_choice("Output mode - " .. lib.display_name(m.desc), texts, selected,
+        function(index)
+            local v = vals[index]
+            self._DRAFT.disabled = v.disabled
+            self._DRAFT.mirror = v.mirror
+            self:_changed()
+        end)
+end
+
+function monitorview:_edit_workspaces()
+    local m = self:_sel_monitor()
+    if not m then
+        self:_msg("no monitor selected")
+        return true
+    end
+    -- inline editor: keys are captured by app:on_event while _WS_EDIT is set
+    local current = self:_workspaces_text()
+    self._WS_EDIT = { text = (current == "(none)" and "" or current) }
+    self:invalidate()
+    return true
+end
+
+function monitorview:_ws_finish(commit)
+    if not self._WS_EDIT then
+        return
+    end
+    if commit then
+        local seen, ws = {}, {}
+        for tok in self._WS_EDIT.text:gmatch("%d+") do
+            local n = tonumber(tok)
+            if n and n >= 1 and not seen[n] then
+                seen[n] = true
+                ws[#ws + 1] = n
+            end
+        end
+        table.sort(ws)
+        self._DRAFT.workspaces = ws
+        self._WS_EDIT = nil
+        self:_changed()
+    else
+        self._WS_EDIT = nil
+        self:invalidate()
+    end
+end
+
+-- Write the profiles and ask Hyprland to apply them.
+function monitorview:_apply_and_message(prefix)
+    local ok, err = lib.write_profiles(lib.config_file(), self._PROFILES)
+    if not ok then
+        self:_msg(prefix .. " failed: " .. tostring(err))
+        return false
+    end
+    local rokok, relerr = lib.hyprctl_reload()
+    if rokok then
+        self:_msg(prefix .. " and applied (hyprctl reload ok)")
+    elseif relerr and relerr:match("Hyprland") then
+        self:_msg(prefix .. ". No Hyprland session: applies next start.")
+    else
+        self:_msg(prefix .. ", but 'hyprctl reload' failed - reload by hand" ..
+            (relerr and (" (" .. tostring(relerr) .. ")") or ""))
+    end
+    return true
+end
+
+-- --------------------------------------------------------------------------
+-- Live preview + auto-revert
+-- --------------------------------------------------------------------------
+-- Apply the current draft to the selected output right away (no save), so
+-- picking a rotation/scale/etc. is visible immediately.
+function monitorview:_apply_live()
+    local m = self:_sel_monitor()
+    if not m then
+        return nil, "no monitor selected"
+    end
+    return lib.hyprctl_eval(rule_lua(m.desc, self._DRAFT))
+end
+
+-- A draft field changed: mark dirty and preview it live, arming the revert.
+function monitorview:_changed()
+    self._DIRTY = true
+    self:invalidate()
+    local ok, err = self:_apply_live()
+    if ok then
+        self._PREVIEW = true
+        self._PREVIEW_UNTIL = os.time() + 15
+        self._MSG = nil
+    else
+        self._PREVIEW = false
+        self._MSG = "preview failed: " .. tostring(err)
+    end
+    return true
+end
+
+-- Put back the saved profile (or the fallback) and drop the pending edit.
+function monitorview:revert_preview()
+    if not self._PREVIEW then
+        return false
+    end
+    self._PREVIEW = false
+    self._PREVIEW_UNTIL = 0
+    self:_load_draft()
+    -- A reload re-reads ~/.local_host_monitors and re-applies every rule, so
+    -- transform / mirror / disabled really go back to their saved values
+    -- (an eval that omits those fields does NOT reset them).
+    lib.hyprctl_reload()
+    self:_msg("preview reverted - back to the saved profile")
+    return true
+end
+
+function monitorview:preview_seconds_left()
+    if not self._PREVIEW then
+        return 0
+    end
+    local left = self._PREVIEW_UNTIL - os.time()
+    if left < 0 then
+        left = 0
+    end
+    return left
+end
+
+function monitorview:_save()
+    local m = self:_sel_monitor()
+    if not m then
+        self:_msg("no monitor selected")
+        return true
+    end
+    if self._PROFILES_ERR then
+        self:_msg("refusing to save: ~/.local_host_monitors has an error - fix it by hand")
+        return true
+    end
+    if not self._DIRTY then
+        self:_msg("no changes to save")
+        return true
+    end
+    local p = self:_profile_for(m.desc)
+    local name = lib.display_name(m.desc)
+    local function apply_draft(target)
+        target.name = name
+        target.mode = self._DRAFT.mode
+        -- the internal display is the layout origin: no relative position
+        target.position = m.internal and "auto" or self._DRAFT.position
+        target.scale = self._DRAFT.scale
+        target.transform = tonumber(self._DRAFT.transform) or 0
+        target.disabled = self._DRAFT.disabled and true or false
+        target.mirror = (self._DRAFT.mirror ~= "" and self._DRAFT.mirror) or nil
+        target.workspaces = self._DRAFT.workspaces or {}
+    end
+    if p then
+        apply_draft(p)
+    else
+        local np = { desc = m.desc }
+        apply_draft(np)
+        table.insert(self._PROFILES, np)
+    end
+    self._DIRTY = false
+    self._PREVIEW = false
+    self._PREVIEW_UNTIL = 0
+    self:_apply_and_message("saved to ~/.local_host_monitors")
+    self:invalidate()
+    return true
+end
+
+function monitorview:_remove()
+    local m = self:_sel_monitor()
+    if not m then
+        self:_msg("no monitor selected")
+        return true
+    end
+    if self._PROFILES_ERR then
+        self:_msg("refusing to change: ~/.local_host_monitors has an error")
+        return true
+    end
+    local p = self:_profile_for(m.desc)
+    if not p then
+        self:_msg("this monitor has no saved profile")
+        return true
+    end
+    local app = self._APP
+    local w = math.max(34, math.min(64, app:width() - 4))
+    local dlg = textdialog:new("monitor-setup.remove", rect:new(0, 0, w, 9), "remove")
+    dlg:text():text_set("Remove the saved profile for\n" ..
+        lib.display_name(m.desc) .. "?\nIt will use the fallback block.")
+    dlg:button_add("yes", "< Yes >", function()
+        for i, pp in ipairs(self._PROFILES) do
+            if pp.desc == m.desc then
+                table.remove(self._PROFILES, i)
+                break
+            end
+        end
+        self._DIRTY = false
+        self._PREVIEW = false
+        self._PREVIEW_UNTIL = 0
+        self:_apply_and_message("profile removed - monitor uses the fallback")
+        self:_load_draft()
+        self:invalidate()
+    end)
+    dlg:button_add("no", "< No >", function() dlg:quit() end)
+    dlg:button_select("no")
+    app:_open(dlg)
+    return true
+end
+
+-- Re-read monitors + profiles from disk/Hyprland without leaving the screen.
+-- 'monitors' may be passed in (already read) to avoid a second hyprctl call.
+function monitorview:refresh(monitors)
+    if self._DIRTY then
+        self:_msg("unsaved changes - save or discard (q) before refreshing")
+        return true
+    end
+    monitors = monitors or lib.read_monitors()
+    local profiles, perr = lib.read_profiles(lib.config_file())
+    self:_setup(monitors, profiles, perr)
+    local n = #self._LIST
+    if n == 0 then
+        self._SEL = 0
+    elseif self._SEL < 1 or self._SEL > n then
+        self._SEL = 1
+    end
+    self:_load_draft()
+    self:_msg(perr and ("cannot read profiles: " .. tostring(perr)) or "refreshed")
+    self:invalidate()
+    return true
+end
+
+function monitorview:_quit()
+    local app = self._APP
+    if not self._DIRTY and not self._PREVIEW then
+        app:quit()
+        return true
+    end
+    local w = math.max(30, math.min(60, app:width() - 4))
+    local dlg = textdialog:new("monitor-setup.exit", rect:new(0, 0, w, 7), "exit")
+    dlg:text():text_set("There are unsaved changes.\nRevert them and quit?")
+    dlg:button_add("yes", "< Yes >", function()
+        self:revert_preview()
+        app:quit()
+    end)
+    dlg:button_add("no", "< No >", function() dlg:quit() end)
+    dlg:button_select("no")
+    app:_open(dlg)
+    return true
+end
+
+function monitorview:_help()
+    local app = self._APP
+    local w = math.max(50, math.min(82, app:width() - 2))
+    local h = math.max(12, math.min(26, app:height() - 2))
+    local dlg = textdialog:new("monitor-setup.help", rect:new(0, 0, w, h), "help")
+    dlg:text():text_set(HELP_TEXT)
+    dlg:option_set("scrollable", true)
+    dlg:button_add("exit", "< Exit >", function() dlg:quit() end)
+    app:_open(dlg)
+    return true
+end
+
+-- --------------------------------------------------------------------------
+-- The application wires keys to the view above; dialogs own the keys while
+-- they are open.
+-- --------------------------------------------------------------------------
+local app = application()
+
+function app:init()
+    application.init(self, "monitor-setup")
+
+    -- first run: the local file is created if it does not exist yet
+    local created, err = lib.ensure_config_file()
+    local msg = nil
+    if created == "template" then
+        msg = "~/.local_host_monitors did not exist: created from the repo template."
+    elseif created == "default" then
+        msg = "~/.local_host_monitors did not exist: created with the default fallback."
+    elseif not created then
+        msg = "cannot create ~/.local_host_monitors: " .. tostring(err)
+    end
+
+    local monitors = lib.read_monitors()
+    local profiles, perr = lib.read_profiles(lib.config_file())
+
+    -- baseline for the hotplug auto-detect (see app:_poll_hotplug)
+    self._MONITOR_SIG = monitor_signature(monitors)
+    self._POLL_TICKS = 0
+
+    self.view_main = monitorview:new("monitor-setup.main", rect:new(0, 0, self:width(), self:height() - 1), self)
+    self:insert(self.view_main)
+    self.view_main:_setup(monitors, profiles, perr)
+
+    local sbar = self:statusbar()
+    sbar:background_set("black")
+    sbar:info():textattr_set("white onblack dim")
+    self:insert(sbar)
+    sbar:info():text_set(status_legend(self:width()))
+
+    if perr then
+        self.view_main:_msg("cannot read ~/.local_host_monitors - saving disabled (see above)")
+    elseif msg then
+        self.view_main:_msg(msg)
+    end
+
+    if #monitors == 0 then
+        self.view_main:_msg("Hyprland reports no monitors (is the session running?)")
+    end
+
+    -- initial selection: the first monitor without a profile, else the first one
+    if #self.view_main._LIST > 0 then
+        self.view_main._SEL = 1
+        for e, idx in ipairs(self.view_main._LIST) do
+            if not self.view_main:_profile_for(monitors[idx].desc) then
+                self.view_main._SEL = e
+                break
+            end
+        end
+        self.view_main:_load_draft()
+        if self.view_main._OPT > #self.view_main:_options() then
+            self.view_main._OPT = #self.view_main:_options()
+        end
+    end
+end
+
+function app:on_resize()
+    if self.view_main then
+        self.view_main:bounds_set(rect:new(0, 0, self:width(), self:height() - 1))
+    end
+    local sbar = self:statusbar()
+    sbar:bounds_set(rect:new(0, self:height() - 1, self:width(), 1))
+    -- the statusbar's internal label keeps its initial width otherwise (LTUI
+    -- does not resize it), clipping the shortcuts to the pre-rule terminal size
+    sbar:info():bounds_set(rect:new(0, 0, sbar:width(), sbar:height()))
+    sbar:info():text_set(status_legend(self:width()))
+    application.on_resize(self)
+end
+
+-- Open a dialog centered on the desktop and remember it so its keys are not
+-- reinterpreted by the main screen.
+function app:_open(dlg)
+    self._DIALOG_OPEN = true
+    dlg:action_add(action.ac_on_exit, function()
+        self._DIALOG_OPEN = false
+    end)
+    self:insert(dlg, { centerx = true, centery = true })
+end
+
+-- Periodic 1s tick: auto-revert an unconfirmed preview, then check hotplug.
+function app:_tick()
+    local vm = self.view_main
+    if vm._PREVIEW then
+        if os.time() >= vm._PREVIEW_UNTIL then
+            vm:revert_preview()
+        else
+            vm:invalidate() -- keep the countdown ticking on screen
+        end
+    end
+    self:_poll_hotplug()
+end
+
+-- Auto-detect hotplug: the program loop fires an idle event every ~50ms; every
+-- ~1s we check the connected monitors and refresh the screen when the set
+-- changed, so plugging a monitor does not require closing/reopening the tool.
+-- This only runs while the tool is open (no daemon, nothing runs when closed).
+function app:_poll_hotplug()
+    local monitors = lib.read_monitors()
+    local sig = monitor_signature(monitors)
+    if sig == self._MONITOR_SIG then
+        return
+    end
+    self._MONITOR_SIG = sig
+    local vm = self.view_main
+    if vm._DIRTY then
+        vm:_msg("monitor change detected - save or discard, then press [R]")
+        vm:invalidate()
+        return
+    end
+    vm:refresh(monitors)
+    if #vm._MONITORS == 0 then
+        vm:_msg("no monitors reported")
+    else
+        vm:_msg("monitor change detected - list updated")
+    end
+end
+
+function app:on_event(e)
+    if self._DIALOG_OPEN then
+        return application.on_event(self, e)
+    end
+    -- inline workspace editor captures keys while it is open
+    local vm = self.view_main
+    if vm and vm._WS_EDIT then
+        if e.type == event.ev_keyboard then
+            local k = e.key_name
+            if k == "Enter" then
+                vm:_ws_finish(true)
+            elseif k == "Esc" then
+                vm:_ws_finish(false)
+            elseif k == "Backspace" then
+                vm._WS_EDIT.text = vm._WS_EDIT.text:sub(1, -2)
+                vm:invalidate()
+            elseif k and #k == 1 and (k:match("%d") or k == " ") then
+                vm._WS_EDIT.text = vm._WS_EDIT.text .. k
+                vm:invalidate()
+            end
+        end
+        return true
+    end
+    if e.type == event.ev_idle then
+        self._POLL_TICKS = self._POLL_TICKS + 1
+        if self._POLL_TICKS >= 20 then -- ~1s at the loop's 50ms idle tick
+            self._POLL_TICKS = 0
+            self:_tick()
+        end
+    elseif e.type == event.ev_keyboard then
+        local k = e.key_name
+        if k == "Down" or k == "j" or k == "J" then
+            return self.view_main:_move(1)
+        elseif k == "Up" or k == "k" or k == "K" then
+            return self.view_main:_move(-1)
+        elseif k == "Tab" or k == "ShiftTab" then
+            return self.view_main:_switch_focus()
+        elseif k == "Left" then
+            return self.view_main:_focus("monitors")
+        elseif k == "Right" then
+            return self.view_main:_focus("options")
+        elseif k == "Enter" then
+            return self.view_main:_activate()
+        elseif k == "a" or k == "A" then
+            return self.view_main:_save()
+        elseif k == "r" or k == "R" then
+            -- 'R' also refreshes (kept as a shortcut); 'r' opens Resolution
+            if k == "R" then
+                return self.view_main:refresh()
+            end
+            return self.view_main:_edit_resolution()
+        elseif k == "p" or k == "P" then
+            return self.view_main:_edit_side()
+        elseif k == "s" or k == "S" then
+            return self.view_main:_edit_scale()
+        elseif k == "u" or k == "U" then
+            return self.view_main:revert_preview()
+        elseif k == "t" or k == "T" then
+            return self.view_main:_edit_transform()
+        elseif k == "o" or k == "O" then
+            return self.view_main:_edit_output()
+        elseif k == "w" or k == "W" then
+            return self.view_main:_edit_workspaces()
+        elseif k == "d" or k == "D" or k == "Delete" then
+            return self.view_main:_remove()
+        elseif k == "F5" then
+            return self.view_main:refresh()
+        elseif k == "h" or k == "H" then
+            return self.view_main:_help()
+        elseif k == "q" or k == "Q" or k == "Esc" then
+            return self.view_main:_quit()
+        elseif k == "CtrlC" then
+            if self.view_main._DIRTY then
+                return self.view_main:_quit()
+            end
+            -- else fall through: the base handler quits the program on CtrlC
+        end
+    end
+    -- let LTUI handle everything we do not consume: Resize (the floating window
+    -- rule resizes us after start), Refresh, CtrlC-to-quit, mouse, commands...
+    return application.on_event(self, e)
+end
+
+app:run()
