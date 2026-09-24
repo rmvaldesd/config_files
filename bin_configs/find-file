@@ -8,9 +8,10 @@
 #   find-file --fzf    fuerza fzf con preview (permite elegir varios con Tab)
 #
 # Desde el bind (SUPER + F), la cara rofi además mira el portapapeles: si lo último
-# copiado es una ruta, la ofrece ARRIBA y preseleccionada, así Enter sin escribir nada
-# abre eso (ver el bloque "La ruta que tengas copiada" más abajo). La cara fzf no lo
-# hace a propósito. Ver también las funciones limpiar_candidato/analizar_candidato.
+# copiado es una ruta o una URL, la ofrece ARRIBA y preseleccionada, así Enter sin
+# escribir nada abre eso (ver el bloque "Lo que tengas copiado" más abajo). La cara fzf
+# no lo hace a propósito. Ver las funciones limpiar_basico/limpiar_ruta/es_url/
+# analizar_candidato.
 #
 # La detección es por TTY y no por variables de entorno: Hyprland lanza los binds sin
 # terminal, así que ahí stdin no es un tty y sale rofi; en una terminal interactiva sí
@@ -84,11 +85,10 @@ resolver() {
     realpath -m -- "$r"
 }
 
-# Lo que se copia rara vez es una ruta limpia. Acá se sacan los adornos con los que
-# suele llegar: CR final (copiado de Windows), espacios, comillas envolventes, el
-# 'file://' de navegadores y gestores, y los escapes de URL ('%20'). No se toca nada
-# más: un nombre con un '%' suelto queda igual, para no arruinarlo.
-limpiar_candidato() {
+# Limpieza COMÚN a cualquier candidato: saca los adornos con los que suele venir lo
+# copiado, sirva después como ruta o como URL. CR final (copiado de Windows), espacios
+# al costado, comillas envolventes y los '<...>' de un mail o un markdown.
+limpiar_basico() {
     local r=$1
 
     r=${r%$'\r'}
@@ -96,11 +96,32 @@ limpiar_candidato() {
     r=${r%"${r##*[![:space:]]}"}
     r=${r#\"}; r=${r%\"}
     r=${r#\'}; r=${r%\'}
+    # '<https://...>' sólo si están los DOS, para no comerse un '>' suelto.
+    case "$r" in "<"*">") r=${r#<}; r=${r%>} ;; esac
+
+    printf '%s' "$r"
+}
+
+# ¿Es una URL? Cualquier esquema con autoridad ('http://', 'https://', 'ftp://',
+# 'gemini://', 'ssh://', ...) o 'mailto:'. 'file://' NO cuenta a propósito: eso es una
+# ruta local y la maneja la rama de archivos, que le saca el prefijo y la resuelve.
+es_url() {
+    case "$1" in file://*) return 1 ;; esac
+    [[ $1 =~ ^[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]]+$ ]] ||
+        [[ $1 =~ ^mailto:[^[:space:]]+$ ]]
+}
+
+# Limpieza específica de una RUTA: el 'file://' que ponen navegadores y gestores y los
+# escapes de URL ('%20'). Acá SÍ se decodifica; en una URL no se toca (ver abajo).
+#
+# Sólo se decodifica si TODOS los '%' son un escape válido y no hay backslashes:
+# 'printf %b' también interpreta '\', así que un nombre con '\' se vería alterado, y un
+# '%' suelto haría saltar un error de printf.
+limpiar_ruta() {
+    local r
+    r=$(limpiar_basico "$1")
     r=${r#file://}
 
-    # Sólo se decodifica si TODOS los '%' son un escape válido y no hay backslashes:
-    # 'printf %b' también interpreta '\', así que un nombre con '\' se vería alterado,
-    # y un '%' suelto haría saltar un error de printf.
     if [[ $r == *%* && $r != *\\* ]] &&
        [[ ! $r =~ %[^0-9A-Fa-f] && ! $r =~ %$ ]]; then
         r=$(printf '%b' "${r//%/\\x}")
@@ -109,12 +130,23 @@ limpiar_candidato() {
     printf '%s' "$r"
 }
 
-# Analiza UNA línea del portapapeles y decide si es una ruta y si existe. Imprime
-# 'ok<TAB>/ruta/absoluta' o 'falta<TAB>/ruta/absoluta'; no imprime nada si la línea no
-# parece una ruta (texto suelto: no se ofrece, para no llenar el menú de prosa).
+# Analiza UNA línea del portapapeles y decide qué es. Imprime:
+#   'url<TAB><url>'            una URL, tal cual (sin decodificar)
+#   'ok<TAB>/ruta/absoluta'    es una ruta y existe
+#   'falta<TAB>/ruta/absoluta' parece ruta y no existe
+# No imprime nada si no parece ni ruta ni URL (texto suelto: no se ofrece, para no
+# llenar el menú de prosa).
 analizar_candidato() {
-    local ruta abs
-    ruta=$(limpiar_candidato "$1")
+    local basico ruta abs
+    basico=$(limpiar_basico "$1")
+    [ -n "$basico" ] || return 0
+
+    # La URL se detecta ANTES y se devuelve SIN TOCAR. Pasarla por limpiar_ruta la
+    # rompería: '%20' se volvería un espacio y '%2F' una barra, y dejaría de apuntar a
+    # lo mismo.
+    if es_url "$basico"; then printf 'url\t%s' "$basico"; return 0; fi
+
+    ruta=$(limpiar_ruta "$basico")
     [ -n "$ruta" ] || return 0
 
     # Parece ruta si arranca como tal o si existe tal cual. Así una frase con barras
@@ -148,6 +180,22 @@ analizar_candidato() {
 }
 
 abrir() {
+    # Una URL va directo a xdg-open (el navegador / manejador por defecto). No se
+    # resuelve ni se le busca mime: no es un archivo, y resolver() la destrozaría. Si el
+    # esquema no tiene manejador se avisa, igual que cuando un tipo no tiene app.
+    if es_url "$1"; then
+        # xdg-mime pide el esquema en minúsculas: 'HTTPS://x' normaliza a 'https'.
+        local esquema=${1%%:*}
+        esquema=${esquema,,}
+        if [ -z "$(xdg-mime query default "x-scheme-handler/$esquema" 2> /dev/null)" ]; then
+            local sin_handler="Sin aplicación para el esquema $esquema"
+            notify-send "Abrir enlace" "$sin_handler" 2> /dev/null || printf '%s\n' "$sin_handler" >&2
+            return 1
+        fi
+        setsid -f xdg-open "$1" > /dev/null 2>&1
+        return 0
+    fi
+
     local absoluta
     absoluta=$(resolver "$1")
 
@@ -198,26 +246,31 @@ if [ "$frontend" = rofi ]; then
             printf "%s\t%s\t%s\n", $0, nombre, carpeta
         }')
 
-    # ── La ruta que tengas copiada ───────────────────────────────────────────
-    # Si lo último copiado es una ruta (copy-path, screenshot-path, un editor, el
-    # navegador), se ofrece ARRIBA y preseleccionada: Enter sin escribir nada abre eso.
-    # Es el atajo para "abrir el archivo que tengo copiado" sin tipear.
+    # ── Lo que tengas copiado ────────────────────────────────────────────────
+    # Si lo último copiado es una ruta (copy-path, screenshot-path, un editor) o una URL
+    # (un navegador), se ofrece ARRIBA y preseleccionada: Enter sin escribir nada abre
+    # eso. Es el atajo para "abrir lo que tengo copiado" sin cambiar de aplicación.
     #
-    # Hay razones por las que fd no la listaría aunque el archivo exista: está fuera de
-    # ~ (fd sólo escanea ~) o adentro de una carpeta excluida de la lista de arriba. Acá
-    # eso da igual: se arma la fila a mano y se la clava al tope. Después se la quita de
-    # la lista base para no verla dos veces.
+    # Hay razones por las que fd no listaría una ruta aunque el archivo exista: está
+    # fuera de ~ (fd sólo escanea ~) o adentro de una carpeta excluida de la lista de
+    # arriba. Acá eso da igual: se arma la fila a mano y se la clava al tope. Después se
+    # la quita de la lista base para no verla dos veces.
+    #
+    # Las filas se arman EN EL ORDEN del portapapeles, mezclando URLs y rutas tal como
+    # vinieron. Cada una se etiqueta en la columna de carpeta: '[portapapeles] url',
+    # '~/dir' o '[portapapeles] no existe'.
     #
     # Sólo en la cara rofi, a propósito: en fzf (que arranca con una query filtrable) una
     # fila pegada al tope es una trampa, porque Enter también selecciona y no hay forma
     # de sacarla si estorba. En rofi se va tipeando y deja de molestar.
-    filas_ok=()
-    filas_falta=()
+    filas_clip=()
+    n_url=0
+    n_falta=0
     if command -v wl-paste > /dev/null 2>&1; then
-        # -n: sin el salto de línea final. head: una ruta no necesita más de unas pocas
-        # líneas, y así un texto enorme no se lee entero. timeout: un dueño del
-        # portapapeles colgado no puede colgar el atajo. Si no hay texto (p. ej.
-        # copiaste una imagen), wl-paste sale distinto de cero y no se ofrece nada.
+        # -n: sin el salto de línea final. head: unas pocas líneas alcanzan, y así un
+        # texto enorme no se lee entero. timeout: un dueño del portapapeles colgado no
+        # puede colgar el atajo. Si no hay texto (p. ej. copiaste una imagen), wl-paste
+        # sale distinto de cero y no se ofrece nada.
         limite=5
         portapapeles=$(timeout 1 wl-paste -n 2> /dev/null | head -n "$limite" || true)
 
@@ -226,28 +279,31 @@ if [ "$frontend" = rofi ]; then
             analisis=$(analizar_candidato "$linea")
             [ -n "$analisis" ] || continue
             estado=${analisis%%$'\t'*}
-            ruta=${analisis#*$'\t'}
+            valor=${analisis#*$'\t'}
 
-            # La carpeta se muestra con '~' para no perder de vista dónde está. El '~'
-            # del reemplazo va ENTRE COMILLAS: pelado, bash lo expande a $HOME y el
-            # reemplazo queda en nada (mismo tipo de trampa que en 'case' y en ${r#~/}).
-            contenedor=${ruta%/*}
-            contenedor=${contenedor/#"$HOME"/"~"}
+            case "$estado" in
+                url)
+                    n_url=$((n_url + 1))
+                    filas_clip+=("$(printf '%s\t%s\t%s' "$valor" "$valor" '[portapapeles] url')")
+                    ;;
+                *)
+                    # La carpeta se muestra con '~' para no perder de vista dónde está.
+                    # El '~' del reemplazo va ENTRE COMILLAS: pelado, bash lo expande a
+                    # $HOME y el reemplazo queda en nada (misma trampa que en 'case' y en
+                    # ${r#~/}).
+                    contenedor=${valor%/*}
+                    contenedor=${contenedor/#"$HOME"/"~"}
 
-            if [ "$estado" = ok ]; then
-                filas_ok+=("$(printf '%s\t%s\t%s' "$ruta" "$(basename -- "$ruta")" "[portapapeles] $contenedor")")
-            else
-                filas_falta+=("$(printf '%s\t%s\t%s' "$ruta" "$(basename -- "$ruta")" '[portapapeles] no existe')")
-            fi
+                    if [ "$estado" = ok ]; then
+                        filas_clip+=("$(printf '%s\t%s\t%s' "$valor" "$(basename -- "$valor")" "[portapapeles] $contenedor")")
+                    else
+                        n_falta=$((n_falta + 1))
+                        filas_clip+=("$(printf '%s\t%s\t%s' "$valor" "$(basename -- "$valor")" '[portapapeles] no existe')")
+                    fi
+                    ;;
+            esac
         done <<< "$portapapeles"
     fi
-
-    # Las que existen van primero: así la preselección (fila 0) cae siempre en una ruta
-    # abrible si hay al menos una. Las que no existen quedan al final, marcadas: se ven
-    # y se entiende por qué no se abren.
-    filas_clip=()
-    if [ "${#filas_ok[@]}" -gt 0 ]; then filas_clip+=("${filas_ok[@]}"); fi
-    if [ "${#filas_falta[@]}" -gt 0 ]; then filas_clip+=("${filas_falta[@]}"); fi
 
     # Quitar de la lista base lo que ya subimos como fila del portapapeles. Se compara
     # por la ruta relativa a ~, que es como vienen las líneas de fd.
@@ -287,10 +343,9 @@ if [ "$frontend" = rofi ]; then
         -theme-str 'window {width: 900px;}'
     )
     if [ "${#filas_clip[@]}" -gt 0 ]; then
-        aviso_clip="Portapapeles: ${#filas_clip[@]} ruta(s)"
-        if [ "${#filas_falta[@]}" -gt 0 ]; then
-            aviso_clip="$aviso_clip · ${#filas_falta[@]} sin existir"
-        fi
+        aviso_clip="Portapapeles: ${#filas_clip[@]}"
+        if [ "$n_url" -gt 0 ]; then aviso_clip="$aviso_clip · $n_url url"; fi
+        if [ "$n_falta" -gt 0 ]; then aviso_clip="$aviso_clip · $n_falta sin existir"; fi
         aviso_clip="$aviso_clip — Alt+1 abre la primera"
         rofi_args+=( -mesg "$aviso_clip" )
     fi

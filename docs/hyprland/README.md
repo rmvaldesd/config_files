@@ -60,7 +60,7 @@ Empujar contra un borde sin pantalla no hace nada (Hyprland avisa "Monitor not f
 - **SUPER + Return** → terminal (foot)
 - **SUPER + B** → navegador (firefox)
 - **SUPER + E** → gestor de archivos (thunar)
-- **SUPER + F** → buscar archivo en `~` y abrirlo (find-file); si tenés una ruta copiada, la ofrece primero
+- **SUPER + F** → buscar archivo en `~` y abrirlo (find-file); si tenés una ruta o URL copiada, la ofrece primero
 - **SUPER + Space** → lanzador de apps (rofi drun)
 - **SUPER + SHIFT + Space** → ejecutar comando (rofi run)
 - **SUPER + SHIFT + V** → historial del portapapeles (cliphist en rofi)
@@ -161,15 +161,15 @@ Se puede llamar suelto: `pick-window` / `pick-window --all`
 - `find-file --rofi` → fuerza rofi
 - `find-file --fzf` → fuerza fzf
 
-### La ruta del portapapeles (solo cara rofi)
+### Lo que tengas copiado: ruta o URL (solo cara rofi)
 
-Si lo último copiado es una ruta (con `copy-path`, `screenshot-path`, un editor, el navegador), el menú de `SUPER + F` la muestra **arriba de todo y preseleccionada**: Enter sin escribir nada abre eso. `Alt+1` la abre igual aunque el filtro la haya tapado.
+Si lo último copiado es una ruta (con `copy-path`, `screenshot-path`, un editor) o una URL (de un navegador), el menú de `SUPER + F` lo muestra **arriba de todo y preseleccionado**: Enter sin escribir nada abre eso. `Alt+1` lo abre igual aunque el filtro lo haya tapado.
 
-- Se miran las **primeras 5 líneas** del portapapeles.
-- Antes de ofrecerla se la limpia: `file://`, escapes de URL (`%20`), comillas, CR final, espacios, `~`, rutas relativas y el sufijo `:línea:col` que agregan editores y `grep`.
-- Si el archivo **existe** pero `fd` no lo listaría (está fuera de `~` o en una carpeta excluida), se lo **inyecta igual** como fila fija; si ya estaba en la lista, no se duplica.
-- Si **no existe**, se muestra marcada `[portapapeles] no existe` y al elegirla solo avisa (no abre).
-- Si el portapapeles tiene texto que no parece ruta (o una imagen), no se ofrece nada.
+- Se miran las **primeras 5 líneas** del portapapeles, y las filas salen **en el orden** en que vinieron.
+- **Rutas:** antes de ofrecerlas se las limpia (`file://`, escapes `%20`, comillas, CR final, espacios, `~`, relativas y el sufijo `:línea:col` de editores y `grep`). Si el archivo **existe** pero `fd` no lo listaría (está fuera de `~` o en una carpeta excluida), se lo **inyecta igual** como fila fija; si ya estaba en la lista, no se duplica. Si **no existe**, se muestra marcada `[portapapeles] no existe` y al elegirla solo avisa (no abre).
+- **URLs:** cualquier `esquema://` (`http`, `https`, `ftp`, `gemini`, `ssh`, …) o `mailto:`, marcada `[portapapeles] url`, y se abre con el manejador por defecto vía `xdg-open` (hoy `google-chrome` para `http(s)`; **no** usa el firefox de `SUPER + B`). A diferencia de las rutas, a una URL **no** se le decodifican los `%`: cambiaría su significado. Si el esquema no tiene manejador, avisa en vez de abrir.
+- `file://…` no cuenta como URL: es una ruta local y va por la rama de archivos (un `.html` local ya se abre con el navegador por `text/html`).
+- Si el portapapeles tiene texto que no parece ni ruta ni URL (o una imagen), no se ofrece nada.
 
 Excluidos de la búsqueda: `.git`, `.cache`, `.cargo`, `.claude`, `.local/share`, `.local/state`, `go/pkg`, `.npm`, `node_modules`, `.oh-my-zsh`.
 
