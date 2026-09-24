@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+# Shared actions for the two rofi file menus: bin_configs/find-file and
+# bin_configs/recent-files. It is SOURCED, never executed, so it lives as a dotfile in
+# bin_configs/ -- scripts/link-bins.sh links "$origen"/* and that glob does not match
+# dotfiles, so this file is never symlinked into /usr/local/bin.
+#
+# The point is ONE keymap in both menus:
+#
+#   Enter   open with the default app        (rofi rc 0)
+#   Alt+1   copy the path (or URL)           (custom-1  -> rc 10)
+#   Alt+2   open the containing folder       (custom-2  -> rc 11)
+#   Alt+3   open a terminal in the folder    (custom-3  -> rc 12)
+#   Alt+4   move to the trash (asks first)   (custom-4  -> rc 13)
+#   Alt+0   action submenu                   (custom-10 -> rc 19)
+#
+# Each menu declares the keys with menu_rofi_keys() and dispatches the result with
+# menu_dispatch(), so the two can never drift. The hint in -mesg comes from menu_hint().
+
+menu_notify() {
+    notify-send "$1" "$2" 2> /dev/null || printf '%s\n' "$2" >&2
+}
+
+# Hint for rofi's -mesg. Keep in sync with the keymap above.
+menu_hint() {
+    printf 'Enter opens · Alt+1 copy · Alt+2 folder · Alt+3 terminal · Alt+4 trash · Alt+0 more'
+}
+
+# The -kb-custom-* flags. Callers do:
+#   mapfile -t menu_keys < <(menu_rofi_keys)
+menu_rofi_keys() {
+    printf '%s\n' \
+        -kb-custom-1 Alt+1 \
+        -kb-custom-2 Alt+2 \
+        -kb-custom-3 Alt+3 \
+        -kb-custom-4 Alt+4 \
+        -kb-custom-10 Alt+0
+}
+
+menu_is_url() {
+    case "$1" in file://*) return 1 ;; esac
+    [[ $1 =~ ^[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]]+$ ]] ||
+        [[ $1 =~ ^mailto:[^[:space:]]+$ ]]
+}
+
+# Absolute path for a menu entry. Accepts '~/x', '/x' and a path relative to the cwd (fd
+# emits its rows relative to ~, and both menus run from there).
+menu_abs() {
+    local r=$1
+    case "$r" in
+        "~")   r=$HOME ;;
+        "~/"*) r="$HOME/${r:2}" ;;
+    esac
+    realpath -m -- "$r"
+}
+
+menu_open() {
+    local target=$1 absolute file_type scheme
+    if menu_is_url "$target"; then
+        scheme=${target%%:*}
+        scheme=${scheme,,}
+        if [ -z "$(xdg-mime query default "x-scheme-handler/$scheme" 2> /dev/null)" ]; then
+            menu_notify "Open link" "No handler for the $scheme scheme"
+            return 1
+        fi
+        setsid -f xdg-open "$target" > /dev/null 2>&1
+        return 0
+    fi
+
+    absolute=$(menu_abs "$target")
+    if [ ! -e "$absolute" ]; then
+        menu_notify "Open file" "Does not exist: $absolute"
+        return 1
+    fi
+    file_type=$(xdg-mime query filetype "$absolute" 2> /dev/null || true)
+    if [ -n "$file_type" ] && [ -z "$(xdg-mime query default "$file_type" 2> /dev/null)" ]; then
+        menu_notify "Open file" "No default application for $file_type"
+        return 1
+    fi
+    setsid -f xdg-open "$absolute" > /dev/null 2>&1
+}
+
+# Copies the entry instead of opening it. A URL is copied as is; a path is copied ABSOLUTE,
+# because the menus store fd rows relative to ~.
+menu_copy() {
+    local target=$1 value
+    if menu_is_url "$target"; then
+        value=$target
+        printf '%s' "$value" | wl-copy
+        menu_notify "Copy" "Link copied: $value"
+    else
+        value=$(menu_abs "$target")
+        printf '%s' "$value" | wl-copy
+        menu_notify "Copy" "Path copied: $value"
+    fi
+}
+
+# The folder / terminal / trash actions only make sense for a real file, not a URL.
+menu_needs_file() {
+    if menu_is_url "$1"; then
+        menu_notify "Not applicable" "'$1' is a link, not a file"
+        return 1
+    fi
+    return 0
+}
+
+menu_open_folder() {
+    menu_needs_file "$1" || return 0
+    setsid -f xdg-open "$(dirname -- "$(menu_abs "$1")")" > /dev/null 2>&1
+}
+
+menu_open_terminal() {
+    menu_needs_file "$1" || return 0
+    setsid -f foot -D "$(dirname -- "$(menu_abs "$1")")" > /dev/null 2>&1
+}
+
+menu_trash() {
+    menu_needs_file "$1" || return 0
+    local absolute answer
+    absolute=$(menu_abs "$1")
+    answer=$(printf 'No\nYes\n' | rofi -dmenu -i -p "Move to the trash?" \
+        -theme-str 'window {width: 500px;}') || return 0
+    [ "$answer" = "Yes" ] || return 0
+    if gio trash "$absolute" 2> /dev/null; then
+        menu_notify "Trash" "To the trash: $(basename -- "$absolute")"
+    else
+        menu_notify "Trash" "Could not move: $absolute"
+    fi
+}
+
+menu_submenu() {
+    local target=$1 action
+    action=$(printf '%s\n' "Open" "Copy path" "Open folder" "Open terminal" \
+        "Move to the trash" |
+        rofi -dmenu -i -p "What do I do?" -theme-str 'window {width: 420px;}') || return 0
+    case "$action" in
+        "Open")              menu_open "$target" ;;
+        "Copy path")         menu_copy "$target" ;;
+        "Open folder")       menu_open_folder "$target" ;;
+        "Open terminal")     menu_open_terminal "$target" ;;
+        "Move to the trash") menu_trash "$target" ;;
+    esac
+}
+
+# Runs the action for rofi's exit code. Unknown code (e.g. 1 = canceled) returns 1.
+menu_dispatch() {
+    local rc=$1 target=$2
+    case "$rc" in
+        0)  menu_open "$target" ;;
+        10) menu_copy "$target" ;;
+        11) menu_open_folder "$target" ;;
+        12) menu_open_terminal "$target" ;;
+        13) menu_trash "$target" ;;
+        19) menu_submenu "$target" ;;
+        *)  return 1 ;;
+    esac
+}

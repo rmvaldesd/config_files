@@ -6,10 +6,14 @@
 #   find-file --rofi   forces the rofi menu
 #   find-file --fzf    forces fzf with preview (lets you pick several with Tab)
 #
-# From the keybind (SUPER + F), the rofi face also looks at the clipboard: if the last
+# From the keybind (SUPER + CONTROL + SPACE), the rofi face also looks at the clipboard: if the last
 # thing copied is a path or a URL, it is offered at the TOP and preselected, so Enter
 # without typing anything opens it (see the "What you have copied" block below). The fzf
-# face deliberately does not. See clean_basic/clean_path/is_url/analyze_candidate.
+# face deliberately does not. See clean_basic/clean_path/menu_is_url/analyze_candidate.
+#
+# Menus: the rofi keymap is shared with recent-files and defined in bin_configs/.menu-actions
+# (Enter opens, Alt+1 copies the path, Alt+2 opens the folder, Alt+3 opens a terminal, Alt+4
+# trashes it, Alt+0 opens a submenu). The fzf face copies with Ctrl+Y and opens with Enter.
 #
 # Detection is by TTY, not by environment variables: Hyprland launches keybinds without a
 # terminal, so there stdin is not a tty and rofi comes out; in an interactive terminal it
@@ -23,6 +27,12 @@
 # them and ~4,700 real entries are left, generated in under 100 ms.
 
 set -euo pipefail
+
+# Shared keymap and actions with recent-files. Resolved through the real file so it also
+# works when this script is called via its /usr/local/bin symlink.
+menu_lib="$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/.menu-actions"
+# shellcheck source=/dev/null
+. "$menu_lib" || { printf 'find-file: cannot source %s\n' "$menu_lib" >&2; exit 1; }
 
 frontend=auto
 case "${1:-}" in
@@ -40,13 +50,15 @@ fi
 # is edited by hand, would be invisible. That is exactly why the hidden directories that
 # are app cache or state have to be removed by hand.
 #
-# This list is the SAME as the one in the fzf widgets of zshrc.local (_fzf_home_ex_fd), on
+# This list starts from the one in the fzf widgets of zshrc.local (_fzf_home_ex_fd), on
 # purpose: so that searching from the terminal and searching from the desktop don't return
-# different universes. If you touch one, touch the other.
+# different universes. find-file adds ONE entry the widgets do not have yet (Downloads/temp,
+# below), so it is a superset: if you touch a shared entry, touch the other file too.
 #
-# The second block is dependency caches, and it is the one that changes things most:
-# without it, the Go module cache alone adds 27,216 of the 34,336 entries -- 79% of the
-# menu -- and buries what you are looking for. Measured here: 34,336 entries vs 4,724.
+# The count under ~ is dominated by state, not by real files. Measured 2026-09: 131,418
+# files, of which 69,848 were under a hidden dot-dir -- browser/app caches (Chrome alone
+# 28k) plus one extracted Azure Kudu support bundle (Downloads/temp, 51,936) -- and only
+# 9,627 were real files. The two extra blocks below strip it to ~10,200 files / ~25 ms.
 exclude=(
     --exclude=.git
     --exclude=.cache
@@ -59,30 +71,44 @@ exclude=(
     --exclude=.npm        # npm cache
     --exclude=node_modules
     --exclude=.oh-my-zsh  # framework code, not own configuration
+
+    # Browser and app caches/state (find-file only). They are most of the file count and
+    # nothing in them is a file you open from the menu. Same family as recent-files' list.
+    --exclude=.config/google-chrome
+    --exclude=.config/chromium
+    --exclude=.config/chromium-headless
+    --exclude=.config/BraveSoftware
+    --exclude=.config/teams-for-linux
+    --exclude=.config/mozilla
+    --exclude=.config/Postman
+    --exclude=.config/draw.io
+    --exclude=.config/obsidian
+    --exclude=.config/Code
+    --exclude=.config/vivaldi
+    --exclude=.config/herdr
+    --exclude=.mozilla
+    --exclude=.eclipse
+    --exclude=.azure
+    --exclude=.zoom
+    --exclude=.bun
+    --exclude=.deno
+    --exclude=.gradle
+    --exclude=.m2
+    --exclude=.rustup
+    --exclude=.claude.json
+    --exclude=.vscode-server
+    --exclude=.cursor
+
+    # One downloaded support bundle: dev_logs.zip -> dev_logs/ (Azure Kudu LogFiles).
+    # 51,936 files / 289 MB, untouched since 2026-08-17. Nothing you open from the menu.
+    --exclude=Downloads/temp
 )
 
 # fd runs FROM ~ so it emits relative paths: those look better in both menus
 # ('Documents/report.pdf' instead of '/home/rodrigo/Documents/report.pdf') and also let
 # the fzf preview work without rebuilding anything, because fzf inherits this same
-# directory. The absolute path is restored by open_target().
+# directory. The absolute path is restored by menu_abs()/menu_open().
 cd "$HOME"
-
-# Returns the ABSOLUTE path for whatever it is given. It accepts the three shapes that
-# arrive here: the ~-relative one produced by the fd list ('Documents/x.pdf'), an absolute
-# one typed by hand ('/etc/hosts') and one with '~' ('~/x'). This used to be resolved by
-# prepending $HOME to EVERYTHING without looking, so '/etc/hosts' ended up as
-# '/home/rodrigo//etc/hosts' and '~/x' as '/home/rodrigo/~/x': typing an absolute path in
-# the menu did not work.
-resolve_path() {
-    local r=$1
-    case "$r" in
-        "~")   r=$HOME ;;
-        # ${r:2} and not ${r#~/}: as in 'case', bash would tilde-expand the '~/' pattern
-        # and trim nothing, leaving '$HOME/~/x'.
-        "~/"*) r="$HOME/${r:2}" ;;
-    esac
-    realpath -m -- "$r"
-}
 
 # Cleanup COMMON to any candidate: strips the wrapping that copied text usually arrives
 # with, whether it later turns out to be a path or a URL. Trailing CR (copied from
@@ -99,15 +125,6 @@ clean_basic() {
     case "$r" in "<"*">") r=${r#<}; r=${r%>} ;; esac
 
     printf '%s' "$r"
-}
-
-# Is this a URL? Any scheme with an authority ('http://', 'https://', 'ftp://',
-# 'gemini://', 'ssh://', ...) or 'mailto:'. 'file://' does NOT count on purpose: that is a
-# local path and is handled by the file branch, which strips the prefix and resolves it.
-is_url() {
-    case "$1" in file://*) return 1 ;; esac
-    [[ $1 =~ ^[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]]+$ ]] ||
-        [[ $1 =~ ^mailto:[^[:space:]]+$ ]]
 }
 
 # Cleanup specific to a PATH: the 'file://' added by browsers and file managers, and the
@@ -143,7 +160,7 @@ analyze_candidate() {
     # The URL is detected FIRST and returned UNTOUCHED. Running it through clean_path
     # would break it: '%20' would become a space and '%2F' a slash, and it would no longer
     # point to the same thing.
-    if is_url "$basic"; then printf 'url\t%s' "$basic"; return 0; fi
+    if menu_is_url "$basic"; then printf 'url\t%s' "$basic"; return 0; fi
 
     path=$(clean_path "$basic")
     [ -n "$path" ] || return 0
@@ -160,7 +177,7 @@ analyze_candidate() {
         *) [ -e "$path" ] || return 0 ;;
     esac
 
-    abs=$(resolve_path "$path")
+    abs=$(menu_abs "$path")
 
     # Copying from an editor or from grep adds ':line[:column]'. It is tried without that
     # suffix ONLY if the path with the suffix does not exist: that way a name that really
@@ -171,7 +188,7 @@ analyze_candidate() {
     # at the FIRST ':' and the group is the real path.
     if [ ! -e "$abs" ] && [[ $abs =~ ^([^:]*):[0-9]+(:[0-9]+)?$ ]]; then
         local without_suffix
-        without_suffix=$(resolve_path "${BASH_REMATCH[1]}")
+        without_suffix=$(menu_abs "${BASH_REMATCH[1]}")
         if [ -e "$without_suffix" ]; then abs=$without_suffix; fi
     fi
 
@@ -179,71 +196,28 @@ analyze_candidate() {
     else                   printf 'missing\t%s' "$abs"; fi
 }
 
-open_target() {
-    # A URL goes straight to xdg-open (the default browser / handler). It is not resolved
-    # nor looked up for mime: it is not a file, and resolve_path() would wreck it. If the
-    # scheme has no handler it warns, just like when a type has no app.
-    if is_url "$1"; then
-        # xdg-mime wants the scheme lowercase: 'HTTPS://x' normalizes to 'https'.
-        local scheme=${1%%:*}
-        scheme=${scheme,,}
-        if [ -z "$(xdg-mime query default "x-scheme-handler/$scheme" 2> /dev/null)" ]; then
-            local no_handler="No handler for the $scheme scheme"
-            notify-send "Open link" "$no_handler" 2> /dev/null || printf '%s\n' "$no_handler" >&2
-            return 1
-        fi
-        setsid -f xdg-open "$1" > /dev/null 2>&1
-        return 0
-    fi
-
-    local absolute
-    absolute=$(resolve_path "$1")
-
-    # If it does not exist, warn and stop. Covers two cases: a path typed by hand with a
-    # mistake, and a clipboard row shown as "missing" (the user asked to see it but not to
-    # open it).
-    if [ ! -e "$absolute" ]; then
-        local warning="Does not exist: $absolute"
-        notify-send "Open file" "$warning" 2> /dev/null || printf '%s\n' "$warning" >&2
-        return 1
-    fi
-
-    # setsid -f detaches the viewer from the script. Without it the process hangs off the
-    # life of xdg-open: in the keybind case, Hyprland would have one child per opened file;
-    # in the terminal case, the shell would be blocked until the viewer is closed.
-    #
-    # Detaching has a cost: the viewer's errors no longer come back here (the failure
-    # happens after the fork). What IS detected beforehand is the frequent case -- that the
-    # file type has no application associated in mimeapps.list -- and that one does warn,
-    # because otherwise the shortcut seems to do nothing.
-    local file_type
-    file_type=$(xdg-mime query filetype "$absolute" 2> /dev/null || true)
-    if [ -n "$file_type" ] && [ -z "$(xdg-mime query default "$file_type" 2> /dev/null)" ]; then
-        local missing_app="No default application for $file_type"
-        notify-send "Open file" "$missing_app" 2> /dev/null || printf '%s\n' "$missing_app" >&2
-        return 1
-    fi
-
-    setsid -f xdg-open "$absolute" > /dev/null 2>&1
-}
-
 if [ "$frontend" = rofi ]; then
-    # Two columns: name on the left, folder on the right. The name is what one remembers
-    # and the folder is what breaks the tie between the ten 'README.md' on the disk.
+    # ONE padded display column: name on the left (40 wide), folder after it. rofi does NOT
+    # align columns across rows, so the layout is built here (same trick as recent-files);
+    # with rofi's own columns a long name pushes the folder right and the list looks ragged.
+    # Names longer than 40 chars are truncated with '...' (only ~5% of the files here go
+    # past 40; the alternative is to push the folder right and lose the alignment).
     #
     # The full path travels as the FIRST column and is not shown: rofi draws only the
-    # columns in -display-columns but RETURNS the whole line, so the path comes back
-    # without dirtying the menu. It is the same trick pick-window uses with the window
-    # address.
+    # column in -display-columns but RETURNS the whole line, so the path comes back without
+    # dirtying the menu. It is the same trick pick-window uses with the window address.
     list_rows=$(fd --type f --hidden --follow "${exclude[@]}" . | awk -F/ '
         {
-            name  = $NF
-            # -1 to also eat the slash separating folder from name. If the file sits
-            # loose in ~ there is no folder and it is a bare "~".
+            name = $NF
+            # -1 to also eat the slash separating folder from name. If the file sits loose
+            # in ~ there is no folder and it is a bare "~". Computed BEFORE truncating the
+            # name, so cutting it for display does not corrupt the folder.
             folder = (length($0) > length(name)) \
                 ? "~/" substr($0, 1, length($0) - length(name) - 1) \
                 : "~"
-            printf "%s\t%s\t%s\n", $0, name, folder
+            shown = name
+            if (length(shown) > 40) shown = substr(shown, 1, 37) "..."
+            printf "%s\t%-40s  %s\n", $0, shown, folder
         }')
 
     # ── What you have copied ─────────────────────────────────────────────────
@@ -283,7 +257,9 @@ if [ "$frontend" = rofi ]; then
             case "$state" in
                 url)
                     n_url=$((n_url + 1))
-                    clip_rows+=("$(printf '%s\t%s\t%s' "$value" "$value" '[clipboard] url')")
+                    shown=${value}
+                    [ "${#shown}" -gt 40 ] && shown="${shown:0:37}..."
+                    clip_rows+=("$(printf '%s\t%-40s  %s' "$value" "$shown" '[clipboard] url')")
                     ;;
                 *)
                     # The folder is shown with '~' so its location is not lost. The '~' of
@@ -292,11 +268,14 @@ if [ "$frontend" = rofi ]; then
                     container=${value%/*}
                     container=${container/#"$HOME"/"~"}
 
+                    shown=$(basename -- "$value")
+                    [ "${#shown}" -gt 40 ] && shown="${shown:0:37}..."
+
                     if [ "$state" = ok ]; then
-                        clip_rows+=("$(printf '%s\t%s\t%s' "$value" "$(basename -- "$value")" "[clipboard] $container")")
+                        clip_rows+=("$(printf '%s\t%-40s  %s' "$value" "$shown" "[clipboard] $container")")
                     else
                         n_missing=$((n_missing + 1))
-                        clip_rows+=("$(printf '%s\t%s\t%s' "$value" "$(basename -- "$value")" '[clipboard] missing')")
+                        clip_rows+=("$(printf '%s\t%-40s  %s' "$value" "$shown" '[clipboard] missing')")
                     fi
                     ;;
             esac
@@ -333,37 +312,34 @@ if [ "$frontend" = rofi ]; then
         list_rows=$(printf '%s\n%s' "$(printf '%s\n' "${clip_rows[@]}")" "$list_rows")
     fi
 
+    # Standard keymap and hint, shared with recent-files (bin_configs/.menu-actions).
+    mapfile -t menu_keys < <(menu_rofi_keys)
     rofi_args=(
         -dmenu -i
         -p "Files"
-        -display-columns 2,3
-        -kb-custom-1 "Alt+1"
-        -theme-str 'window {width: 900px;}'
+        -display-columns 2
+        "${menu_keys[@]}"
+        -theme-str 'window {width: 1100px;}'
     )
+    clip_notice=$(menu_hint)
     if [ "${#clip_rows[@]}" -gt 0 ]; then
         clip_notice="Clipboard: ${#clip_rows[@]}"
         if [ "$n_url" -gt 0 ]; then clip_notice="$clip_notice · $n_url url"; fi
         if [ "$n_missing" -gt 0 ]; then clip_notice="$clip_notice · $n_missing missing"; fi
-        clip_notice="$clip_notice — Alt+1 opens the first"
-        rofi_args+=( -mesg "$clip_notice" )
+        clip_notice="$clip_notice — $(menu_hint)"
     fi
+    rofi_args+=( -mesg "$clip_notice" )
 
-    # The '|| rofi_rc=$?' captures the code without 'set -e' cutting the script: it is
-    # needed to tell "canceled" (1) from "pressed Alt+1" (10, the kb-custom-1).
+    # The '|| rofi_rc=$?' captures the code without 'set -e' cutting the script: the code
+    # tells which key was pressed (see the shared keymap in .menu-actions).
     rofi_rc=0
     selection=$(printf '%s\n' "$list_rows" | rofi "${rofi_args[@]}") || rofi_rc=$?
 
-    # Alt+1: no matter which row the filter left highlighted, the order is to open the
-    # first clipboard one. rofi still prints the highlighted row to stdout; it is ignored
-    # and the one already stored is used.
-    if [ "$rofi_rc" -eq 10 ] && [ "${#clip_rows[@]}" -gt 0 ]; then
-        open_target "${clip_rows[0]%%$'\t'*}"
-        exit 0
-    fi
-
-    [ "$rofi_rc" -eq 0 ] || exit 0
+    # Any handled key prints the highlighted row; run the shared action for it. Anything
+    # else (1 = canceled) is not handled.
+    case "$rofi_rc" in 0|10|11|12|13|19) ;; *) exit 0 ;; esac
     [ -n "$selection" ] || exit 0
-    open_target "${selection%%$'\t'*}"
+    menu_dispatch "$rofi_rc" "${selection%%$'\t'*}" || true
 else
     # The preview first checks whether the file is binary. Without that guard, previewing a
     # PDF or an image -- which are exactly the ones opened with this launcher -- dumps raw
@@ -383,17 +359,20 @@ else
     # --multi to open several at once (Tab marks). No --height: here the menu is the whole
     # point of the command, not an accessory of the editing line as in the zsh widgets, so
     # it keeps the full screen and the preview is visible.
+    # Ctrl+Y copies the marked paths (absolute: fzf runs in ~ and realpath completes them)
+    # without closing the menu; Enter still opens. {+} is all marked, or the current line.
     selection=$(fd --type f --hidden --follow "${exclude[@]}" . |
         fzf --multi --height=100% \
             --prompt 'open ~> ' \
-            --header 'Enter opens with the default app   Tab marks several' \
+            --header 'Enter opens with the default app   Tab marks several   Ctrl+Y copies the path' \
+            --bind 'ctrl-y:execute-silent(realpath -m -- {+} | wl-copy)' \
             --preview "$preview") || exit 0
 
     [ -n "$selection" ] || exit 0
 
-    # One call to open_target() per line. The empty IFS and -r keep a name with spaces or
+    # One call to menu_open() per line. The empty IFS and -r keep a name with spaces or
     # backslashes from arriving split or altered.
     while IFS= read -r file; do
-        [ -n "$file" ] && open_target "$file"
+        [ -n "$file" ] && menu_open "$file"
     done <<< "$selection"
 fi

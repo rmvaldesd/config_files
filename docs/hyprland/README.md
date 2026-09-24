@@ -16,6 +16,7 @@ Referencia rápida de atajos y comportamientos.
 - **SUPER + SHIFT + T** → alternar flotante (igual que V)
 - **SUPER + SHIFT + F** → maximizar (respeta waybar y gaps)
 - **SUPER + CTRL + F** → pantalla completa
+- **SUPER + F** → fullscreen (toggle; alias of SUPER + CTRL + F)
 - **SUPER + P** → modo pseudo (duplica la ventana en el layout)
 - **SUPER + click izq** → mover ventana con mouse
 - **SUPER + click der** → redimensionar con mouse
@@ -60,8 +61,8 @@ Empujar contra un borde sin pantalla no hace nada (Hyprland avisa "Monitor not f
 - **SUPER + Return** → terminal (foot)
 - **SUPER + B** → navegador (firefox)
 - **SUPER + E** → gestor de archivos (thunar)
-- **SUPER + F** → search a file under `~` and open it (find-file); if you have a path or URL copied, it offers it first
-- **SUPER + O** → recent files: apps, downloads, screenshots and modified files (recent-files)
+- **SUPER + CONTROL + SPACE** → search a file under `~` and open it (find-file); if you have a path or URL copied, it offers it first
+- **SUPER + ALT + SPACE** → recent files: apps, downloads, screenshots and modified files (recent-files)
 - **SUPER + Space** → lanzador de apps (rofi drun)
 - **SUPER + SHIFT + Space** → ejecutar comando (rofi run)
 - **SUPER + SHIFT + V** → historial del portapapeles (cliphist en rofi)
@@ -156,7 +157,7 @@ Se puede llamar suelto: `pick-window` / `pick-window --all`
 
 ## Buscador de archivos (`find-file`)
 
-`SUPER + F` busca en todo `~` y abre con la app por defecto (PDF → zathura, PNG → imv, texto → Sublime). Menú con nombre + carpeta, filtrable.
+`SUPER + CONTROL + SPACE` busca en todo `~` y abre con la app por defecto (PDF → zathura, PNG → imv, texto → Sublime). Menú con nombre + carpeta, filtrable.
 
 - `find-file` → elige frontend automáticamente (rofi desde bind, fzf en terminal)
 - `find-file --rofi` → fuerza rofi
@@ -164,7 +165,9 @@ Se puede llamar suelto: `pick-window` / `pick-window --all`
 
 ### What you have copied: path or URL (rofi face only)
 
-If the last thing copied is a path (with `copy-path`, `screenshot-path`, an editor) or a URL (from a browser), the `SUPER + F` menu shows it **at the top and preselected**: Enter without typing anything opens it. `Alt+1` opens it too even if the filter hid it.
+If the last thing copied is a path (with `copy-path`, `screenshot-path`, an editor) or a URL (from a browser), the `SUPER + CONTROL + SPACE` menu shows it **at the top and preselected**: Enter without typing anything opens it.
+
+The menu uses the **same keymap as `recent-files`** (defined once in `bin_configs/.menu-actions`): `Alt+1` copies the path, `Alt+2` opens the containing folder, `Alt+3` opens a terminal there, `Alt+4` moves it to the trash and `Alt+0` opens a submenu. In the fzf face (terminal), **`Ctrl+Y`** copies the marked paths.
 
 - The **first 5 lines** of the clipboard are read, and the rows come **in the order** they arrived.
 - **Paths:** before being offered they are cleaned (`file://`, `%20` escapes, quotes, trailing CR, spaces, `~`, relatives and the `:line:col` suffix from editors and `grep`). If the file **exists** but `fd` would not list it (it is outside `~` or in an excluded folder), it is **injected anyway** as a pinned row; if it was already in the list, it is not duplicated. If it **does not exist**, it is shown marked `[clipboard] missing` and choosing it only warns (it does not open).
@@ -178,7 +181,7 @@ Excluidos de la búsqueda: `.git`, `.cache`, `.cargo`, `.claude`, `.local/share`
 
 ## Recent files (`recent-files`)
 
-`SUPER + O` opens a rofi menu of recent files under `~`, merged from four sources and shown with **category, name, age and folder**, newest first.
+`SUPER + ALT + SPACE` opens a rofi menu of recent files under `~`, merged from four sources and shown with **category, name, age and folder**, newest first.
 
 Rows are one fixed-width line, `name | category | age | folder` (rofi aligns nothing on its own, so the layout is padded by the script; names longer than 30 chars are truncated with `...`).
 

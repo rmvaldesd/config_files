@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shows recent files under ~ in a rofi menu and lets you act on the chosen one: open,
 # copy its path, open the folder, open a terminal there, or move it to the trash.
-# Keybind: SUPER + O.
+# Keybind: SUPER + ALT + SPACE.
 #
 # Where "recent" comes from, in order of trust:
 #
@@ -32,6 +32,12 @@
 # from the keybind or by hand.
 
 set -euo pipefail
+
+# Shared keymap and actions with find-file. Resolved through the real file so it also works
+# when this script is called via its /usr/local/bin symlink.
+menu_lib="$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")/.menu-actions"
+# shellcheck source=/dev/null
+. "$menu_lib" || { printf 'recent-files: cannot source %s\n' "$menu_lib" >&2; exit 1; }
 
 # Window and cap for the "modified" category. Chosen by measuring on this machine: 3 days
 # with the exclusions below give ~320 entries, generated in ~60 ms.
@@ -168,48 +174,6 @@ time_ago() {
     fi
 }
 
-open_file() {
-    setsid -f xdg-open "$1" > /dev/null 2>&1
-}
-
-copy_path() {
-    printf '%s' "$1" | wl-copy
-    notify "Path copied: $1"
-}
-
-open_folder() {
-    setsid -f xdg-open "$(dirname -- "$1")" > /dev/null 2>&1
-}
-
-open_terminal() {
-    setsid -f foot -D "$(dirname -- "$1")" > /dev/null 2>&1
-}
-
-trash_file() {
-    local answer
-    answer=$(printf 'No\nYes\n' | rofi -dmenu -i -p "Move to the trash?" \
-        -theme-str 'window {width: 500px;}') || return 0
-    [ "$answer" = "Yes" ] || return 0
-    if gio trash "$1" 2> /dev/null; then notify "To the trash: $(basename -- "$1")"
-    else notify "Could not move: $1"; fi
-}
-
-# Asked for by Alt+0 (rofi exits with 19): the entry door for whoever does not remember
-# the keys.
-action_menu() {
-    local path=$1 action
-    action=$(printf '%s\n' "Open" "Copy path" "Open folder" "Open terminal" \
-        "Move to the trash" |
-        rofi -dmenu -i -p "What do I do?" -theme-str 'window {width: 420px;}') || return 0
-    case "$action" in
-        "Open")              open_file "$path" ;;
-        "Copy path")         copy_path "$path" ;;
-        "Open folder")       open_folder "$path" ;;
-        "Open terminal")     open_terminal "$path" ;;
-        "Move to the trash") trash_file "$path" ;;
-    esac
-}
-
 # Build the list: gather the sources, deduplicate by path keeping the highest-priority
 # row, sort by date desc and translate to the columns rofi sees.
 rows=$(
@@ -249,17 +213,14 @@ if [ -z "$rows" ]; then
     exit 0
 fi
 
-# Enter opens (0); the custom ones are 10.. (custom-1 = 10, custom-10 = 19).
+# Standard keymap and hint, shared with find-file (bin_configs/.menu-actions).
+mapfile -t menu_keys < <(menu_rofi_keys)
 rofi_args=(
     -dmenu -i
     -p "Recent"
     -display-columns 2
-    -kb-custom-1 "Alt+1"
-    -kb-custom-2 "Alt+2"
-    -kb-custom-3 "Alt+3"
-    -kb-custom-4 "Alt+4"
-    -kb-custom-10 "Alt+0"
-    -mesg "Enter opens · Alt+1 path · Alt+2 folder · Alt+3 terminal · Alt+4 trash · Alt+0 more"
+    "${menu_keys[@]}"
+    -mesg "$(menu_hint)"
     -theme-str 'window {width: 1100px;}'
 )
 
@@ -268,15 +229,6 @@ rofi_args=(
 rc=0
 selection=$(printf '%s\n' "$rows" | rofi "${rofi_args[@]}") || rc=$?
 
+case "$rc" in 0|10|11|12|13|19) ;; *) exit 0 ;; esac
 [ -n "$selection" ] || exit 0
-path=${selection%%$'\t'*}
-
-case "$rc" in
-    0)  open_file     "$path" ;;
-    10) copy_path     "$path" ;;
-    11) open_folder   "$path" ;;
-    12) open_terminal "$path" ;;
-    13) trash_file    "$path" ;;
-    19) action_menu   "$path" ;;
-    *)  exit 0 ;;
-esac
+menu_dispatch "$rc" "${selection%%$'\t'*}" || true
