@@ -663,6 +663,10 @@ hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("pick-window --all"))
 --
 -- El script (bin_configs/find-file) elige frontend solo: desde acá no hay terminal, así
 -- que saca el menú de rofi; corrido a mano en una terminal saca fzf con preview.
+--
+-- La cara rofi además mira el portapapeles: si tenés una ruta copiada, la ofrece arriba
+-- y preseleccionada (Enter sin escribir nada la abre; Alt+1 la abre igual con filtro).
+-- Detalle en docs/hyprland/README.md. La cara fzf no hace eso.
 hl.bind(mainMod .. " + F", hl.dsp.exec_cmd("find-file"))
 
 -- Dictado por voz (voxtype). 'T' de 'transcribir'.

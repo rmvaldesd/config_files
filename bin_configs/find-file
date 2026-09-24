@@ -7,6 +7,11 @@
 #   find-file --rofi   fuerza el menú de rofi
 #   find-file --fzf    fuerza fzf con preview (permite elegir varios con Tab)
 #
+# Desde el bind (SUPER + F), la cara rofi además mira el portapapeles: si lo último
+# copiado es una ruta, la ofrece ARRIBA y preseleccionada, así Enter sin escribir nada
+# abre eso (ver el bloque "La ruta que tengas copiada" más abajo). La cara fzf no lo
+# hace a propósito. Ver también las funciones limpiar_candidato/analizar_candidato.
+#
 # La detección es por TTY y no por variables de entorno: Hyprland lanza los binds sin
 # terminal, así que ahí stdin no es un tty y sale rofi; en una terminal interactiva sí
 # lo es y sale fzf. Es el único dato confiable -- WAYLAND_DISPLAY, por ejemplo, está
@@ -63,8 +68,97 @@ excluir=(
 # mismo directorio. La ruta absoluta la repone abrir().
 cd "$HOME"
 
+# Devuelve la ruta ABSOLUTA de lo que le pasen. Acepta las tres formas que llegan acá:
+# la relativa a ~ que produce la lista de fd ('Documents/x.pdf'), una absoluta tipeada a
+# mano ('/etc/hosts') y una con '~' ('~/x'). Antes esto se resolvía anteponiendo $HOME a
+# TODO sin mirar, así que '/etc/hosts' terminaba en '/home/rodrigo//etc/hosts' y '~/x'
+# en '/home/rodrigo/~/x': tipear una ruta absoluta en el menú no funcionaba.
+resolver() {
+    local r=$1
+    case "$r" in
+        "~")   r=$HOME ;;
+        # ${r:2} y no ${r#~/}: igual que en 'case', bash expandiría la tilde del
+        # patrón '~/' y no recortaría nada, dejando '$HOME/~/x'.
+        "~/"*) r="$HOME/${r:2}" ;;
+    esac
+    realpath -m -- "$r"
+}
+
+# Lo que se copia rara vez es una ruta limpia. Acá se sacan los adornos con los que
+# suele llegar: CR final (copiado de Windows), espacios, comillas envolventes, el
+# 'file://' de navegadores y gestores, y los escapes de URL ('%20'). No se toca nada
+# más: un nombre con un '%' suelto queda igual, para no arruinarlo.
+limpiar_candidato() {
+    local r=$1
+
+    r=${r%$'\r'}
+    r=${r#"${r%%[![:space:]]*}"}
+    r=${r%"${r##*[![:space:]]}"}
+    r=${r#\"}; r=${r%\"}
+    r=${r#\'}; r=${r%\'}
+    r=${r#file://}
+
+    # Sólo se decodifica si TODOS los '%' son un escape válido y no hay backslashes:
+    # 'printf %b' también interpreta '\', así que un nombre con '\' se vería alterado,
+    # y un '%' suelto haría saltar un error de printf.
+    if [[ $r == *%* && $r != *\\* ]] &&
+       [[ ! $r =~ %[^0-9A-Fa-f] && ! $r =~ %$ ]]; then
+        r=$(printf '%b' "${r//%/\\x}")
+    fi
+
+    printf '%s' "$r"
+}
+
+# Analiza UNA línea del portapapeles y decide si es una ruta y si existe. Imprime
+# 'ok<TAB>/ruta/absoluta' o 'falta<TAB>/ruta/absoluta'; no imprime nada si la línea no
+# parece una ruta (texto suelto: no se ofrece, para no llenar el menú de prosa).
+analizar_candidato() {
+    local ruta abs
+    ruta=$(limpiar_candidato "$1")
+    [ -n "$ruta" ] || return 0
+
+    # Parece ruta si arranca como tal o si existe tal cual. Así una frase con barras
+    # ('avisar en /etc/hosts y seguir') no entra: no arranca con '/' ni existe entera.
+    #
+    # '~' y '~/'* van ENTRE COMILLAS a propósito: en los patrones de un 'case' bash
+    # también hace expansión de tilde, así que un '~/*' pelado se convierte en
+    # '/home/rodrigo/*' y nunca matchea el '~/algo' literal que llega acá.
+    case "$ruta" in
+        "~"|"~/"*|/*|./*|../*) ;;
+        *) [ -e "$ruta" ] || return 0 ;;
+    esac
+
+    abs=$(resolver "$ruta")
+
+    # Copiar desde un editor o desde un grep agrega ':línea[:columna]'. Se prueba sin
+    # ese sufijo SÓLO si la ruta con sufijo no existe: así un nombre que de verdad
+    # termina en ':12' no se corta.
+    #
+    # El patrón usa [^:]* y no .*: con .* (greedy) el grupo se queda con el ÚLTIMO
+    # ':12' y '/a/b:12:3' daría '/a/b:12', que tampoco existe. Con [^:]* corta en el
+    # PRIMER ':' y el grupo es la ruta real.
+    if [ ! -e "$abs" ] && [[ $abs =~ ^([^:]*):[0-9]+(:[0-9]+)?$ ]]; then
+        local sin_sufijo
+        sin_sufijo=$(resolver "${BASH_REMATCH[1]}")
+        if [ -e "$sin_sufijo" ]; then abs=$sin_sufijo; fi
+    fi
+
+    if [ -e "$abs" ]; then printf 'ok\t%s' "$abs"
+    else                   printf 'falta\t%s' "$abs"; fi
+}
+
 abrir() {
-    local relativa=$1 absoluta="$HOME/$1"
+    local absoluta
+    absoluta=$(resolver "$1")
+
+    # Si no existe, se avisa y se corta. Cubre dos casos: una ruta tipeada a mano con
+    # un error, y una fila del portapapeles que se mostró marcada "no existe" (el
+    # usuario pidió verla pero no abrirla).
+    if [ ! -e "$absoluta" ]; then
+        local aviso="No existe: $absoluta"
+        notify-send "Abrir archivo" "$aviso" 2> /dev/null || printf '%s\n' "$aviso" >&2
+        return 1
+    fi
 
     # setsid -f desprende el visor del script. Sin eso el proceso queda colgado de la
     # vida de xdg-open: en el caso del bind, Hyprland tendría un hijo por cada archivo
@@ -77,8 +171,8 @@ abrir() {
     local tipo
     tipo=$(xdg-mime query filetype "$absoluta" 2> /dev/null || true)
     if [ -n "$tipo" ] && [ -z "$(xdg-mime query default "$tipo" 2> /dev/null)" ]; then
-        local aviso="Sin aplicación por defecto para $tipo"
-        notify-send "Abrir archivo" "$aviso" 2> /dev/null || printf '%s\n' "$aviso" >&2
+        local sin_app="Sin aplicación por defecto para $tipo"
+        notify-send "Abrir archivo" "$sin_app" 2> /dev/null || printf '%s\n' "$sin_app" >&2
         return 1
     fi
 
@@ -104,18 +198,117 @@ if [ "$frontend" = rofi ]; then
             printf "%s\t%s\t%s\n", $0, nombre, carpeta
         }')
 
-    # Sin resultados no tiene sentido abrir el menú: 'printf' de una cadena vacía le
-    # daría a rofi una línea en blanco y el menú saldría con una entrada fantasma.
-    if [ -z "$lista" ]; then
+    # ── La ruta que tengas copiada ───────────────────────────────────────────
+    # Si lo último copiado es una ruta (copy-path, screenshot-path, un editor, el
+    # navegador), se ofrece ARRIBA y preseleccionada: Enter sin escribir nada abre eso.
+    # Es el atajo para "abrir el archivo que tengo copiado" sin tipear.
+    #
+    # Hay razones por las que fd no la listaría aunque el archivo exista: está fuera de
+    # ~ (fd sólo escanea ~) o adentro de una carpeta excluida de la lista de arriba. Acá
+    # eso da igual: se arma la fila a mano y se la clava al tope. Después se la quita de
+    # la lista base para no verla dos veces.
+    #
+    # Sólo en la cara rofi, a propósito: en fzf (que arranca con una query filtrable) una
+    # fila pegada al tope es una trampa, porque Enter también selecciona y no hay forma
+    # de sacarla si estorba. En rofi se va tipeando y deja de molestar.
+    filas_ok=()
+    filas_falta=()
+    if command -v wl-paste > /dev/null 2>&1; then
+        # -n: sin el salto de línea final. head: una ruta no necesita más de unas pocas
+        # líneas, y así un texto enorme no se lee entero. timeout: un dueño del
+        # portapapeles colgado no puede colgar el atajo. Si no hay texto (p. ej.
+        # copiaste una imagen), wl-paste sale distinto de cero y no se ofrece nada.
+        limite=5
+        portapapeles=$(timeout 1 wl-paste -n 2> /dev/null | head -n "$limite" || true)
+
+        while IFS= read -r linea; do
+            [ -n "$linea" ] || continue
+            analisis=$(analizar_candidato "$linea")
+            [ -n "$analisis" ] || continue
+            estado=${analisis%%$'\t'*}
+            ruta=${analisis#*$'\t'}
+
+            # La carpeta se muestra con '~' para no perder de vista dónde está. El '~'
+            # del reemplazo va ENTRE COMILLAS: pelado, bash lo expande a $HOME y el
+            # reemplazo queda en nada (mismo tipo de trampa que en 'case' y en ${r#~/}).
+            contenedor=${ruta%/*}
+            contenedor=${contenedor/#"$HOME"/"~"}
+
+            if [ "$estado" = ok ]; then
+                filas_ok+=("$(printf '%s\t%s\t%s' "$ruta" "$(basename -- "$ruta")" "[portapapeles] $contenedor")")
+            else
+                filas_falta+=("$(printf '%s\t%s\t%s' "$ruta" "$(basename -- "$ruta")" '[portapapeles] no existe')")
+            fi
+        done <<< "$portapapeles"
+    fi
+
+    # Las que existen van primero: así la preselección (fila 0) cae siempre en una ruta
+    # abrible si hay al menos una. Las que no existen quedan al final, marcadas: se ven
+    # y se entiende por qué no se abren.
+    filas_clip=()
+    if [ "${#filas_ok[@]}" -gt 0 ]; then filas_clip+=("${filas_ok[@]}"); fi
+    if [ "${#filas_falta[@]}" -gt 0 ]; then filas_clip+=("${filas_falta[@]}"); fi
+
+    # Quitar de la lista base lo que ya subimos como fila del portapapeles. Se compara
+    # por la ruta relativa a ~, que es como vienen las líneas de fd.
+    if [ "${#filas_clip[@]}" -gt 0 ]; then
+        relativas=""
+        for fila in "${filas_clip[@]}"; do
+            r=${fila%%$'\t'*}
+            case "$r" in "$HOME"/*) relativas+="${r#"$HOME"/}"$'\n' ;; esac
+        done
+        if [ -n "$relativas" ]; then
+            lista=$(printf '%s\n' "$lista" | awk -F'\t' -v rels="$relativas" '
+                BEGIN { n = split(rels, a, "\n"); for (i = 1; i <= n; i++) if (a[i] != "") saltar[a[i]] = 1 }
+                !($1 in saltar)')
+        fi
+    fi
+
+    # Sin nada que mostrar (ni archivos en ~ ni ruta del portapapeles) no tiene sentido
+    # abrir el menú: 'printf' de una cadena vacía le daría a rofi una línea en blanco y
+    # el menú saldría con una entrada fantasma.
+    if [ "${#filas_clip[@]}" -eq 0 ] && [ -z "$lista" ]; then
         notify-send "Archivos" "No se encontró ningún archivo en ~" 2> /dev/null || true
         exit 0
     fi
 
-    seleccion=$(printf '%s\n' "$lista" | rofi -dmenu -i \
-        -p "Archivos" \
-        -display-columns 2,3 \
-        -theme-str 'window {width: 900px;}') || exit 0
+    # Las del portapapeles van arriba de las de fd. Si no hay de fd, queda sólo la
+    # cadena del portapapeles (sin línea vacía de más: la sustitución de comandos se
+    # come el \n final y el 'printf' de abajo repone exactamente uno).
+    if [ "${#filas_clip[@]}" -gt 0 ]; then
+        lista=$(printf '%s\n%s' "$(printf '%s\n' "${filas_clip[@]}")" "$lista")
+    fi
 
+    rofi_args=(
+        -dmenu -i
+        -p "Archivos"
+        -display-columns 2,3
+        -kb-custom-1 "Alt+1"
+        -theme-str 'window {width: 900px;}'
+    )
+    if [ "${#filas_clip[@]}" -gt 0 ]; then
+        aviso_clip="Portapapeles: ${#filas_clip[@]} ruta(s)"
+        if [ "${#filas_falta[@]}" -gt 0 ]; then
+            aviso_clip="$aviso_clip · ${#filas_falta[@]} sin existir"
+        fi
+        aviso_clip="$aviso_clip — Alt+1 abre la primera"
+        rofi_args+=( -mesg "$aviso_clip" )
+    fi
+
+    # El '|| rofi_rc=$?' captura el código sin que 'set -e' corte el script: hace falta
+    # distinguir "canceló" (1) de "apretó Alt+1" (10, la kb-custom-1).
+    rofi_rc=0
+    seleccion=$(printf '%s\n' "$lista" | rofi "${rofi_args[@]}") || rofi_rc=$?
+
+    # Alt+1: no importa qué fila haya dejado resaltada el filtro, la orden es abrir la
+    # primera del portapapeles. rofi igual imprime la fila resaltada en stdout; se
+    # ignora y se usa la que ya tenemos guardada.
+    if [ "$rofi_rc" -eq 10 ] && [ "${#filas_clip[@]}" -gt 0 ]; then
+        abrir "${filas_clip[0]%%$'\t'*}"
+        exit 0
+    fi
+
+    [ "$rofi_rc" -eq 0 ] || exit 0
     [ -n "$seleccion" ] || exit 0
     abrir "${seleccion%%$'\t'*}"
 else

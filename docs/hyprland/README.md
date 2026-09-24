@@ -60,7 +60,7 @@ Empujar contra un borde sin pantalla no hace nada (Hyprland avisa "Monitor not f
 - **SUPER + Return** → terminal (foot)
 - **SUPER + B** → navegador (firefox)
 - **SUPER + E** → gestor de archivos (thunar)
-- **SUPER + F** → buscar archivo en `~` y abrirlo (find-file)
+- **SUPER + F** → buscar archivo en `~` y abrirlo (find-file); si tenés una ruta copiada, la ofrece primero
 - **SUPER + Space** → lanzador de apps (rofi drun)
 - **SUPER + SHIFT + Space** → ejecutar comando (rofi run)
 - **SUPER + SHIFT + V** → historial del portapapeles (cliphist en rofi)
@@ -160,6 +160,16 @@ Se puede llamar suelto: `pick-window` / `pick-window --all`
 - `find-file` → elige frontend automáticamente (rofi desde bind, fzf en terminal)
 - `find-file --rofi` → fuerza rofi
 - `find-file --fzf` → fuerza fzf
+
+### La ruta del portapapeles (solo cara rofi)
+
+Si lo último copiado es una ruta (con `copy-path`, `screenshot-path`, un editor, el navegador), el menú de `SUPER + F` la muestra **arriba de todo y preseleccionada**: Enter sin escribir nada abre eso. `Alt+1` la abre igual aunque el filtro la haya tapado.
+
+- Se miran las **primeras 5 líneas** del portapapeles.
+- Antes de ofrecerla se la limpia: `file://`, escapes de URL (`%20`), comillas, CR final, espacios, `~`, rutas relativas y el sufijo `:línea:col` que agregan editores y `grep`.
+- Si el archivo **existe** pero `fd` no lo listaría (está fuera de `~` o en una carpeta excluida), se lo **inyecta igual** como fila fija; si ya estaba en la lista, no se duplica.
+- Si **no existe**, se muestra marcada `[portapapeles] no existe` y al elegirla solo avisa (no abre).
+- Si el portapapeles tiene texto que no parece ruta (o una imagen), no se ofrece nada.
 
 Excluidos de la búsqueda: `.git`, `.cache`, `.cargo`, `.claude`, `.local/share`, `.local/state`, `go/pkg`, `.npm`, `node_modules`, `.oh-my-zsh`.
 
