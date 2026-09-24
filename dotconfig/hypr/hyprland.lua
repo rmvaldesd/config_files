@@ -664,10 +664,17 @@ hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("pick-window --all"))
 -- El script (bin_configs/find-file) elige frontend solo: desde acá no hay terminal, así
 -- que saca el menú de rofi; corrido a mano en una terminal saca fzf con preview.
 --
--- La cara rofi además mira el portapapeles: si tenés una ruta o una URL copiada, la
--- ofrece arriba y preseleccionada (Enter sin escribir nada la abre; Alt+1 la abre igual
--- con filtro). Detalle en docs/hyprland/README.md. La cara fzf no hace eso.
+-- The rofi face also looks at the clipboard: if you have a path or a URL copied, it
+-- offers it at the top and preselected (Enter without typing anything opens it; Alt+1
+-- opens it even with a filter). Details in docs/hyprland/README.md. The fzf face does
+-- not do that.
 hl.bind(mainMod .. " + F", hl.dsp.exec_cmd("find-file"))
+
+-- Recent files: downloads, screenshots, recently opened (xbel) and recently modified,
+-- in one rofi menu with actions to open, copy the path, open the folder, open a terminal
+-- there or move to the trash. 'O' because 'R' (recent) is taken by the resize submap.
+-- Script: bin_configs/recent-files; details in docs/hyprland/README.md.
+hl.bind(mainMod .. " + O", hl.dsp.exec_cmd("recent-files"))
 
 -- Dictado por voz (voxtype). 'T' de 'transcribir'.
 -- Toggle: una pulsación arranca a grabar, otra para y transcribe.

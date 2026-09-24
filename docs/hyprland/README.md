@@ -60,7 +60,8 @@ Empujar contra un borde sin pantalla no hace nada (Hyprland avisa "Monitor not f
 - **SUPER + Return** → terminal (foot)
 - **SUPER + B** → navegador (firefox)
 - **SUPER + E** → gestor de archivos (thunar)
-- **SUPER + F** → buscar archivo en `~` y abrirlo (find-file); si tenés una ruta o URL copiada, la ofrece primero
+- **SUPER + F** → search a file under `~` and open it (find-file); if you have a path or URL copied, it offers it first
+- **SUPER + O** → recent files: apps, downloads, screenshots and modified files (recent-files)
 - **SUPER + Space** → lanzador de apps (rofi drun)
 - **SUPER + SHIFT + Space** → ejecutar comando (rofi run)
 - **SUPER + SHIFT + V** → historial del portapapeles (cliphist en rofi)
@@ -161,17 +162,43 @@ Se puede llamar suelto: `pick-window` / `pick-window --all`
 - `find-file --rofi` → fuerza rofi
 - `find-file --fzf` → fuerza fzf
 
-### Lo que tengas copiado: ruta o URL (solo cara rofi)
+### What you have copied: path or URL (rofi face only)
 
-Si lo último copiado es una ruta (con `copy-path`, `screenshot-path`, un editor) o una URL (de un navegador), el menú de `SUPER + F` lo muestra **arriba de todo y preseleccionado**: Enter sin escribir nada abre eso. `Alt+1` lo abre igual aunque el filtro lo haya tapado.
+If the last thing copied is a path (with `copy-path`, `screenshot-path`, an editor) or a URL (from a browser), the `SUPER + F` menu shows it **at the top and preselected**: Enter without typing anything opens it. `Alt+1` opens it too even if the filter hid it.
 
-- Se miran las **primeras 5 líneas** del portapapeles, y las filas salen **en el orden** en que vinieron.
-- **Rutas:** antes de ofrecerlas se las limpia (`file://`, escapes `%20`, comillas, CR final, espacios, `~`, relativas y el sufijo `:línea:col` de editores y `grep`). Si el archivo **existe** pero `fd` no lo listaría (está fuera de `~` o en una carpeta excluida), se lo **inyecta igual** como fila fija; si ya estaba en la lista, no se duplica. Si **no existe**, se muestra marcada `[portapapeles] no existe` y al elegirla solo avisa (no abre).
-- **URLs:** cualquier `esquema://` (`http`, `https`, `ftp`, `gemini`, `ssh`, …) o `mailto:`, marcada `[portapapeles] url`, y se abre con el manejador por defecto vía `xdg-open` (hoy `google-chrome` para `http(s)`; **no** usa el firefox de `SUPER + B`). A diferencia de las rutas, a una URL **no** se le decodifican los `%`: cambiaría su significado. Si el esquema no tiene manejador, avisa en vez de abrir.
-- `file://…` no cuenta como URL: es una ruta local y va por la rama de archivos (un `.html` local ya se abre con el navegador por `text/html`).
-- Si el portapapeles tiene texto que no parece ni ruta ni URL (o una imagen), no se ofrece nada.
+- The **first 5 lines** of the clipboard are read, and the rows come **in the order** they arrived.
+- **Paths:** before being offered they are cleaned (`file://`, `%20` escapes, quotes, trailing CR, spaces, `~`, relatives and the `:line:col` suffix from editors and `grep`). If the file **exists** but `fd` would not list it (it is outside `~` or in an excluded folder), it is **injected anyway** as a pinned row; if it was already in the list, it is not duplicated. If it **does not exist**, it is shown marked `[clipboard] missing` and choosing it only warns (it does not open).
+- **URLs:** any `scheme://` (`http`, `https`, `ftp`, `gemini`, `ssh`, ...) or `mailto:`, marked `[clipboard] url`, opened with the default handler via `xdg-open` (today `google-chrome` for `http(s)`; it does **not** use the firefox of `SUPER + B`). Unlike paths, a URL's `%` escapes are **not** decoded: it would change its meaning. If the scheme has no handler, it warns instead of opening.
+- `file://...` does not count as a URL: it is a local path and goes through the file branch (a local `.html` already opens with the browser via `text/html`).
+- If the clipboard has text that looks like neither a path nor a URL (or an image), nothing is offered.
 
 Excluidos de la búsqueda: `.git`, `.cache`, `.cargo`, `.claude`, `.local/share`, `.local/state`, `go/pkg`, `.npm`, `node_modules`, `.oh-my-zsh`.
+
+---
+
+## Recent files (`recent-files`)
+
+`SUPER + O` opens a rofi menu of recent files under `~`, merged from four sources and shown with **category, name, age and folder**, newest first.
+
+- **app** — files GTK applications recorded in `~/.local/share/recently-used.xbel` (the ones actually opened, wherever they live).
+- **download** — files in `~/Downloads`.
+- **screenshot** — files in `~/Pictures/screenshots`.
+- **modified** — files touched in the last **3 days** under `~`, capped at 400 and with the browser/app-churn folders excluded. Without those exclusions, ~90% of this list is Chrome and Firefox rewriting state.
+
+If a file falls in more than one source it is shown once, with the most specific category (screenshot > download > app > modified).
+
+Actions, via rofi custom keys:
+
+| Key | Action |
+|---|---|
+| `Enter` | open with the default app (`xdg-open`) |
+| `Alt+1` | copy the path (`wl-copy`) |
+| `Alt+2` | open the containing folder |
+| `Alt+3` | open a terminal there (`foot -D`) |
+| `Alt+4` | move to the trash (`gio trash`, asks first) |
+| `Alt+0` | action submenu, for when you do not remember the keys |
+
+`thunar` has no `--select`, so "open the folder" opens the containing directory, not the file highlighted.
 
 ---
 
