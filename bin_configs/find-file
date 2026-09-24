@@ -1,28 +1,26 @@
 #!/usr/bin/env bash
-# Busca un archivo en cualquier lugar de ~ y lo abre con su aplicación por defecto.
-# Un solo script con dos caras, según desde dónde se lo llame:
+# Finds a file anywhere under ~ and opens it with its default application.
+# One script with two faces, depending on where it's called from:
 #
-#   find-file          elige solo: rofi si lo lanzó el bind (SUPER + F), fzf si lo
-#                      corriste en una terminal
-#   find-file --rofi   fuerza el menú de rofi
-#   find-file --fzf    fuerza fzf con preview (permite elegir varios con Tab)
+#   find-file          picks the frontend: rofi from the keybind, fzf in a terminal
+#   find-file --rofi   forces the rofi menu
+#   find-file --fzf    forces fzf with preview (lets you pick several with Tab)
 #
-# Desde el bind (SUPER + F), la cara rofi además mira el portapapeles: si lo último
-# copiado es una ruta o una URL, la ofrece ARRIBA y preseleccionada, así Enter sin
-# escribir nada abre eso (ver el bloque "Lo que tengas copiado" más abajo). La cara fzf
-# no lo hace a propósito. Ver las funciones limpiar_basico/limpiar_ruta/es_url/
-# analizar_candidato.
+# From the keybind (SUPER + F), the rofi face also looks at the clipboard: if the last
+# thing copied is a path or a URL, it is offered at the TOP and preselected, so Enter
+# without typing anything opens it (see the "What you have copied" block below). The fzf
+# face deliberately does not. See clean_basic/clean_path/is_url/analyze_candidate.
 #
-# La detección es por TTY y no por variables de entorno: Hyprland lanza los binds sin
-# terminal, así que ahí stdin no es un tty y sale rofi; en una terminal interactiva sí
-# lo es y sale fzf. Es el único dato confiable -- WAYLAND_DISPLAY, por ejemplo, está
-# puesto en las DOS situaciones, porque la terminal también es un cliente de Wayland.
+# Detection is by TTY, not by environment variables: Hyprland launches keybinds without a
+# terminal, so there stdin is not a tty and rofi comes out; in an interactive terminal it
+# is one and fzf comes out. That is the only reliable signal -- WAYLAND_DISPLAY, for
+# example, is set in BOTH cases, because the terminal is also a Wayland client.
 #
-# Por qué un script y no 'rofi -show recursivebrowser' (que existe en rofi 2.0 y abre
-# con xdg-open por su cuenta): ese modo usa su propio escáner, sin forma de excluir
-# nada. Termina listando las decenas de miles de archivos de caché de este disco, que
-# no son cosas que uno quiera abrir, y sepultando bajo ellos a los que sí. Con fd los
-# excluimos y quedan ~4.700 entradas reales, que se generan en menos de 100 ms.
+# Why a script and not 'rofi -show recursivebrowser' (which exists in rofi 2.0 and opens
+# with xdg-open on its own): that mode uses its own scanner, with no way to exclude
+# anything. It ends up listing the tens of thousands of cache files on this disk, which
+# are not things one wants to open, and burying the ones that are. With fd we exclude
+# them and ~4,700 real entries are left, generated in under 100 ms.
 
 set -euo pipefail
 
@@ -31,25 +29,25 @@ case "${1:-}" in
     --rofi) frontend=rofi ;;
     --fzf)  frontend=fzf ;;
     "")     ;;
-    *)      printf 'uso: %s [--rofi|--fzf]\n' "$0" >&2; exit 1 ;;
+    *)      printf 'usage: %s [--rofi|--fzf]\n' "$0" >&2; exit 1 ;;
 esac
 
 if [ "$frontend" = auto ]; then
     if [ -t 0 ] && [ -t 1 ]; then frontend=fzf; else frontend=rofi; fi
 fi
 
-# --hidden es necesario: fd salta los ocultos de fábrica y sin esto ~/.config, que sí
-# se edita a mano, quedaría invisible. Justamente por eso hay que sacar a mano los
-# directorios ocultos que son caché o estado de las apps.
+# --hidden is required: fd skips hidden files by default, and without it ~/.config, which
+# is edited by hand, would be invisible. That is exactly why the hidden directories that
+# are app cache or state have to be removed by hand.
 #
-# Esta lista es la MISMA que la de los widgets de fzf de zshrc.local (_fzf_home_ex_fd),
-# a propósito: que buscar desde la terminal y buscar desde el escritorio no devuelvan
-# universos distintos. Si tocás una, tocá la otra.
+# This list is the SAME as the one in the fzf widgets of zshrc.local (_fzf_home_ex_fd), on
+# purpose: so that searching from the terminal and searching from the desktop don't return
+# different universes. If you touch one, touch the other.
 #
-# El segundo bloque son cachés de dependencias, y es el que más cambia las cosas: sin
-# él, el caché de módulos de Go solo aporta 27.216 de las 34.336 entradas -- el 79% del
-# menú -- y sepulta a lo que uno busca. Medido acá: 34.336 entradas contra 4.724.
-excluir=(
+# The second block is dependency caches, and it is the one that changes things most:
+# without it, the Go module cache alone adds 27,216 of the 34,336 entries -- 79% of the
+# menu -- and buries what you are looking for. Measured here: 34,336 entries vs 4,724.
+exclude=(
     --exclude=.git
     --exclude=.cache
     --exclude=.cargo
@@ -57,38 +55,39 @@ excluir=(
     --exclude=.local/share
     --exclude=.local/state
 
-    --exclude=go/pkg      # caché de módulos de Go, de sólo lectura
-    --exclude=.npm        # caché de npm
+    --exclude=go/pkg      # Go module cache, read-only
+    --exclude=.npm        # npm cache
     --exclude=node_modules
-    --exclude=.oh-my-zsh  # código del framework, no configuración propia
+    --exclude=.oh-my-zsh  # framework code, not own configuration
 )
 
-# fd corre DESDE ~ para que emita rutas relativas: son las que se ven mejor en los dos
-# menús ('Documents/informe.pdf' y no '/home/rodrigo/Documents/informe.pdf') y además
-# hacen que el preview de fzf funcione sin reconstruir nada, porque fzf hereda este
-# mismo directorio. La ruta absoluta la repone abrir().
+# fd runs FROM ~ so it emits relative paths: those look better in both menus
+# ('Documents/report.pdf' instead of '/home/rodrigo/Documents/report.pdf') and also let
+# the fzf preview work without rebuilding anything, because fzf inherits this same
+# directory. The absolute path is restored by open_target().
 cd "$HOME"
 
-# Devuelve la ruta ABSOLUTA de lo que le pasen. Acepta las tres formas que llegan acá:
-# la relativa a ~ que produce la lista de fd ('Documents/x.pdf'), una absoluta tipeada a
-# mano ('/etc/hosts') y una con '~' ('~/x'). Antes esto se resolvía anteponiendo $HOME a
-# TODO sin mirar, así que '/etc/hosts' terminaba en '/home/rodrigo//etc/hosts' y '~/x'
-# en '/home/rodrigo/~/x': tipear una ruta absoluta en el menú no funcionaba.
-resolver() {
+# Returns the ABSOLUTE path for whatever it is given. It accepts the three shapes that
+# arrive here: the ~-relative one produced by the fd list ('Documents/x.pdf'), an absolute
+# one typed by hand ('/etc/hosts') and one with '~' ('~/x'). This used to be resolved by
+# prepending $HOME to EVERYTHING without looking, so '/etc/hosts' ended up as
+# '/home/rodrigo//etc/hosts' and '~/x' as '/home/rodrigo/~/x': typing an absolute path in
+# the menu did not work.
+resolve_path() {
     local r=$1
     case "$r" in
         "~")   r=$HOME ;;
-        # ${r:2} y no ${r#~/}: igual que en 'case', bash expandiría la tilde del
-        # patrón '~/' y no recortaría nada, dejando '$HOME/~/x'.
+        # ${r:2} and not ${r#~/}: as in 'case', bash would tilde-expand the '~/' pattern
+        # and trim nothing, leaving '$HOME/~/x'.
         "~/"*) r="$HOME/${r:2}" ;;
     esac
     realpath -m -- "$r"
 }
 
-# Limpieza COMÚN a cualquier candidato: saca los adornos con los que suele venir lo
-# copiado, sirva después como ruta o como URL. CR final (copiado de Windows), espacios
-# al costado, comillas envolventes y los '<...>' de un mail o un markdown.
-limpiar_basico() {
+# Cleanup COMMON to any candidate: strips the wrapping that copied text usually arrives
+# with, whether it later turns out to be a path or a URL. Trailing CR (copied from
+# Windows), surrounding spaces, surrounding quotes and the '<...>' of an email or markdown.
+clean_basic() {
     local r=$1
 
     r=${r%$'\r'}
@@ -96,30 +95,30 @@ limpiar_basico() {
     r=${r%"${r##*[![:space:]]}"}
     r=${r#\"}; r=${r%\"}
     r=${r#\'}; r=${r%\'}
-    # '<https://...>' sólo si están los DOS, para no comerse un '>' suelto.
+    # '<https://...>' only if BOTH are present, so a lone '>' is not eaten.
     case "$r" in "<"*">") r=${r#<}; r=${r%>} ;; esac
 
     printf '%s' "$r"
 }
 
-# ¿Es una URL? Cualquier esquema con autoridad ('http://', 'https://', 'ftp://',
-# 'gemini://', 'ssh://', ...) o 'mailto:'. 'file://' NO cuenta a propósito: eso es una
-# ruta local y la maneja la rama de archivos, que le saca el prefijo y la resuelve.
-es_url() {
+# Is this a URL? Any scheme with an authority ('http://', 'https://', 'ftp://',
+# 'gemini://', 'ssh://', ...) or 'mailto:'. 'file://' does NOT count on purpose: that is a
+# local path and is handled by the file branch, which strips the prefix and resolves it.
+is_url() {
     case "$1" in file://*) return 1 ;; esac
     [[ $1 =~ ^[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]]+$ ]] ||
         [[ $1 =~ ^mailto:[^[:space:]]+$ ]]
 }
 
-# Limpieza específica de una RUTA: el 'file://' que ponen navegadores y gestores y los
-# escapes de URL ('%20'). Acá SÍ se decodifica; en una URL no se toca (ver abajo).
+# Cleanup specific to a PATH: the 'file://' added by browsers and file managers, and the
+# URL escapes ('%20'). Here it IS decoded; in a URL it is not touched (see below).
 #
-# Sólo se decodifica si TODOS los '%' son un escape válido y no hay backslashes:
-# 'printf %b' también interpreta '\', así que un nombre con '\' se vería alterado, y un
-# '%' suelto haría saltar un error de printf.
-limpiar_ruta() {
+# It is only decoded if ALL the '%' are a valid escape and there are no backslashes:
+# 'printf %b' also interprets '\', so a name with '\' would be altered, and a lone '%'
+# would make printf throw an error.
+clean_path() {
     local r
-    r=$(limpiar_basico "$1")
+    r=$(clean_basic "$1")
     r=${r#file://}
 
     if [[ $r == *%* && $r != *\\* ]] &&
@@ -130,272 +129,271 @@ limpiar_ruta() {
     printf '%s' "$r"
 }
 
-# Analiza UNA línea del portapapeles y decide qué es. Imprime:
-#   'url<TAB><url>'            una URL, tal cual (sin decodificar)
-#   'ok<TAB>/ruta/absoluta'    es una ruta y existe
-#   'falta<TAB>/ruta/absoluta' parece ruta y no existe
-# No imprime nada si no parece ni ruta ni URL (texto suelto: no se ofrece, para no
-# llenar el menú de prosa).
-analizar_candidato() {
-    local basico ruta abs
-    basico=$(limpiar_basico "$1")
-    [ -n "$basico" ] || return 0
+# Analyzes ONE clipboard line and decides what it is. It prints:
+#   'url<TAB><url>'            a URL, as is (not decoded)
+#   'ok<TAB>/absolute/path'    it is a path and it exists
+#   'missing<TAB>/absolute/path'  it looks like a path and does not exist
+# It prints nothing if it looks like neither a path nor a URL (loose text: it is not
+# offered, so the menu does not fill up with prose).
+analyze_candidate() {
+    local basic path abs
+    basic=$(clean_basic "$1")
+    [ -n "$basic" ] || return 0
 
-    # La URL se detecta ANTES y se devuelve SIN TOCAR. Pasarla por limpiar_ruta la
-    # rompería: '%20' se volvería un espacio y '%2F' una barra, y dejaría de apuntar a
-    # lo mismo.
-    if es_url "$basico"; then printf 'url\t%s' "$basico"; return 0; fi
+    # The URL is detected FIRST and returned UNTOUCHED. Running it through clean_path
+    # would break it: '%20' would become a space and '%2F' a slash, and it would no longer
+    # point to the same thing.
+    if is_url "$basic"; then printf 'url\t%s' "$basic"; return 0; fi
 
-    ruta=$(limpiar_ruta "$basico")
-    [ -n "$ruta" ] || return 0
+    path=$(clean_path "$basic")
+    [ -n "$path" ] || return 0
 
-    # Parece ruta si arranca como tal o si existe tal cual. Así una frase con barras
-    # ('avisar en /etc/hosts y seguir') no entra: no arranca con '/' ni existe entera.
+    # It looks like a path if it starts like one or if it exists as is. That way a
+    # sentence with slashes ('ping /etc/hosts and continue') does not get in: it does not
+    # start with '/' nor exists whole.
     #
-    # '~' y '~/'* van ENTRE COMILLAS a propósito: en los patrones de un 'case' bash
-    # también hace expansión de tilde, así que un '~/*' pelado se convierte en
-    # '/home/rodrigo/*' y nunca matchea el '~/algo' literal que llega acá.
-    case "$ruta" in
+    # '~' and '~/'* are QUOTED on purpose: in a 'case' pattern bash also tilde-expands,
+    # so a bare '~/*' becomes '/home/rodrigo/*' and never matches the literal '~/something'
+    # that arrives here.
+    case "$path" in
         "~"|"~/"*|/*|./*|../*) ;;
-        *) [ -e "$ruta" ] || return 0 ;;
+        *) [ -e "$path" ] || return 0 ;;
     esac
 
-    abs=$(resolver "$ruta")
+    abs=$(resolve_path "$path")
 
-    # Copiar desde un editor o desde un grep agrega ':línea[:columna]'. Se prueba sin
-    # ese sufijo SÓLO si la ruta con sufijo no existe: así un nombre que de verdad
-    # termina en ':12' no se corta.
+    # Copying from an editor or from grep adds ':line[:column]'. It is tried without that
+    # suffix ONLY if the path with the suffix does not exist: that way a name that really
+    # ends in ':12' is not cut.
     #
-    # El patrón usa [^:]* y no .*: con .* (greedy) el grupo se queda con el ÚLTIMO
-    # ':12' y '/a/b:12:3' daría '/a/b:12', que tampoco existe. Con [^:]* corta en el
-    # PRIMER ':' y el grupo es la ruta real.
+    # The pattern uses [^:]* and not .*: with .* (greedy) the group keeps the LAST ':12'
+    # and '/a/b:12:3' would give '/a/b:12', which also does not exist. With [^:]* it cuts
+    # at the FIRST ':' and the group is the real path.
     if [ ! -e "$abs" ] && [[ $abs =~ ^([^:]*):[0-9]+(:[0-9]+)?$ ]]; then
-        local sin_sufijo
-        sin_sufijo=$(resolver "${BASH_REMATCH[1]}")
-        if [ -e "$sin_sufijo" ]; then abs=$sin_sufijo; fi
+        local without_suffix
+        without_suffix=$(resolve_path "${BASH_REMATCH[1]}")
+        if [ -e "$without_suffix" ]; then abs=$without_suffix; fi
     fi
 
     if [ -e "$abs" ]; then printf 'ok\t%s' "$abs"
-    else                   printf 'falta\t%s' "$abs"; fi
+    else                   printf 'missing\t%s' "$abs"; fi
 }
 
-abrir() {
-    # Una URL va directo a xdg-open (el navegador / manejador por defecto). No se
-    # resuelve ni se le busca mime: no es un archivo, y resolver() la destrozaría. Si el
-    # esquema no tiene manejador se avisa, igual que cuando un tipo no tiene app.
-    if es_url "$1"; then
-        # xdg-mime pide el esquema en minúsculas: 'HTTPS://x' normaliza a 'https'.
-        local esquema=${1%%:*}
-        esquema=${esquema,,}
-        if [ -z "$(xdg-mime query default "x-scheme-handler/$esquema" 2> /dev/null)" ]; then
-            local sin_handler="Sin aplicación para el esquema $esquema"
-            notify-send "Abrir enlace" "$sin_handler" 2> /dev/null || printf '%s\n' "$sin_handler" >&2
+open_target() {
+    # A URL goes straight to xdg-open (the default browser / handler). It is not resolved
+    # nor looked up for mime: it is not a file, and resolve_path() would wreck it. If the
+    # scheme has no handler it warns, just like when a type has no app.
+    if is_url "$1"; then
+        # xdg-mime wants the scheme lowercase: 'HTTPS://x' normalizes to 'https'.
+        local scheme=${1%%:*}
+        scheme=${scheme,,}
+        if [ -z "$(xdg-mime query default "x-scheme-handler/$scheme" 2> /dev/null)" ]; then
+            local no_handler="No handler for the $scheme scheme"
+            notify-send "Open link" "$no_handler" 2> /dev/null || printf '%s\n' "$no_handler" >&2
             return 1
         fi
         setsid -f xdg-open "$1" > /dev/null 2>&1
         return 0
     fi
 
-    local absoluta
-    absoluta=$(resolver "$1")
+    local absolute
+    absolute=$(resolve_path "$1")
 
-    # Si no existe, se avisa y se corta. Cubre dos casos: una ruta tipeada a mano con
-    # un error, y una fila del portapapeles que se mostró marcada "no existe" (el
-    # usuario pidió verla pero no abrirla).
-    if [ ! -e "$absoluta" ]; then
-        local aviso="No existe: $absoluta"
-        notify-send "Abrir archivo" "$aviso" 2> /dev/null || printf '%s\n' "$aviso" >&2
+    # If it does not exist, warn and stop. Covers two cases: a path typed by hand with a
+    # mistake, and a clipboard row shown as "missing" (the user asked to see it but not to
+    # open it).
+    if [ ! -e "$absolute" ]; then
+        local warning="Does not exist: $absolute"
+        notify-send "Open file" "$warning" 2> /dev/null || printf '%s\n' "$warning" >&2
         return 1
     fi
 
-    # setsid -f desprende el visor del script. Sin eso el proceso queda colgado de la
-    # vida de xdg-open: en el caso del bind, Hyprland tendría un hijo por cada archivo
-    # abierto; en el de la terminal, la shell quedaría bloqueada hasta cerrar el visor.
+    # setsid -f detaches the viewer from the script. Without it the process hangs off the
+    # life of xdg-open: in the keybind case, Hyprland would have one child per opened file;
+    # in the terminal case, the shell would be blocked until the viewer is closed.
     #
-    # El desprendimiento tiene un costo: los errores del visor ya no vuelven acá (el
-    # fallo ocurre después del fork). Lo que sí se detecta antes es el caso frecuente
-    # -- que el tipo de archivo no tenga aplicación asociada en mimeapps.list -- y de
-    # ese sí se avisa, porque si no el atajo parece no hacer nada.
-    local tipo
-    tipo=$(xdg-mime query filetype "$absoluta" 2> /dev/null || true)
-    if [ -n "$tipo" ] && [ -z "$(xdg-mime query default "$tipo" 2> /dev/null)" ]; then
-        local sin_app="Sin aplicación por defecto para $tipo"
-        notify-send "Abrir archivo" "$sin_app" 2> /dev/null || printf '%s\n' "$sin_app" >&2
+    # Detaching has a cost: the viewer's errors no longer come back here (the failure
+    # happens after the fork). What IS detected beforehand is the frequent case -- that the
+    # file type has no application associated in mimeapps.list -- and that one does warn,
+    # because otherwise the shortcut seems to do nothing.
+    local file_type
+    file_type=$(xdg-mime query filetype "$absolute" 2> /dev/null || true)
+    if [ -n "$file_type" ] && [ -z "$(xdg-mime query default "$file_type" 2> /dev/null)" ]; then
+        local missing_app="No default application for $file_type"
+        notify-send "Open file" "$missing_app" 2> /dev/null || printf '%s\n' "$missing_app" >&2
         return 1
     fi
 
-    setsid -f xdg-open "$absoluta" > /dev/null 2>&1
+    setsid -f xdg-open "$absolute" > /dev/null 2>&1
 }
 
 if [ "$frontend" = rofi ]; then
-    # Dos columnas: nombre a la izquierda, carpeta a la derecha. El nombre es lo que uno
-    # recuerda y la carpeta lo que desempata entre los diez 'README.md' del disco.
+    # Two columns: name on the left, folder on the right. The name is what one remembers
+    # and the folder is what breaks the tie between the ten 'README.md' on the disk.
     #
-    # La ruta completa viaja como PRIMERA columna y no se muestra: rofi dibuja sólo las
-    # columnas de -display-columns pero DEVUELVE la línea entera, así que la ruta llega
-    # de vuelta sin ensuciar el menú. Es el mismo truco que usa pick-window con la
-    # dirección de la ventana.
-    lista=$(fd --type f --hidden --follow "${excluir[@]}" . | awk -F/ '
+    # The full path travels as the FIRST column and is not shown: rofi draws only the
+    # columns in -display-columns but RETURNS the whole line, so the path comes back
+    # without dirtying the menu. It is the same trick pick-window uses with the window
+    # address.
+    list_rows=$(fd --type f --hidden --follow "${exclude[@]}" . | awk -F/ '
         {
-            nombre  = $NF
-            # -1 para comerse también la barra que separa carpeta de nombre. Si el
-            # archivo está suelto en ~ no hay carpeta y queda "~" pelado.
-            carpeta = (length($0) > length(nombre)) \
-                ? "~/" substr($0, 1, length($0) - length(nombre) - 1) \
+            name  = $NF
+            # -1 to also eat the slash separating folder from name. If the file sits
+            # loose in ~ there is no folder and it is a bare "~".
+            folder = (length($0) > length(name)) \
+                ? "~/" substr($0, 1, length($0) - length(name) - 1) \
                 : "~"
-            printf "%s\t%s\t%s\n", $0, nombre, carpeta
+            printf "%s\t%s\t%s\n", $0, name, folder
         }')
 
-    # ── Lo que tengas copiado ────────────────────────────────────────────────
-    # Si lo último copiado es una ruta (copy-path, screenshot-path, un editor) o una URL
-    # (un navegador), se ofrece ARRIBA y preseleccionada: Enter sin escribir nada abre
-    # eso. Es el atajo para "abrir lo que tengo copiado" sin cambiar de aplicación.
+    # ── What you have copied ─────────────────────────────────────────────────
+    # If the last thing copied is a path (copy-path, screenshot-path, an editor) or a URL
+    # (a browser), it is offered at the TOP and preselected: Enter without typing anything
+    # opens it. It is the shortcut for "open what I have copied" without switching apps.
     #
-    # Hay razones por las que fd no listaría una ruta aunque el archivo exista: está
-    # fuera de ~ (fd sólo escanea ~) o adentro de una carpeta excluida de la lista de
-    # arriba. Acá eso da igual: se arma la fila a mano y se la clava al tope. Después se
-    # la quita de la lista base para no verla dos veces.
+    # There are reasons fd would not list a path even if the file exists: it is outside ~
+    # (fd only scans ~) or inside an excluded folder from the list above. Here that does
+    # not matter: the row is built by hand and pinned to the top. Afterwards it is removed
+    # from the base list so it is not seen twice.
     #
-    # Las filas se arman EN EL ORDEN del portapapeles, mezclando URLs y rutas tal como
-    # vinieron. Cada una se etiqueta en la columna de carpeta: '[portapapeles] url',
-    # '~/dir' o '[portapapeles] no existe'.
+    # Rows are built IN CLIPBOARD ORDER, mixing URLs and paths as they came. Each one is
+    # labeled in the folder column: '[clipboard] url', '~/dir' or '[clipboard] missing'.
     #
-    # Sólo en la cara rofi, a propósito: en fzf (que arranca con una query filtrable) una
-    # fila pegada al tope es una trampa, porque Enter también selecciona y no hay forma
-    # de sacarla si estorba. En rofi se va tipeando y deja de molestar.
-    filas_clip=()
+    # Only in the rofi face, on purpose: in fzf (which starts with a filterable query) a
+    # row pinned to the top is a trap, because Enter also selects and there is no way to
+    # move it out of the way. In rofi you type and it stops bothering you.
+    clip_rows=()
     n_url=0
-    n_falta=0
+    n_missing=0
     if command -v wl-paste > /dev/null 2>&1; then
-        # -n: sin el salto de línea final. head: unas pocas líneas alcanzan, y así un
-        # texto enorme no se lee entero. timeout: un dueño del portapapeles colgado no
-        # puede colgar el atajo. Si no hay texto (p. ej. copiaste una imagen), wl-paste
-        # sale distinto de cero y no se ofrece nada.
-        limite=5
-        portapapeles=$(timeout 1 wl-paste -n 2> /dev/null | head -n "$limite" || true)
+        # -n: no trailing newline. head: a few lines are enough, so a huge text is not
+        # read whole. timeout: a hung clipboard owner cannot hang the shortcut. If there
+        # is no text (e.g. you copied an image), wl-paste exits non-zero and nothing is
+        # offered.
+        limit=5
+        clipboard=$(timeout 1 wl-paste -n 2> /dev/null | head -n "$limit" || true)
 
-        while IFS= read -r linea; do
-            [ -n "$linea" ] || continue
-            analisis=$(analizar_candidato "$linea")
-            [ -n "$analisis" ] || continue
-            estado=${analisis%%$'\t'*}
-            valor=${analisis#*$'\t'}
+        while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            analysis=$(analyze_candidate "$line")
+            [ -n "$analysis" ] || continue
+            state=${analysis%%$'\t'*}
+            value=${analysis#*$'\t'}
 
-            case "$estado" in
+            case "$state" in
                 url)
                     n_url=$((n_url + 1))
-                    filas_clip+=("$(printf '%s\t%s\t%s' "$valor" "$valor" '[portapapeles] url')")
+                    clip_rows+=("$(printf '%s\t%s\t%s' "$value" "$value" '[clipboard] url')")
                     ;;
                 *)
-                    # La carpeta se muestra con '~' para no perder de vista dónde está.
-                    # El '~' del reemplazo va ENTRE COMILLAS: pelado, bash lo expande a
-                    # $HOME y el reemplazo queda en nada (misma trampa que en 'case' y en
-                    # ${r#~/}).
-                    contenedor=${valor%/*}
-                    contenedor=${contenedor/#"$HOME"/"~"}
+                    # The folder is shown with '~' so its location is not lost. The '~' of
+                    # the replacement goes QUOTED: bare, bash expands it to $HOME and the
+                    # replacement becomes nothing (same trap as in 'case' and ${r#~/}).
+                    container=${value%/*}
+                    container=${container/#"$HOME"/"~"}
 
-                    if [ "$estado" = ok ]; then
-                        filas_clip+=("$(printf '%s\t%s\t%s' "$valor" "$(basename -- "$valor")" "[portapapeles] $contenedor")")
+                    if [ "$state" = ok ]; then
+                        clip_rows+=("$(printf '%s\t%s\t%s' "$value" "$(basename -- "$value")" "[clipboard] $container")")
                     else
-                        n_falta=$((n_falta + 1))
-                        filas_clip+=("$(printf '%s\t%s\t%s' "$valor" "$(basename -- "$valor")" '[portapapeles] no existe')")
+                        n_missing=$((n_missing + 1))
+                        clip_rows+=("$(printf '%s\t%s\t%s' "$value" "$(basename -- "$value")" '[clipboard] missing')")
                     fi
                     ;;
             esac
-        done <<< "$portapapeles"
+        done <<< "$clipboard"
     fi
 
-    # Quitar de la lista base lo que ya subimos como fila del portapapeles. Se compara
-    # por la ruta relativa a ~, que es como vienen las líneas de fd.
-    if [ "${#filas_clip[@]}" -gt 0 ]; then
-        relativas=""
-        for fila in "${filas_clip[@]}"; do
-            r=${fila%%$'\t'*}
-            case "$r" in "$HOME"/*) relativas+="${r#"$HOME"/}"$'\n' ;; esac
+    # Remove from the base list whatever was already lifted as a clipboard row. It is
+    # compared by the ~-relative path, which is how fd lines come.
+    if [ "${#clip_rows[@]}" -gt 0 ]; then
+        relatives=""
+        for row in "${clip_rows[@]}"; do
+            r=${row%%$'\t'*}
+            case "$r" in "$HOME"/*) relatives+="${r#"$HOME"/}"$'\n' ;; esac
         done
-        if [ -n "$relativas" ]; then
-            lista=$(printf '%s\n' "$lista" | awk -F'\t' -v rels="$relativas" '
-                BEGIN { n = split(rels, a, "\n"); for (i = 1; i <= n; i++) if (a[i] != "") saltar[a[i]] = 1 }
-                !($1 in saltar)')
+        if [ -n "$relatives" ]; then
+            list_rows=$(printf '%s\n' "$list_rows" | awk -F'\t' -v rels="$relatives" '
+                BEGIN { n = split(rels, a, "\n"); for (i = 1; i <= n; i++) if (a[i] != "") skip[a[i]] = 1 }
+                !($1 in skip)')
         fi
     fi
 
-    # Sin nada que mostrar (ni archivos en ~ ni ruta del portapapeles) no tiene sentido
-    # abrir el menú: 'printf' de una cadena vacía le daría a rofi una línea en blanco y
-    # el menú saldría con una entrada fantasma.
-    if [ "${#filas_clip[@]}" -eq 0 ] && [ -z "$lista" ]; then
-        notify-send "Archivos" "No se encontró ningún archivo en ~" 2> /dev/null || true
+    # With nothing to show (no files in ~ and no clipboard path) there is no point opening
+    # the menu: 'printf' of an empty string would give rofi a blank line and the menu would
+    # come out with a ghost entry.
+    if [ "${#clip_rows[@]}" -eq 0 ] && [ -z "$list_rows" ]; then
+        notify-send "Files" "No files found in ~" 2> /dev/null || true
         exit 0
     fi
 
-    # Las del portapapeles van arriba de las de fd. Si no hay de fd, queda sólo la
-    # cadena del portapapeles (sin línea vacía de más: la sustitución de comandos se
-    # come el \n final y el 'printf' de abajo repone exactamente uno).
-    if [ "${#filas_clip[@]}" -gt 0 ]; then
-        lista=$(printf '%s\n%s' "$(printf '%s\n' "${filas_clip[@]}")" "$lista")
+    # The clipboard ones go above the fd ones. If there are none from fd, only the
+    # clipboard string remains (with no extra blank line: command substitution eats the
+    # trailing \n and the 'printf' below puts back exactly one).
+    if [ "${#clip_rows[@]}" -gt 0 ]; then
+        list_rows=$(printf '%s\n%s' "$(printf '%s\n' "${clip_rows[@]}")" "$list_rows")
     fi
 
     rofi_args=(
         -dmenu -i
-        -p "Archivos"
+        -p "Files"
         -display-columns 2,3
         -kb-custom-1 "Alt+1"
         -theme-str 'window {width: 900px;}'
     )
-    if [ "${#filas_clip[@]}" -gt 0 ]; then
-        aviso_clip="Portapapeles: ${#filas_clip[@]}"
-        if [ "$n_url" -gt 0 ]; then aviso_clip="$aviso_clip · $n_url url"; fi
-        if [ "$n_falta" -gt 0 ]; then aviso_clip="$aviso_clip · $n_falta sin existir"; fi
-        aviso_clip="$aviso_clip — Alt+1 abre la primera"
-        rofi_args+=( -mesg "$aviso_clip" )
+    if [ "${#clip_rows[@]}" -gt 0 ]; then
+        clip_notice="Clipboard: ${#clip_rows[@]}"
+        if [ "$n_url" -gt 0 ]; then clip_notice="$clip_notice · $n_url url"; fi
+        if [ "$n_missing" -gt 0 ]; then clip_notice="$clip_notice · $n_missing missing"; fi
+        clip_notice="$clip_notice — Alt+1 opens the first"
+        rofi_args+=( -mesg "$clip_notice" )
     fi
 
-    # El '|| rofi_rc=$?' captura el código sin que 'set -e' corte el script: hace falta
-    # distinguir "canceló" (1) de "apretó Alt+1" (10, la kb-custom-1).
+    # The '|| rofi_rc=$?' captures the code without 'set -e' cutting the script: it is
+    # needed to tell "canceled" (1) from "pressed Alt+1" (10, the kb-custom-1).
     rofi_rc=0
-    seleccion=$(printf '%s\n' "$lista" | rofi "${rofi_args[@]}") || rofi_rc=$?
+    selection=$(printf '%s\n' "$list_rows" | rofi "${rofi_args[@]}") || rofi_rc=$?
 
-    # Alt+1: no importa qué fila haya dejado resaltada el filtro, la orden es abrir la
-    # primera del portapapeles. rofi igual imprime la fila resaltada en stdout; se
-    # ignora y se usa la que ya tenemos guardada.
-    if [ "$rofi_rc" -eq 10 ] && [ "${#filas_clip[@]}" -gt 0 ]; then
-        abrir "${filas_clip[0]%%$'\t'*}"
+    # Alt+1: no matter which row the filter left highlighted, the order is to open the
+    # first clipboard one. rofi still prints the highlighted row to stdout; it is ignored
+    # and the one already stored is used.
+    if [ "$rofi_rc" -eq 10 ] && [ "${#clip_rows[@]}" -gt 0 ]; then
+        open_target "${clip_rows[0]%%$'\t'*}"
         exit 0
     fi
 
     [ "$rofi_rc" -eq 0 ] || exit 0
-    [ -n "$seleccion" ] || exit 0
-    abrir "${seleccion%%$'\t'*}"
+    [ -n "$selection" ] || exit 0
+    open_target "${selection%%$'\t'*}"
 else
-    # El preview mira primero si el archivo es binario. Sin ese guard, previsualizar un
-    # PDF o una imagen -- que son justo los que uno abre con este lanzador -- vuelca
-    # bytes crudos al panel y desconfigura la terminal. Para esos se muestra qué son y
-    # cuánto pesan, que es la única información útil que tienen antes de abrirlos.
+    # The preview first checks whether the file is binary. Without that guard, previewing a
+    # PDF or an image -- which are exactly the ones opened with this launcher -- dumps raw
+    # bytes into the panel and wrecks the terminal. For those it shows what they are and
+    # how much they weigh, the only useful information they have before being opened.
     #
-    # bat va con fallback a head porque no está instalado en todas las máquinas donde
-    # se clona este repo; mismo patrón que los widgets de zshrc.local.
+    # bat falls back to head because it is not installed on every machine where this repo
+    # is cloned; same pattern as the zshrc.local widgets.
     preview='
         if file -bL --mime -- {} | grep -q charset=binary; then
             file -bL -- {}
-            printf "Tamaño: "; du -h -- {} | cut -f1
+            printf "Size: "; du -h -- {} | cut -f1
         else
             bat --style=numbers --color=always -- {} 2>/dev/null || head -n 200 -- {}
         fi'
 
-    # --multi para abrir varias de una (Tab marca). Sin --height: acá el menú es toda
-    # la razón de ser del comando, no un accesorio de la línea de edición como en los
-    # widgets de zsh, así que se queda con la pantalla entera y el preview se ve.
-    seleccion=$(fd --type f --hidden --follow "${excluir[@]}" . |
+    # --multi to open several at once (Tab marks). No --height: here the menu is the whole
+    # point of the command, not an accessory of the editing line as in the zsh widgets, so
+    # it keeps the full screen and the preview is visible.
+    selection=$(fd --type f --hidden --follow "${exclude[@]}" . |
         fzf --multi --height=100% \
-            --prompt 'abrir ~> ' \
-            --header 'Enter abre con la app por defecto   Tab marca varios' \
+            --prompt 'open ~> ' \
+            --header 'Enter opens with the default app   Tab marks several' \
             --preview "$preview") || exit 0
 
-    [ -n "$seleccion" ] || exit 0
+    [ -n "$selection" ] || exit 0
 
-    # Una llamada a abrir() por línea. El IFS vacío y el -r evitan que un nombre con
-    # espacios o con barras invertidas llegue partido o alterado.
-    while IFS= read -r archivo; do
-        [ -n "$archivo" ] && abrir "$archivo"
-    done <<< "$seleccion"
+    # One call to open_target() per line. The empty IFS and -r keep a name with spaces or
+    # backslashes from arriving split or altered.
+    while IFS= read -r file; do
+        [ -n "$file" ] && open_target "$file"
+    done <<< "$selection"
 fi
