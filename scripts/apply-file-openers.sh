@@ -3,9 +3,9 @@
 # apply-file-openers.sh — Adds the file openers to a machine that ALREADY installed the
 # system with archdesktopinstall.sh, without rerunning the whole installer:
 #
-#   * find-file      (bind SUPER+F): finds a file under ~ and opens it, and from the
+#   * find-file      (bind SUPER+CONTROL+SPACE): finds a file under ~ and opens it, and from the
 #                    keybind also looks at the clipboard (path or URL, offered on top).
-#   * recent-files   (bind SUPER+O): one rofi menu of recent files (apps, downloads,
+#   * recent-files   (bind SUPER+ALT+SPACE): one rofi menu of recent files (apps, downloads,
 #                    screenshots, modified) with per-file actions.
 #
 #   ./apply-file-openers.sh            → pull + packages + links + reload
@@ -14,8 +14,8 @@
 # What it does, in order:
 #  1. git pull --ff-only of ~/config_files (the dotfiles repo).
 #  2. Checks the repo already brings the feature (if not, update it).
-#  3. Ensures ~/.config/hypr/hyprland.lua links to the repo: the SUPER+F and SUPER+O
-#     binds come from there.
+#  3. Ensures ~/.config/hypr/hyprland.lua links to the repo: the find-file and
+#     recent-files binds come from there.
 #  4. Installs the packages that are missing: xdg-utils (xdg-open/xdg-mime), glib2
 #     (gio), fd, rofi, wl-clipboard, foot, thunar, jq. The rest (Hyprland, coreutils,
 #     findutils, util-linux) the installer already left.
@@ -80,7 +80,7 @@ for bind in "find-file" "recent-files"; do
     fi
 done
 
-# 3) Ensure the Hyprland config link (SUPER+F and SUPER+O binds).
+# 3) Ensure the Hyprland config link (find-file and recent-files binds).
 mkdir -p "$HOME/.config/hypr"
 if [ -e "$CFG_DEST" ] || [ -L "$CFG_DEST" ]; then
     real="$(realpath "$CFG_DEST" 2>/dev/null || echo "$CFG_DEST")"
@@ -126,4 +126,4 @@ else
 fi
 
 echo
-echo "Done. Try SUPER+F (paste or type a path/URL) and SUPER+O (recent files)."
+echo "Done. Try SUPER+CONTROL+SPACE (paste or type a path/URL) and SUPER+ALT+SPACE (recent files)."

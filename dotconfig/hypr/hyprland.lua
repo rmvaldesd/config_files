@@ -620,6 +620,9 @@ hl.bind(secondMod .. " + T", hl.dsp.window.float({ action = "toggle" }))
 -- define mas abajo, con los binds de workspaces; la combinacion resultante es la misma.
 hl.bind(secondMod .. " + F", hl.dsp.window.fullscreen({ mode = "maximized" }))
 hl.bind(mainMod .. " + CONTROL + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
+-- SUPER + F now toggles fullscreen, freeing it from find-file (which moved to
+-- SUPER + CONTROL + SPACE). SUPER + CONTROL + F is kept as an alias.
+hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
 
 hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("hyprlock"))
 
@@ -657,24 +660,28 @@ hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("pick-window"))
 -- las hace el dispatcher de foco de Hyprland solo, el script no las programa.
 hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("pick-window --all"))
 
--- Buscar un archivo en cualquier lugar de ~ y abrirlo con su aplicación por defecto.
--- F de 'find' / 'file', y queda al lado del Ctrl+F de zsh, que hace lo mismo dentro de
--- la terminal. SUPER + F estaba libre; SUPER + SHIFT + F (pantalla completa) no se toca.
+-- Find a file anywhere under ~ and open it with its default app. Bound to
+-- SUPER + CONTROL + SPACE, completing the launcher family: SUPER + SPACE is the app
+-- launcher, SUPER + SHIFT + SPACE the command runner and SUPER + ALT + SPACE recent
+-- files. CONTROL is written by hand because thirdMod is defined further down; the
+-- resulting combo is the same.
 --
--- El script (bin_configs/find-file) elige frontend solo: desde acá no hay terminal, así
--- que saca el menú de rofi; corrido a mano en una terminal saca fzf con preview.
+-- The script (bin_configs/find-file) picks the frontend by itself: from here there is no
+-- terminal, so it shows the rofi menu; run by hand in a terminal it shows fzf with preview.
 --
 -- The rofi face also looks at the clipboard: if you have a path or a URL copied, it
 -- offers it at the top and preselected (Enter without typing anything opens it; Alt+1
 -- opens it even with a filter). Details in docs/hyprland/README.md. The fzf face does
 -- not do that.
-hl.bind(mainMod .. " + F", hl.dsp.exec_cmd("find-file"))
+hl.bind(mainMod .. " + CONTROL + Space", hl.dsp.exec_cmd("find-file"))
 
--- Recent files: downloads, screenshots, recently opened (xbel) and recently modified,
--- in one rofi menu with actions to open, copy the path, open the folder, open a terminal
--- there or move to the trash. 'O' because 'R' (recent) is taken by the resize submap.
+-- Recent files: downloads, screenshots, recently opened (xbel) and recently modified, in
+-- one rofi menu with actions to open, copy the path, open the folder, open a terminal
+-- there or move to the trash. Bound to SUPER + ALT + SPACE to complete the launcher
+-- family. WARNING: this config documents further up (see pick-window) that SUPER + ALT
+-- binds do not dispatch on this setup; if it does not fire, move it to SUPER + CONTROL + O.
 -- Script: bin_configs/recent-files; details in docs/hyprland/README.md.
-hl.bind(mainMod .. " + O", hl.dsp.exec_cmd("recent-files"))
+hl.bind(mainMod .. " + ALT + Space", hl.dsp.exec_cmd("recent-files"))
 
 -- Dictado por voz (voxtype). 'T' de 'transcribir'.
 -- Toggle: una pulsación arranca a grabar, otra para y transcribe.
@@ -800,7 +807,7 @@ hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(ayuda))
 
 -- Monitor Setup: perfil de monitores externos por EDID en una terminal flotante
 -- (bin_configs/monitor-setup). 'F2' esta en la primer fila de teclas de funcion,
--- libre en este esquema; SUPER + F ya es find-file y se elige un F2 a proposito
+-- libre en este esquema; SUPER + F ya es fullscreen y se elige un F2 a proposito
 -- para que el launcher de aplicaciones no lo pise.
 -- '-W 110x28' fuerza el tamaño en columnas/filas para que la statusbar (96 cols
 -- de atajos) entre completa; el window rule flotante lo acomoda al monitor.
