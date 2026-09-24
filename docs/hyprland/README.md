@@ -180,12 +180,14 @@ Excluidos de la búsqueda: `.git`, `.cache`, `.cargo`, `.claude`, `.local/share`
 
 `SUPER + O` opens a rofi menu of recent files under `~`, merged from four sources and shown with **category, name, age and folder**, newest first.
 
+Rows are one fixed-width line, `name | category | age | folder` (rofi aligns nothing on its own, so the layout is padded by the script; names longer than 30 chars are truncated with `...`).
+
 - **app** — files GTK applications recorded in `~/.local/share/recently-used.xbel` (the ones actually opened, wherever they live).
 - **download** — files in `~/Downloads`.
 - **screenshot** — files in `~/Pictures/screenshots`.
-- **modified** — files touched in the last **3 days** under `~`, capped at 400 and with the browser/app-churn folders excluded. Without those exclusions, ~90% of this list is Chrome and Firefox rewriting state.
+- **created** / **modified** — files touched in the last **3 days** under `~`, capped at 400 and with the browser/app-churn folders excluded. Without those exclusions, ~90% of this list is Chrome and Firefox rewriting state. The split is by **birth time**: if the file was born within 300 s of its last write it is new (`created`), otherwise it is an existing file that was edited (`modified`).
 
-If a file falls in more than one source it is shown once, with the most specific category (screenshot > download > app > modified).
+If a file falls in more than one source it is shown once, with the most specific category (screenshot > download > app > created/modified).
 
 Actions, via rofi custom keys:
 

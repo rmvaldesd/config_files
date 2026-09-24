@@ -11,16 +11,19 @@
 #      There are ~91 entries today and ~41 survive (the rest no longer exist).
 #   2. Downloads            (~/Downloads)                                     [download]
 #   3. Screenshots          (~/Pictures/screenshots)                         [screenshot]
-#   4. Modified             files touched in the last days under ~             [modified]
+#   4. Touched              files touched in the last days under ~      [created/modified]
 #      This is noise by nature, so it uses a short window and a cap. Worse: without
-#      excluding the browser profiles, ~6000 of ~7700 "modified" files in 3 days are Chrome
+#      excluding the browser profiles, ~6000 of ~7700 touched files in 3 days are Chrome
 #      and Firefox rewriting state. With the exclusions below, what is left is the files
 #      actually touched (Sources/*, obsidian-vaults, config_files, ...).
+#      Each one is split by BIRTH time: if the file was born at (almost) the same moment
+#      it was last written, the recent event is a creation -> 'created'; otherwise it is an
+#      existing file that was edited -> 'modified'.
 #
 # Each row carries its category and is deduplicated by path: if a file falls in two
-# sources, the more specific one wins (screenshot > download > app > modified). The folder
-# says more than "an app opened it": a screenshot or a download is labeled as such even if
-# it is also in the xbel or was modified.
+# sources, the more specific one wins (screenshot > download > app > created/modified). The
+# folder says more than "an app opened it": a screenshot or a download is labeled as such
+# even if it is also in the xbel or was touched.
 #
 # thunar has no --select, so "open the folder" opens the containing directory, not the
 # file highlighted. That is what there is.
@@ -134,22 +137,34 @@ list_modified() {
     # plain '\t').
     fd --type f --hidden --follow --changed-within "$modified_window" \
         "${exclude[@]}" -0 . "$HOME" 2> /dev/null |
-        xargs -0 -r stat -c $'%Y\t%n' 2> /dev/null |
-        while IFS=$'\t' read -r epoch path; do
-            printf '%s\t1\tmodified\t%s\n' "$epoch" "$path"
+        xargs -0 -r stat -c $'%Y\t%W\t%n' 2> /dev/null |
+        while IFS=$'\t' read -r epoch birth path; do
+            # birth (%W) is 0 when the filesystem does not record it. If the file was born
+            # at (almost) the same moment it was last written, the recent event is a
+            # CREATION; otherwise an existing file was edited. 300 s of slack absorbs a
+            # file that took a while to be fully written, but still counts a file edited
+            # long after it was made as 'modified'.
+            category=modified
+            if [ "${birth:-0}" -gt 0 ] && [ $(( epoch - birth )) -le 300 ]; then
+                category=created
+            fi
+            printf '%s\t1\t%s\t%s\n' "$epoch" "$category" "$path"
         done |
         sort -rn | head -n "$modified_cap" || true
 }
 
-# How long ago, in short form. No 'date -d @epoch' for the recent range (avoids one fork
-# per row); the long date format is only for the old ones.
+# How long ago, in short form. No 'date -d @epoch' at all: that would be one fork per row
+# and, worse, a full date like '2026-07-27' (10 chars) would blow up the fixed-width age
+# column. The units cap at 4 chars ('now', '59m', '23h', '6d', '3w', '11mo', '1y').
 time_ago() {
     local secs=$(( $(date +%s) - $1 ))
-    if   [ "$secs" -lt 60 ];      then printf 'now'
-    elif [ "$secs" -lt 3600 ];    then printf '%dm' "$((secs / 60))"
-    elif [ "$secs" -lt 86400 ];   then printf '%dh' "$((secs / 3600))"
-    elif [ "$secs" -lt 2592000 ]; then printf '%dd' "$((secs / 86400))"
-    else printf '%s' "$(date -d "@$1" +%Y-%m-%d)"
+    if   [ "$secs" -lt 60 ];        then printf 'now'
+    elif [ "$secs" -lt 3600 ];      then printf '%dm'  "$((secs / 60))"
+    elif [ "$secs" -lt 86400 ];     then printf '%dh'  "$((secs / 3600))"
+    elif [ "$secs" -lt 604800 ];    then printf '%dd'  "$((secs / 86400))"
+    elif [ "$secs" -lt 2592000 ];   then printf '%dw'  "$((secs / 604800))"
+    elif [ "$secs" -lt 31536000 ];  then printf '%dmo' "$((secs / 2592000))"
+    else printf '%dy' "$((secs / 31536000))"
     fi
 }
 
@@ -214,7 +229,18 @@ rows=$(
         folder=$(dirname -- "$path")
         # The '~' of the replacement goes quoted: bare, bash expands it (see find-file).
         folder=${folder/#"$HOME"/"~"}
-        printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$name" "$category" "$(time_ago "$epoch")" "$folder"
+
+        # Truncate the name so the columns after it start at a fixed position. rofi does
+        # NOT align columns across rows (it just puts a separator), so a long name pushes
+        # everything to the right. '...' is ASCII on purpose: an ellipsis would add 3 bytes
+        # and break the padding.
+        if [ "${#name}" -gt 30 ]; then name="${name:0:27}..."; fi
+
+        # ONE padded column, not rofi's -display-columns: alignment has to be built here.
+        # Fields: name(30) category(10) age(4, right) folder(last, free). The path stays as
+        # the hidden first column and is what the script reads back.
+        printf '%s\t%-30s  %-10s  %4s  %s\n' \
+            "$path" "$name" "$category" "$(time_ago "$epoch")" "$folder"
     done
 )
 
@@ -227,7 +253,7 @@ fi
 rofi_args=(
     -dmenu -i
     -p "Recent"
-    -display-columns 2,3,4,5
+    -display-columns 2
     -kb-custom-1 "Alt+1"
     -kb-custom-2 "Alt+2"
     -kb-custom-3 "Alt+3"
