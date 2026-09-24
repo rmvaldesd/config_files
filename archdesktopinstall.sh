@@ -256,6 +256,9 @@ zathura           # Visor de documentos minimalista con teclas tipo vim (j/k par
     # --- Lua + ncurses para la TUI de monitores (bin_configs/monitor-setup) ---
     lua54             # Intérprete Y cabeceras de Lua 5.4: provee /usr/bin/lua5.4 (el shebang de monitor-setup) y /usr/include/lua5.4. El binding C de la LTUI vendoreada se compila contra esas cabeceras; el paquete 'lua' no las trae.
     ncurses           # Librería curses; el binding ltui/lcurses.so linkea '-lcurses'. Ya baja como dependencia de foot, se lista explícito para no depender de ese árbol.
+    # --- File openers (bin_configs/find-file, bin_configs/recent-files) ---
+    xdg-utils         # Provides 'xdg-open' and 'xdg-mime': find-file uses them to open with the default app, to warn when a type has no handler, and to resolve the http(s) handler that opens clipboard URLs. It usually arrives as a transitive dependency; listed explicitly so the openers do not depend on that tree.
+    glib2             # Provides 'gio': recent-files uses 'gio trash' to move a file to the trash. Usually present as a GTK dependency; listed explicitly for the same reason.
 )
 sudo pacman -S --needed --noconfirm "${paquetes_utilidades[@]}"
 
@@ -559,6 +562,8 @@ bash "$HOME/config_files/scripts/install-fonts.sh"
 #   clean-orphans limpieza de paquetes huérfanos
 #   pick-window   selector de ventanas del workspace actual, bind SUPER+W
 #   find-file     busca un archivo en ~ y lo abre con su app por defecto, bind SUPER+F
+#   recent-files  recent files menu (apps, downloads, screenshots, modified) with
+#                 per-file actions (open, copy path, folder, terminal, trash), bind SUPER+O
 #   hypridle-profile  cambia entre los perfiles de bloqueo home/office. El symlink del
 #                 perfil activo lo dejó unas líneas más arriba esta misma sección, así
 #                 que al terminar el instalador los perfiles quedan andando solos.
