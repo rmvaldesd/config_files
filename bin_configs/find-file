@@ -46,34 +46,53 @@ if [ "$frontend" = auto ]; then
     if [ -t 0 ] && [ -t 1 ]; then frontend=fzf; else frontend=rofi; fi
 fi
 
-# --hidden is required: fd skips hidden files by default, and without it ~/.config, which
-# is edited by hand, would be invisible. That is exactly why the hidden directories that
-# are app cache or state have to be removed by hand.
-#
-# This list starts from the one in the fzf widgets of zshrc.local (_fzf_home_ex_fd), on
-# purpose: so that searching from the terminal and searching from the desktop don't return
-# different universes. find-file adds ONE entry the widgets do not have yet (Downloads/temp,
-# below), so it is a superset: if you touch a shared entry, touch the other file too.
+# --hidden is required: fd skips hidden files by default, and without it ~/.config, which is
+# edited by hand, would be invisible.
 #
 # The count under ~ is dominated by state, not by real files. Measured 2026-09: 131,418
 # files, of which 69,848 were under a hidden dot-dir -- browser/app caches (Chrome alone
 # 28k) plus one extracted Azure Kudu support bundle (Downloads/temp, 51,936) -- and only
-# 9,627 were real files. The two extra blocks below strip it to ~10,200 files / ~25 ms.
+# 9,627 were real files.
+#
+# So instead of one long hand-written list, the hidden directories are computed below: every
+# top-level dot-dir is excluded EXCEPT the keepers (.config and .agents). A new
+# ~/.whatever-cache is then hidden without touching this file -- except the .config caches,
+# which still have to be named (below). The zsh widgets in zshrc.local keep their own static
+# list (_fzf_home_ex_fd), so the two are no longer identical, on purpose.
 exclude=(
-    --exclude=.git
-    --exclude=.cache
-    --exclude=.cargo
-    --exclude=.claude
-    --exclude=.local/share
-    --exclude=.local/state
-
-    --exclude=go/pkg      # Go module cache, read-only
-    --exclude=.npm        # npm cache
+    # Non-dot caches. The worst offenders are NOT dot-dirs, so the dynamic rule below would
+    # miss them: ~/go/pkg was 24k files, and ~/Downloads/temp 52k (the extracted support
+    # bundle dev_logs.zip -> dev_logs/, 289 MB, untouched since 2026-08-17).
+    --exclude=go/pkg
     --exclude=node_modules
-    --exclude=.oh-my-zsh  # framework code, not own configuration
+    --exclude=Downloads/temp
 
-    # Browser and app caches/state (find-file only). They are most of the file count and
-    # nothing in them is a file you open from the menu. Same family as recent-files' list.
+    # Nested dot-dirs that --exclude has to name explicitly: the loop below only sees
+    # TOP-LEVEL dot-dirs, but the ones that hurt live inside the repos (.git, .venv).
+    --exclude=.git
+    --exclude=.venv
+)
+
+# Every top-level hidden directory, except the keepers:
+#   .config  it holds the real config (Hyprland, nvim, ...) AND its own caches, which are
+#            named below. Hiding all of .config would lose the configs; keeping all of it
+#            would keep ~60k cache files.
+#   .agents  the skills (SKILL.md). Drop it here to hide them too.
+# A dotFILE at ~ (.zshrc, .gitconfig, .local_host_settings) is a file, not a directory, so
+# fd still lists it. Hidden files inside visible dirs are untouched too.
+shopt -s nullglob
+for dotdir in "$HOME"/.[!.]*/; do
+    name=$(basename -- "$dotdir")
+    case "$name" in
+        .config|.agents) continue ;;
+    esac
+    exclude+=( "--exclude=$name" )
+done
+shopt -u nullglob
+
+# .config caches: not config, just app state, and most of the file count (Chrome alone was
+# 28k). This part is still curated: a new app state dir under .config has to be added here.
+exclude+=(
     --exclude=.config/google-chrome
     --exclude=.config/chromium
     --exclude=.config/chromium-headless
@@ -86,22 +105,8 @@ exclude=(
     --exclude=.config/Code
     --exclude=.config/vivaldi
     --exclude=.config/herdr
-    --exclude=.mozilla
-    --exclude=.eclipse
-    --exclude=.azure
-    --exclude=.zoom
-    --exclude=.bun
-    --exclude=.deno
-    --exclude=.gradle
-    --exclude=.m2
-    --exclude=.rustup
-    --exclude=.claude.json
-    --exclude=.vscode-server
-    --exclude=.cursor
-
-    # One downloaded support bundle: dev_logs.zip -> dev_logs/ (Azure Kudu LogFiles).
-    # 51,936 files / 289 MB, untouched since 2026-08-17. Nothing you open from the menu.
-    --exclude=Downloads/temp
+    --exclude=.config/apidog
+    --exclude=.config/opencode
 )
 
 # fd runs FROM ~ so it emits relative paths: those look better in both menus
