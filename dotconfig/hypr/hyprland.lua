@@ -687,16 +687,28 @@ hl.bind(mainMod .. " + CONTROL + Space", hl.dsp.exec_cmd("find-file"))
 -- Script: bin_configs/recent-files; details in docs/hyprland/README.md.
 hl.bind(mainMod .. " + ALT + Space", hl.dsp.exec_cmd("recent-files"))
 
--- Dictado por voz (voxtype). 'T' de 'transcribir'.
--- Toggle: una pulsación arranca a grabar, otra para y transcribe.
--- Da por hecho que el demonio corre y que el bind del compositor es la única
--- vía de activación (ver config.toml: [hotkey] enabled = false, state_file = "auto").
+-- Voice dictation (voxtype). 'T' for 'transcribe'.
+-- Toggle: one tap starts recording, another stops and transcribes.
+-- It assumes the daemon is running and that the compositor bind is the only
+-- way to trigger it (see config.toml: [hotkey] enabled = false, state_file = "auto").
 --
--- Dictado FORZADO a base.en: el modelo configurado (whisper.model) es
--- large-v3-turbo, que es el que usa el modo meeting y es demasiado lento para
--- dictar. 'record toggle --model' lo pisa solo para esta transcripción, así que
--- dictar sigue siendo instantáneo y las reuniones usan el modelo grande.
-hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("voxtype record toggle --model base.en"))
+-- The model is whisper.model = 'base' (multilingual: works for English and Spanish) and
+-- stays loaded because on_demand_loading = false, so the first word does not wait. NOTE:
+-- the per-run --model flag is NOT honored in this build (verified up to 1.1.0), which is
+-- why it is not here. It is a single shared model; meetings switch models through the
+-- bin_configs/voxtype-meeting wrapper, not a flag.
+hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("voxtype record toggle"))
+
+-- MEETING panel (Quickshell OSD): buttons to start/stop recording a meeting instead of
+-- typing 'voxtype meeting start/stop'. It only touches the flag the OSD watches, so the
+-- panel appears and the dictation OSD still shows while you record. Requires the
+-- 'quickshell' package + '[osd] frontend = "quickshell"' in voxtype (and a daemon
+-- restart). SHIFT + M for 'Meeting': it was free after moving the shutdown bind to
+-- SUPER + CONTROL + ESC.
+hl.bind(
+  secondMod .. " + M",
+  hl.dsp.exec_cmd("mkdir -p $XDG_RUNTIME_DIR/voxtype && touch $XDG_RUNTIME_DIR/voxtype/meeting-controls.flag")
+)
 
 -- Activar el submapa al pulsar Mod + R
 hl.bind("SUPER + R", hl.dsp.submap("resize"))

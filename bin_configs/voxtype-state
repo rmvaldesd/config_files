@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Waybar helper for the 'custom/voxtype' module. Prints ONE JSON line with the current
+# voxtype state, meant to be read at a glance.
+#
+# The module is HIDDEN when voxtype is idle and only shows up while it is in use:
+#   meeting recording -> camera + elapsed
+#   dictating         -> dot + elapsed
+#   transcribing      -> spinner + elapsed (the gap after you stop)
+# The tooltip adds the model and the daemon CPU%, which is how you tell "still working"
+# (high CPU) from "hung" (0% while the state still says transcribing).
+#
+# Sources (written by the daemon under $XDG_RUNTIME_DIR/voxtype/):
+#   state          idle | recording | streaming | transcribing | stopped   (dictation)
+#   meeting_state  first line = status (recording | paused | ...), second = meeting id
+#   model_override the model used for the last transcription (e.g. base.en)
+# The elapsed time is the state file's mtime: when it entered that state.
+#
+# Pair it with "hide-empty-text": true in the bar so the empty "text" removes the module.
+
+set -u
+
+dir="${XDG_RUNTIME_DIR:-/tmp}/voxtype"
+dictation=$(head -n 1 "$dir/state" 2>/dev/null || true)
+meeting=$(head -n 1 "$dir/meeting_state" 2>/dev/null || true)
+override=$(cat "$dir/model_override" 2>/dev/null || true)
+default_model=$(sed -n 's/^model *= *"\(.*\)".*/\1/p' "$HOME/.config/voxtype/config.toml" 2>/dev/null | head -n 1)
+
+# Daemon CPU over ~0.2s, from /proc/<pid>/stat fields 14+15 (utime+stime, in jiffies).
+# cpu% = delta / (sample_s * CLK_TCK) * 100. CLK_TCK is 100 on most kernels but not all,
+# so it is read instead of assumed.
+cpu=0
+hz=$(getconf CLK_TCK 2>/dev/null || echo 100)
+pid=$(pgrep -x voxtype 2>/dev/null | head -n 1 || true)
+if [ -n "$pid" ] && [ -r "/proc/$pid/stat" ]; then
+    sample_ms=200
+    a=$(awk '{print $14 + $15}' "/proc/$pid/stat" 2>/dev/null) || a=0
+    sleep 0.2
+    b=$(awk '{print $14 + $15}' "/proc/$pid/stat" 2>/dev/null) || b=0
+    cpu=$(( (b - a) * 100000 / (sample_ms * hz) ))
+fi
+
+# mm:ss since the state file was last written (i.e. since it entered this state).
+elapsed() {
+    local file=$1 now mtime secs
+    now=$(date +%s)
+    mtime=$(stat -c %Y "$file" 2>/dev/null || echo "$now")
+    secs=$(( now - mtime ))
+    [ "$secs" -lt 0 ] && secs=0
+    printf '%d:%02d' "$(( secs / 60 ))" "$(( secs % 60 ))"
+}
+
+# JSON needs the newlines as \n. The '%' signs are fine in printf's argument.
+emit() {
+    local text=$1 class=$2 tooltip=$3
+    tooltip=${tooltip//$'\n'/\\n}
+    printf '{"text":"%s","class":"%s","tooltip":"%s"}\n' "$text" "$class" "$tooltip"
+}
+
+# Nerd Font glyphs: camera, dot, spinner, microphone.
+cam=$'\uf03d'
+dot=$'\uf111'
+spin=$'\uf110'
+
+hints='Click: meeting panel  ·  Right-click: restart daemon  ·  Middle-click: cancel'
+
+case "$meeting" in
+    recording|active|paused)
+        emit "$cam $(elapsed "$dir/meeting_state")" "meeting" \
+"Meeting: $meeting ($(elapsed "$dir/meeting_state"))
+Model: ${default_model:-?}
+CPU: ${cpu}%
+$hints" ;;
+    *)
+        case "$dictation" in
+            recording|streaming)
+                emit "$dot $(elapsed "$dir/state")" "recording" \
+"Voxtype: recording ($(elapsed "$dir/state"))
+Model: ${override:-${default_model:-?}}
+CPU: ${cpu}%
+$hints" ;;
+            transcribing)
+                emit "$spin $(elapsed "$dir/state")" "transcribing" \
+"Voxtype: transcribing ($(elapsed "$dir/state"))
+Model: ${override:-${default_model:-?}}
+CPU: ${cpu}%
+$hints" ;;
+            *)
+                emit "" "" "" ;;   # idle / stopped -> hidden
+        esac ;;
+esac

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Wrapper for `voxtype meeting` that swaps in the big model only for a meeting.
+#
+# WHY: voxtype's per-run `--model` is ignored in this build (1.0.1) -- both dictation and
+# meetings always use whisper.model. So to keep dictation fast (small, multilingual model
+# loaded and resident) and still transcribe meetings with the accurate model, this swaps
+# the config model around the meeting and restarts the daemon.
+#
+#   voxtype-meeting start [--title X]   big model + restart + `voxtype meeting start`
+#   voxtype-meeting stop                `meeting stop`, wait for the final transcription,
+#                                       then restore the dictation model + restart
+#   voxtype-meeting <anything else>     passthrough to `voxtype meeting ...`
+#                                       (status, list, show, export, summarize, label)
+#
+# NOTE: the OSD panel's Start/Stop call the daemon directly, so they use whatever
+# whisper.model is set at that moment (the small one). To record a meeting with the big
+# model, start it with this wrapper.
+
+set -u
+
+MEETING_MODEL="large-v3-turbo"
+DICTATION_MODEL="base"
+dir="${XDG_RUNTIME_DIR:-/tmp}/voxtype"
+
+# Point whisper.model at MODEL and restart the daemon, only if it isn't already there.
+use_model() {
+    local model=$1 current
+    current=$(voxtype config get whisper.model 2> /dev/null | head -n 1)
+    if [ "$current" = "$model" ]; then
+        return 0
+    fi
+    voxtype config set whisper.model "$model" > /dev/null 2>&1
+    systemctl --user restart voxtype
+    local i
+    for i in $(seq 1 40); do
+        systemctl --user is-active --quiet voxtype && break
+        sleep 0.25
+    done
+    echo "-> voxtype: whisper.model = $model"
+}
+
+case "${1:-}" in
+    start)
+        shift
+        use_model "$MEETING_MODEL"
+        voxtype meeting start "$@" ;;
+    stop)
+        voxtype meeting stop
+        echo "-> waiting for the final transcription to finish (Ctrl-C does not cancel it, it only stops waiting)..."
+        # The final chunk is transcribed in the background after the stop request. Wait
+        # until the daemon has been idle for a few consecutive checks, then restore the
+        # small model. ~1h cap so a runaway never hangs forever.
+        idle=0
+        for _ in $(seq 1 1800); do
+            st=$(head -n 1 "$dir/state" 2> /dev/null || echo idle)
+            ms=$(head -n 1 "$dir/meeting_state" 2> /dev/null || echo idle)
+            if [ "$st" = idle ] && { [ "$ms" = idle ] || [ -z "$ms" ]; }; then
+                idle=$((idle + 1))
+                [ "$idle" -ge 3 ] && break
+            else
+                idle=0
+            fi
+            sleep 2
+        done
+        use_model "$DICTATION_MODEL" ;;
+    *)
+        voxtype meeting "$@" ;;
+esac

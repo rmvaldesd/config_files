@@ -8,6 +8,9 @@
   // Sin separación automática entre módulos: la separación la dan el padding y la
   // regla vertical de 1px definidos en style.css.
   "spacing": 0,
+  // A module with an empty "text" disappears entirely instead of leaving a gap. Used by
+  // custom/voxtype, which only shows while voxtype is in use.
+  "hide-empty-text": true,
   "modules-left": [
     "ext/workspaces"
   ],
@@ -332,22 +335,26 @@
     "on-click": "exec foot --title=rclone-sync -e ~/config_files/scripts/rclone-sync menu",
     "on-click-right": "exec foot --title=rclone-log -e ~/config_files/scripts/rclone-sync log"
   },
-  // Estado del dictado por voz (voxtype). El icono cambia según el estado (idle /
-  // grabando / transcribiendo / detenido): 'voxtype status --follow --format json'
-  // emite el JSON en vivo y waybar pinta el fondo según las clases de style.css.
-  // El on-click reinicia el daemon, que es el fix cuando el dictado se queda colgado.
+  // voxtype status in the bar. It ONLY appears while voxtype is in use: dictation
+  // recording, transcribing (the moment between releasing the key and typing), or a
+  // meeting being recorded. When idle nothing shows: the script returns an empty "text"
+  // and the bar drops it with 'hide-empty-text'.
+  //
+  // It is built by bin_configs/voxtype-state, which reads state (dictation) and
+  // meeting_state (meeting) from $XDG_RUNTIME_DIR/voxtype. The classes
+  // (recording/transcribing/meeting) are styled in style.css.
+  //
+  // The text is an icon + a live timer (mm:ss) so you can see it moving; the tooltip
+  // adds the model and the daemon CPU% (to tell "transcribing" from "hung").
+  // Left-click: open the meeting panel (OSD). Right-click: restart the daemon (the fix
+  // when dictation hangs). Middle-click: cancel the current dictation.
   "custom/voxtype": {
-    "exec": "voxtype status --follow --format json",
+    "exec": "$HOME/config_files/bin_configs/voxtype-state",
     "return-type": "json",
-    "restart-interval": 5,
-    "format": "{icon}",
-    "format-icons": {
-      "idle": "\uf130",
-      "recording": "\uf111",
-      "transcribing": "\uf110",
-      "stopped": "\uf131"
-    },
+    "interval": 1,
     "tooltip": true,
-    "on-click": "systemctl --user restart voxtype"
+    "on-click": "mkdir -p $XDG_RUNTIME_DIR/voxtype && touch $XDG_RUNTIME_DIR/voxtype/meeting-controls.flag",
+    "on-click-right": "systemctl --user restart voxtype",
+    "on-click-middle": "voxtype record cancel"
   }
 }

@@ -192,7 +192,8 @@ window#waybar {
   color: @highlight;
 }
 
-#custom-voxtype.recording {
+#custom-voxtype.recording,
+#custom-voxtype.meeting {
   color: @urgent;
   font-weight: 700;
 }

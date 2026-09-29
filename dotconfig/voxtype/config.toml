@@ -107,7 +107,7 @@ volume = 0.699999988079071
 # .en models are English-only but faster and more accurate for English
 # large-v3-turbo is faster than large-v3 with minimal accuracy loss (recommended for GPU)
 # Or provide absolute path to a custom .bin model file
-model = "large-v3-turbo"
+model = "base"
 
 # Language for transcription
 # Options:
@@ -123,7 +123,7 @@ language = "auto"
 translate = false
 mode = "local"
 flash_attention = false
-on_demand_loading = true
+on_demand_loading = false
 gpu_isolation = false
 
 # Number of CPU threads for inference (omit for auto-detection)
@@ -327,7 +327,7 @@ show_engine_icon = false
 # - gtk4: Default toolkit frontend
 # - native: SCTK + wgpu + egui frontend
 # - quickshell: QML frontend with recipe/style customization
-frontend = "gtk4"
+frontend = "quickshell"
 
 # Quickshell style customization. These fields are ignored by gtk4/native.
 # style can be "default", an installed package name, or a package path.
