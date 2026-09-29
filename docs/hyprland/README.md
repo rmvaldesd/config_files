@@ -11,7 +11,7 @@ Referencia rápida de atajos y comportamientos.
 
 - **SUPER + H/L/K/J** → mover foco (izq / der / arriba / abajo)
 - **SUPER + SHIFT + H/L/K/J** → mover la ventana en esa dirección
-- **SUPER + SHIFT + C** → cerrar ventana
+- **SUPER + Q** → cerrar la ventana activa
 - **SUPER + V** → alternar flotante
 - **SUPER + SHIFT + T** → alternar flotante (igual que V)
 - **SUPER + SHIFT + F** → maximizar (respeta waybar y gaps)
@@ -68,9 +68,9 @@ Empujar contra un borde sin pantalla no hace nada (Hyprland avisa "Monitor not f
 - **SUPER + SHIFT + V** → historial del portapapeles (cliphist en rofi)
 - **SUPER + W** → selector de ventanas del workspace actual
 - **SUPER + SHIFT + W** → selector de todas las ventanas (salta al workspace)
-- **SUPER + SHIFT + Q** → bloquear pantalla (hyprlock)
+- **SUPER + ESC** → bloquear pantalla (hyprlock)
 - **SUPER + D** → **emergencia:** encender pantalla si quedó negra
-- **SUPER + SHIFT + M** → menú de apagado
+- **SUPER + CTRL + ESC** → menú de apagado / cerrar sesión
 - **SUPER + A** → esta ayuda (terminal flotante con glow o less)
 
 ---

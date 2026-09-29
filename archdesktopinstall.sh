@@ -555,7 +555,7 @@ bash "$HOME/config_files/scripts/install-fonts.sh"
 
 # Enlaza en /usr/local/bin todo lo ejecutable de bin_configs/, que en el PATH precede a
 # /usr/bin (por eso el wrapper 'dbeaver' logra tapar al binario del paquete). Hoy son:
-#   hyprshutdown  menú de apagado, lo llama el bind SUPER+SHIFT+M
+#   hyprshutdown  menú de apagado, lo llama el bind SUPER+CONTROL+ESC
 #   dbeaver       wrapper que le sube el heap de 1 GB a 4 GB (ver docs/linux/dbeaver.md)
 #   add-printer   asistente de impresoras de red; la sección 7 deja la infraestructura
 #                 lista pero no crea ninguna cola, porque eso depende de tu red

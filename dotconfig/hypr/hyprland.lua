@@ -582,10 +582,13 @@ local mainMod = "SUPER" -- Sets "Windows" key as main modifier
 local secondMod = "SUPER + SHIFT"
 
 -- Example binds, see https://wiki.hypr.land/Configuring/Basics/Binds/ for more
-local closeWindowBind = hl.bind(secondMod .. " + C", hl.dsp.window.close())
+-- Close the focused window. Moved to SUPER + Q from SUPER + SHIFT + C, which is now free.
+local closeWindowBind = hl.bind(mainMod .. " + Q", hl.dsp.window.close())
 -- closeWindowBind:set_enabled(false)
+-- Session menu (lock / logout / reboot / shutdown), from bin_configs/hyprshutdown. Moved to
+-- SUPER + CONTROL + ESCAPE from SUPER + SHIFT + M, which is now free.
 hl.bind(
-  secondMod .. " + M",
+  mainMod .. " + CONTROL + escape",
   hl.dsp.exec_cmd("command -v hyprshutdown >/dev/null 2>&1 && hyprshutdown || hyprctl dispatch 'hl.dsp.exit()'")
 )
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
@@ -624,7 +627,8 @@ hl.bind(mainMod .. " + CONTROL + F", hl.dsp.window.fullscreen({ mode = "fullscre
 -- SUPER + CONTROL + SPACE). SUPER + CONTROL + F is kept as an alias.
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }))
 
-hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("hyprlock"))
+-- Lock the screen. Moved to SUPER + ESCAPE from SUPER + SHIFT + Q, which is now free.
+hl.bind(mainMod .. " + escape", hl.dsp.exec_cmd("hyprlock"))
 
 -- SALIDA DE EMERGENCIA para una pantalla que quedo negra. 'D' de DPMS.
 -- Un 'dpms off' que NO haya disparado hypridle queda PEGADO: el 'on-resume' de
@@ -705,7 +709,7 @@ hl.define_submap("resize", function()
 end)
 
 -- Mover el WORKSPACE ACTIVO de una pantalla a otra. 'M' de monitor: SUPER + M
--- estaba libre (SUPER + SHIFT + M es apagar, esa no se toca).
+-- estaba libre (SUPER + SHIFT + M quedo libre al mover el apagado a SUPER + CONTROL + ESC).
 --
 -- Va en un submapa y no en un acorde por dos razones. La primera es que las
 -- combinaciones direccionales ya estan las tres tomadas: SUPER mueve el foco,
@@ -809,11 +813,13 @@ hl.bind(mainMod .. " + A", hl.dsp.exec_cmd(ayuda))
 -- (bin_configs/monitor-setup). 'F2' esta en la primer fila de teclas de funcion,
 -- libre en este esquema; SUPER + F ya es fullscreen y se elige un F2 a proposito
 -- para que el launcher de aplicaciones no lo pise.
--- '-W 110x28' fuerza el tamaño en columnas/filas para que la statusbar (96 cols
--- de atajos) entre completa; el window rule flotante lo acomoda al monitor.
--- La fuente va en size=10 (vs 12 del foot.ini) para que el flotante se lea bien.
+-- '-W 100x28' fuerza el tamaño en columnas/filas; el window rule flotante lo acomoda
+-- al monitor. La TUI se reacomoda al ancho y lo mas ancho que dibuja es la ayuda (80
+-- cols) -- la leyenda de atajos mide ~61 -- asi que 100 sobra (antes eran 110).
+-- La fuente va en size=12 (la del foot.ini): es el tamaño mas grande que entra en eDP-1
+-- (1280x800 logicos) conservando margen; size=13 ya se sale de la pantalla de la laptop.
 local monitorSetup =
-    "foot --title=monitor-setup '--font=JetBrainsMono Nerd Font:size=10' -W 110x28 -e monitor-setup"
+    "foot --title=monitor-setup '--font=JetBrainsMono Nerd Font:size=12' -W 100x28 -e monitor-setup"
 hl.bind(mainMod .. " + F2", hl.dsp.exec_cmd(monitorSetup))
 
 -- Tu nueva combinación base: SUPER + CONTROL
@@ -986,10 +992,10 @@ hl.window_rule({
 -- de ella y la TUI se queda dibujada sin escuchar teclas: q/Esc no la cierran.
 -- Mismo arreglo que los popups de Zoom (ver regla zoom-menu-stay-focused abajo).
 --
--- NO hay regla de 'size' a proposito: el tamaño lo define foot con '-W 110x28'
--- (celdas), que es lo unico que calza exacto con la TUI (la statusbar de ~100
--- cols entra completa). Si Hyprland ademas forzara un size en píxeles logicos,
--- las dos metricas no coinciden y quedan margenes negros asimetricos alrededor.
+-- NO hay regla de 'size' a proposito: el tamaño lo define foot con '-W 100x28'
+-- (celdas), que es lo unico que calza exacto con la TUI (la ayuda de 80 cols entra
+-- completa). Si Hyprland ademas forzara un size en píxeles logicos, las dos metricas
+-- no coinciden y quedan margenes negros asimetricos alrededor.
 hl.window_rule({
   name = "monitor-setup-flotante",
   match = { title = "^monitor-setup$" },
