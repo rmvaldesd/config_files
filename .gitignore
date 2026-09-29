@@ -15,3 +15,7 @@ scripts/rclone-sync-filtros.txt.md5
 
 # LTUI binding local (se compila con scripts/build-ltui.sh)
 bin_configs/ltui/lcurses.so
+
+# Apps that rewrite a symlinked dotconfig dir (voxtype does, leaving a .bak) drop those
+# files inside the repo; don't track them.
+dotconfig/*/*.bak

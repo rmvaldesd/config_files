@@ -123,7 +123,7 @@ language = "auto"
 translate = false
 mode = "local"
 flash_attention = false
-on_demand_loading = false
+on_demand_loading = true
 gpu_isolation = false
 
 # Number of CPU threads for inference (omit for auto-detection)

@@ -691,7 +691,12 @@ hl.bind(mainMod .. " + ALT + Space", hl.dsp.exec_cmd("recent-files"))
 -- Toggle: una pulsación arranca a grabar, otra para y transcribe.
 -- Da por hecho que el demonio corre y que el bind del compositor es la única
 -- vía de activación (ver config.toml: [hotkey] enabled = false, state_file = "auto").
-hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("voxtype record toggle"))
+--
+-- Dictado FORZADO a base.en: el modelo configurado (whisper.model) es
+-- large-v3-turbo, que es el que usa el modo meeting y es demasiado lento para
+-- dictar. 'record toggle --model' lo pisa solo para esta transcripción, así que
+-- dictar sigue siendo instantáneo y las reuniones usan el modelo grande.
+hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("voxtype record toggle --model base.en"))
 
 -- Activar el submapa al pulsar Mod + R
 hl.bind("SUPER + R", hl.dsp.submap("resize"))
