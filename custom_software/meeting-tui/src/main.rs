@@ -190,4 +190,23 @@ mod tests {
             assert!(text.contains(needle), "settings view missing {needle}");
         }
     }
+
+    #[test]
+    fn hints_stay_visible_on_a_narrow_window() {
+        let mut app = App::new();
+        app.mode = Mode::List;
+        let mut terminal = Terminal::new(TestBackend::new(40, 20)).unwrap();
+        terminal.draw(|f| ui::draw(f, &app)).unwrap();
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(
+            text.contains("c configuration"),
+            "the configuration hint was cut off at 40 columns"
+        );
+    }
 }

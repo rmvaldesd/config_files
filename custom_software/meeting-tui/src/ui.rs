@@ -9,14 +9,21 @@ use ratatui::Frame;
 use crate::app::{App, InputKind, Mode};
 
 pub fn draw(f: &mut Frame, app: &App) {
+    let area = f.area();
+    // Lay the hints out for the real width and reserve exactly the rows they need, so the
+    // tail (e.g. "c configuration") is never cut off on a narrow window.
+    let hint_lines = layout_hints(&hint_segments(app), area.width as usize);
+    let message_rows = u16::from(app.message_text().is_some());
+    let footer_height = (hint_lines.len() as u16 + message_rows).max(1);
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
             Constraint::Min(3),
-            Constraint::Length(2),
+            Constraint::Length(footer_height),
         ])
-        .split(f.area());
+        .split(area);
 
     draw_header(f, app, chunks[0]);
     match app.mode {
@@ -24,10 +31,10 @@ pub fn draw(f: &mut Frame, app: &App) {
         Mode::Settings => draw_settings(f, app, chunks[1]),
         _ => draw_list(f, app, chunks[1]),
     }
-    draw_footer(f, app, chunks[2]);
+    draw_footer(f, app, &hint_lines, chunks[2]);
 
     if let Mode::Input(kind) = app.mode {
-        draw_input(f, app, kind, f.area());
+        draw_input(f, app, kind, area);
     }
 }
 
@@ -175,23 +182,16 @@ fn draw_live(f: &mut Frame, app: &App, area: Rect) {
     );
 }
 
-fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
-    let hints = match app.mode {
-        Mode::Input(InputKind::Name) => "type a name  ·  Enter start  ·  Esc cancel",
-        Mode::Input(InputKind::ExportDir) => {
-            "type a folder (or ~/...)  ·  Enter save  ·  Esc cancel"
-        }
-        Mode::Live => "p pause/resume  ·  x stop  ·  q quit",
-        Mode::Settings => "↑↓ move  ·  Enter change  ·  Esc back",
-        Mode::List => {
-            "s start  ·  e/Enter export  ·  o folder  ·  O meeting dir  ·  c configuration  ·  r refresh  ·  q quit"
-        }
-    };
-
-    let mut lines = vec![Line::from(Span::styled(
-        hints,
-        Style::default().fg(Color::DarkGray),
-    ))];
+fn draw_footer(f: &mut Frame, app: &App, hint_lines: &[String], area: Rect) {
+    let mut lines: Vec<Line> = hint_lines
+        .iter()
+        .map(|hint| {
+            Line::from(Span::styled(
+                hint.clone(),
+                Style::default().fg(Color::DarkGray),
+            ))
+        })
+        .collect();
     if let Some(msg) = app.message_text() {
         lines.push(Line::from(Span::styled(
             msg.to_string(),
@@ -199,6 +199,59 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
         )));
     }
     f.render_widget(Paragraph::new(lines), area);
+}
+
+/// The key hints for the current mode, as separate pieces so they can wrap.
+fn hint_segments(app: &App) -> Vec<String> {
+    let segments: &[&str] = match app.mode {
+        Mode::Input(InputKind::Name) => &["type a name", "Enter start", "Esc cancel"],
+        Mode::Input(InputKind::ExportDir) => {
+            &["type a folder (or ~/...)", "Enter save", "Esc cancel"]
+        }
+        Mode::Live => &["p pause/resume", "x stop", "q quit"],
+        Mode::Settings => &["↑↓ move", "Enter change", "Esc back"],
+        Mode::List => &[
+            "s start",
+            "e/Enter export",
+            "o folder",
+            "O meeting dir",
+            "c configuration",
+            "r refresh",
+            "q quit",
+        ],
+    };
+    segments.iter().map(|segment| segment.to_string()).collect()
+}
+
+/// Greedy layout of the hints into lines no wider than `width` columns.
+///
+/// Every segment is kept: on a narrow window the hints wrap to more lines instead of being
+/// cut off at the right edge.
+fn layout_hints(segments: &[String], width: usize) -> Vec<String> {
+    const SEP: &str = " · ";
+    let width = width.max(1);
+    let mut lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for segment in segments {
+        if current.is_empty() {
+            current = segment.clone();
+            continue;
+        }
+        let candidate = format!("{current}{SEP}{segment}");
+        if candidate.chars().count() <= width {
+            current = candidate;
+        } else {
+            lines.push(std::mem::take(&mut current));
+            current = segment.clone();
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+    lines
 }
 
 fn draw_input(f: &mut Frame, app: &App, kind: InputKind, area: Rect) {
@@ -233,5 +286,60 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
         y: area.y + (area.height.saturating_sub(h)) / 2,
         width: w,
         height: h,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn list_segments() -> Vec<String> {
+        [
+            "s start",
+            "e/Enter export",
+            "o folder",
+            "O meeting dir",
+            "c configuration",
+            "r refresh",
+            "q quit",
+        ]
+        .iter()
+        .map(|segment| segment.to_string())
+        .collect()
+    }
+
+    #[test]
+    fn wide_window_uses_a_single_line() {
+        let lines = layout_hints(&list_segments(), 100);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].contains("c configuration"));
+    }
+
+    #[test]
+    fn narrow_window_wraps_without_losing_any_hint() {
+        let segments = list_segments();
+        let lines = layout_hints(&segments, 40);
+        assert!(lines.len() > 1, "should wrap at 40 columns");
+        for line in &lines {
+            assert!(
+                line.chars().count() <= 40,
+                "line wider than the window: {line}"
+            );
+        }
+        for segment in &segments {
+            assert!(
+                lines.iter().any(|line| line.contains(segment.as_str())),
+                "hint lost when wrapping: {segment}"
+            );
+        }
+    }
+
+    #[test]
+    fn tiny_width_still_keeps_every_segment() {
+        let segments = list_segments();
+        let lines = layout_hints(&segments, 1);
+        for segment in &segments {
+            assert!(lines.iter().any(|line| line == segment), "lost {segment}");
+        }
     }
 }
