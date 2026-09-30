@@ -702,14 +702,13 @@ hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("voxtype record toggle"))
 -- MEETING control (meeting-tui): a ratatui TUI, in its own floating foot window, that
 -- starts/stops/pauses the meeting, names it (a timestamp is appended) and, while idle,
 -- lists past meetings and exports them to a folder. Source and build live in
--- custom_software/meeting-tui/ (run 'make' there once; the bind runs
--- custom_software/meeting-tui/bin/meeting-tui).
--- This replaces the old Quickshell meeting panel: it no longer triggers the OSD
--- 'meeting-controls.flag'. SHIFT + M for 'Meeting': it was free after moving the
--- shutdown bind to SUPER + CONTROL + ESC.
-local meetingTui =
-    "foot --title=meeting-tui '--font=JetBrainsMono Nerd Font:size=12' -W 100x30 -e $HOME/config_files/custom_software/meeting-tui/bin/meeting-tui"
-hl.bind(secondMod .. " + M", hl.dsp.exec_cmd(meetingTui))
+-- custom_software/meeting-tui/ (run 'make' there once).
+--
+-- Both this bind and the Waybar voxtype icon go through bin_configs/meeting-panel, which
+-- closes any panel already on screen first: hitting it again gives a fresh window instead
+-- of stacking a second one. SHIFT + M for 'Meeting': it was free after moving the shutdown
+-- bind to SUPER + CONTROL + ESC.
+hl.bind(secondMod .. " + M", hl.dsp.exec_cmd("$HOME/config_files/bin_configs/meeting-panel"))
 
 -- Activar el submapa al pulsar Mod + R
 hl.bind("SUPER + R", hl.dsp.submap("resize"))

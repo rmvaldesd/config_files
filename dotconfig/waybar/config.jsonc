@@ -346,14 +346,15 @@
   //
   // The text is an icon + a live timer (mm:ss) so you can see it moving; the tooltip
   // adds the model and the daemon CPU% (to tell "transcribing" from "hung").
-  // Left-click: open the meeting panel (OSD). Right-click: restart the daemon (the fix
-  // when dictation hangs). Middle-click: cancel the current dictation.
+  // Left-click: open the meeting panel (meeting-tui, in a floating foot window; clicking
+  // again replaces it instead of stacking a second one). Right-click: restart the daemon
+  // (the fix when dictation hangs). Middle-click: cancel the current dictation.
   "custom/voxtype": {
     "exec": "$HOME/config_files/bin_configs/voxtype-state",
     "return-type": "json",
     "interval": 1,
     "tooltip": true,
-    "on-click": "mkdir -p $XDG_RUNTIME_DIR/voxtype && touch $XDG_RUNTIME_DIR/voxtype/meeting-controls.flag",
+    "on-click": "$HOME/config_files/bin_configs/meeting-panel",
     "on-click-right": "systemctl --user restart voxtype",
     "on-click-middle": "voxtype record cancel"
   }

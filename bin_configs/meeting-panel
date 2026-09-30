@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# meeting-panel — open the meeting-tui panel, replacing any copy already on screen.
+#
+# Both the Hyprland bind (SUPER + SHIFT + M) and the Waybar voxtype icon call this, so
+# hitting the icon while a panel is open gives a FRESH window instead of stacking a second
+# one: the previous window is closed first.
+#
+# The panel is a floating foot running the Rust TUI. foot sets the window title to
+# 'meeting-tui', which is also what the Hyprland window rule keys on, so any existing
+# window with that title (or initial title) is closed before the new one opens.
+#
+# Build order: bash ~/config_files/scripts/link-bins.sh puts this on PATH.
+
+set -u
+
+title="meeting-tui"
+tui="$HOME/config_files/custom_software/meeting-tui/bin/meeting-tui"
+
+if [ ! -x "$tui" ]; then
+    echo "meeting-panel: $tui not found. Build it with:" >&2
+    echo "    make -C ~/config_files/custom_software/meeting-tui" >&2
+    exit 1
+fi
+
+# Close the previous panel (if any) and wait for it to actually disappear, so we never end
+# up with two windows. Without Hyprland (or jq) this is skipped and we just open the window.
+if command -v hyprctl > /dev/null 2>&1 && command -v jq > /dev/null 2>&1; then
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        pids=$(hyprctl clients -j 2> /dev/null \
+            | jq -r --arg t "$title" '.[] | select(.title == $t or .initialTitle == $t) | .pid' 2> /dev/null)
+        [ -z "$pids" ] && break
+        printf '%s\n' "$pids" | xargs -r kill 2> /dev/null || true
+        sleep 0.1
+    done
+fi
+
+exec foot --title="$title" '--font=JetBrainsMono Nerd Font:size=12' -W 100x30 -e "$tui"

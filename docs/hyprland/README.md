@@ -271,6 +271,7 @@ Lista huérfanos con tamaño, pide confirmación y los elimina (en rondas hasta 
 - **Memoria** → `ram-top` (ventana flotante)
 - **Disco** → btop (en terminal)
 - **Idioma del teclado** → cambia al siguiente layout
+- **voxtype** (solo mientras se usa) → abre el panel de reuniones (meeting-tui); si ya estaba abierto, lo reemplaza
 
 ---
 
@@ -300,6 +301,8 @@ Quickshell meeting OSD:
 - `c` opens the configuration screen: export format (markdown/text/json), export folder
   (default `~/meeting-transcriptions`), and whether to include speakers, timestamps and
   metadata. `↑↓` move, `Enter` changes the value, `Esc` goes back.
+- The Waybar voxtype icon (visible only while recording) opens the same panel, through
+  `bin_configs/meeting-panel`, which closes any panel already open first.
 
 Build once per machine: `cd ~/config_files/custom_software/meeting-tui && make` (needs
 `cargo`; it drops the binary in `custom_software/meeting-tui/bin/`, which is what the bind
