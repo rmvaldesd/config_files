@@ -13,7 +13,7 @@ Quickshell meeting panel behind `SUPER + SHIFT + M`:
 ## Build
 
 ```sh
-cd ~/config_files/meeting-tui
+cd ~/config_files/custom_software/meeting-tui
 make            # release build -> bin/meeting-tui
 ```
 

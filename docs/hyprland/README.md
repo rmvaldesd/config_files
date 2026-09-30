@@ -72,7 +72,7 @@ Empujar contra un borde sin pantalla no hace nada (Hyprland avisa "Monitor not f
 - **SUPER + D** → **emergencia:** encender pantalla si quedó negra
 - **SUPER + CTRL + ESC** → menú de apagado / cerrar sesión
 - **SUPER + A** → esta ayuda (terminal flotante con glow o less)
-- **SUPER + SHIFT + M** → meeting-tui: start/stop/pause a voxtype meeting, name it, and export past transcripts (`meeting-tui/`, Rust)
+- **SUPER + SHIFT + M** → meeting-tui: start/stop/pause a voxtype meeting, name it, and export past transcripts (`custom_software/meeting-tui/`, Rust)
 
 ---
 
@@ -299,8 +299,9 @@ Quickshell meeting OSD:
   `~/meeting-transcriptions`), `f` cycles markdown/text/json, `o` opens the folder, `O`
   opens the meeting's voxtype folder.
 
-Build once per machine: `cd ~/config_files/meeting-tui && make` (needs `cargo`; it drops the
-binary in `meeting-tui/bin/`, which is what the bind runs). Settings live in
+Build once per machine: `cd ~/config_files/custom_software/meeting-tui && make` (needs
+`cargo`; it drops the binary in `custom_software/meeting-tui/bin/`, which is what the bind
+runs). Settings live in
 `~/.config/meeting-tui/config.toml`.
 
 ---
@@ -375,5 +376,5 @@ Desaparecen a los 5 segundos. Urgencia crítica no expira sola.
 - fzf / imgs / PATH / hook direnv: `zshrc.local`
 - Asociaciones de archivos: `mimeapps.list`
 - Scripts propios (enlazados): `bin_configs/` → `/usr/local/bin/` vía `scripts/link-bins.sh`
-- meeting-tui (panel de reuniones): `meeting-tui/` (Rust; `make` deja el binario en `meeting-tui/bin/`)
+- meeting-tui (panel de reuniones): `custom_software/meeting-tui/` (Rust; `make` deja el binario en `custom_software/meeting-tui/bin/`)
 - Instalación completa: `archdesktopinstall.sh`

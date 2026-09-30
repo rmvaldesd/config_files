@@ -599,17 +599,18 @@ else
 fi
 
 # Build meeting-tui (Rust/ratatui), the meeting panel that SUPER+SHIFT+M opens. Its binary
-# is machine-specific and not versioned, so it is compiled here into meeting-tui/bin/.
+# is machine-specific and not versioned, so it is compiled here into
+# custom_software/meeting-tui/bin/.
 # Needs cargo: without it the bind has nothing to run, so warn instead of failing.
 if command -v cargo >/dev/null 2>&1; then
-    if make -C "$HOME/config_files/meeting-tui" >/dev/null 2>&1; then
+    if make -C "$HOME/config_files/custom_software/meeting-tui" >/dev/null 2>&1; then
         echo "-> meeting-tui built (SUPER+SHIFT+M ready)."
     else
-        echo "WARN: meeting-tui failed to build; retry with: make -C ~/config_files/meeting-tui"
+        echo "WARN: meeting-tui failed to build; retry with: make -C ~/config_files/custom_software/meeting-tui"
     fi
 else
     echo "WARN: 'cargo' is missing, so meeting-tui (SUPER+SHIFT+M) was not built."
-    echo "      Install Rust ('sudo pacman -S rust', or rustup), then: make -C ~/config_files/meeting-tui"
+    echo "      Install Rust ('sudo pacman -S rust', or rustup), then: make -C ~/config_files/custom_software/meeting-tui"
 fi
 
 # Ajustes por-máquina de Hyprland (monitores, layout, mouse). ~/.local_host_settings
