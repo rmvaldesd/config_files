@@ -259,6 +259,8 @@ zathura           # Visor de documentos minimalista con teclas tipo vim (j/k par
     # --- File openers (bin_configs/find-file, bin_configs/recent-files) ---
     xdg-utils         # Provides 'xdg-open' and 'xdg-mime': find-file uses them to open with the default app, to warn when a type has no handler, and to resolve the http(s) handler that opens clipboard URLs. It usually arrives as a transitive dependency; listed explicitly so the openers do not depend on that tree.
     glib2             # Provides 'gio': recent-files uses 'gio trash' to move a file to the trash. Usually present as a GTK dependency; listed explicitly for the same reason.
+    # --- voxtype OSD frontend (Quickshell) ---
+    quickshell        # QML OSD frontend voxtype is configured to use ([osd] frontend = "quickshell"): the graphical meeting panel (SUPER+SHIFT+M) and the dictation overlay. Ships in the 'extra' repo.
 )
 sudo pacman -S --needed --noconfirm "${paquetes_utilidades[@]}"
 
@@ -574,6 +576,9 @@ bash "$HOME/config_files/scripts/install-fonts.sh"
 #                 su binding C lo compila el paso de abajo, no viene en el repo.
 #   monitor-id    imprime la identidad EDID de cada monitor, lista para pegar como
 #                 perfil en ~/.local_host_monitors.
+#   voxtype-meeting  wrapper that swaps whisper.model to large-v3-turbo for a meeting and
+#                 restores 'base' when it ends (this build ignores a per-run --model).
+#   voxtype-state    Waybar helper for the custom/voxtype module; empty when voxtype is idle.
 #
 # Va como script aparte y en un loop, y no como cinco 'ln' acá, para que sumar un
 # ejecutable a bin_configs/ no requiera acordarse de tocar este archivo. El script
@@ -729,7 +734,7 @@ echo "-> Instalando paquetes desde AUR..."
 paquetes_aur=(
     sublime-text-4   # Editor gráfico. No está en repos oficiales: el paquete de AUR descarga el binario oficial de sublimehq. Queda asociado a los archivos de texto y código vía mimeapps.list; neovim sigue siendo el editor de terminal.
     zoom             # Cliente oficial de videollamadas. El arreglo para que arranque en Wayland nativo (no XWayland) va aparte en la sección 9, sobre ~/.config/zoomus.conf; ver docs/linux/zoom.md.
-    voxtype-bin      # Dictado por voz push-to-talk optimizado para Wayland (daemon + OSD + backends CPU/GPU). Es el binario precompilado del AUR; la config vive en ~/.config/voxtype/config.toml (no versionada en el repo) y el modelo se baja con 'voxtype setup --download'. La activación se maneja desde Hyprland (bind SUPER+T -> 'voxtype record toggle'), con el hotkey interno desactivado en la config. La integración con Waybar es el módulo 'custom/voxtype' de dotconfig/waybar.
+    voxtype-bin      # Push-to-talk voice dictation for Wayland (daemon + OSD + CPU/GPU backends). Prebuilt AUR binary. Its config is versioned in dotconfig/voxtype (linked into ~/.config by section 9) and its models are downloaded just below; activation comes from Hyprland (SUPER+T -> 'voxtype record toggle') with the built-in hotkey disabled. The bar integration is the 'custom/voxtype' module in dotconfig/waybar.
 )
 yay -S --needed --noconfirm "${paquetes_aur[@]}" || \
     echo "AVISO: falló la instalación desde AUR; el resto del entorno quedó completo. Reintenta luego con: yay -S ${paquetes_aur[*]}"
@@ -742,17 +747,21 @@ yay -S --needed --noconfirm "${paquetes_aur[@]}" || \
 if command -v voxtype &>/dev/null; then
     systemctl --user enable --now voxtype.service
 
-    # Modelo Whisper del dictado. 'setup --download' es idempotente: si la primera vez
-    # el archivo ya existe lo confirma, si no lo baja (~141 MB hacia ~/.local/share/voxtype/models).
-    #
-    # '--model base.en' es importante: la config que voxtype genera de cero trae
-    # 'model = "base"' (el multilingüe, ~142 MB más), y el daemon CRASHEA con "Model
-    # 'base' not found" si solo está bajada la variante base.en. Por eso, además del
-    # download, se fija el modelo en la config del usuario a mano: 'voxtype config set'
-    # NO acepta la clave 'model' (ver 'voxtype config schema'), así que va sed directo
-    # sobre la línea de modelo. Si ya está en base.en el sed no toca nada.
-    voxtype setup --download --model base.en --no-post-install
-    sed -i 's/^model = "base"$/model = "base.en"/' ~/.config/voxtype/config.toml
+    # Whisper models. The config is versioned in dotconfig/voxtype (linked in section 9)
+    # and uses two: 'base' for everyday dictation (small, multilingual, kept loaded) and
+    # 'large-v3-turbo' for meetings (swapped in by bin_configs/voxtype-meeting, because
+    # this build ignores a per-run --model). 'setup --download' is idempotent, so it only
+    # fetches what is missing. There is NO config edit here on purpose: the model is
+    # already 'base' in the repo, and a sed would rewrite the repo through the symlink.
+    voxtype setup --download --model base --no-post-install
+    voxtype setup --download --model large-v3-turbo --no-post-install
+
+    # Quickshell OSD tree (meeting panel + engine picker). NOT versioned: voxtype copies
+    # these QML files from /usr/share/voxtype/quickshell into the user's data dir, so a
+    # fresh machine needs this step or the panel has nothing to render.
+    voxtype setup quickshell || \
+        echo "WARN: could not install the Quickshell OSD tree; the meeting panel may not open."
+
     systemctl --user restart voxtype.service
 fi
 
