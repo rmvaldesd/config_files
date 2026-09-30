@@ -31,10 +31,13 @@ pub fn draw(f: &mut Frame, app: &App) {
 }
 
 fn draw_header(f: &mut Frame, app: &App, area: Rect) {
+    let status = app.live.status.to_ascii_lowercase();
     let (label, color) = if !app.live.active {
         ("IDLE", Color::DarkGray)
-    } else if app.live.status.eq_ignore_ascii_case("paused") {
+    } else if status == "paused" {
         ("MEETING PAUSED", Color::Yellow)
+    } else if status == "stopping" || status == "transcribing" {
+        ("MEETING FINISHING", Color::Cyan)
     } else {
         ("MEETING RECORDING", Color::Red)
     };

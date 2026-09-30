@@ -134,4 +134,43 @@ mod tests {
         app.live.started = Some(chrono::Local::now());
         render(&app);
     }
+
+    fn rendered_text(app: &App) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        terminal.draw(|f| ui::draw(f, app)).unwrap();
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect()
+    }
+
+    #[test]
+    fn header_reflects_the_state() {
+        let mut app = App::new();
+
+        app.live.active = false;
+        assert!(rendered_text(&app).contains("IDLE"), "idle header");
+
+        app.live.active = true;
+        app.live.status = "paused".to_string();
+        assert!(
+            rendered_text(&app).contains("MEETING PAUSED"),
+            "paused header"
+        );
+
+        app.live.status = "stopping".to_string();
+        assert!(
+            rendered_text(&app).contains("MEETING FINISHING"),
+            "finishing header"
+        );
+
+        app.live.status = "recording".to_string();
+        assert!(
+            rendered_text(&app).contains("MEETING RECORDING"),
+            "recording header"
+        );
+    }
 }

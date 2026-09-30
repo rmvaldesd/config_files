@@ -51,6 +51,9 @@ pub struct App {
     pub should_quit: bool,
     pub voxtype_version: Option<String>,
     last_poll: Instant,
+    /// Set when we start a meeting ourselves: the daemon needs a moment to write the
+    /// state file, and that gap must not be mistaken for "the meeting already ended".
+    pending_start: Option<Instant>,
 }
 
 impl App {
@@ -66,6 +69,7 @@ impl App {
             should_quit: false,
             voxtype_version: voxtype::version(),
             last_poll: Instant::now(),
+            pending_start: None,
         };
         if !app.meetings.is_empty() {
             app.table.select(Some(0));
@@ -129,6 +133,7 @@ impl App {
     fn poll_live(&mut self) {
         match voxtype::live_state() {
             Some((status, id)) => {
+                self.pending_start = None;
                 if !self.live.active {
                     self.live = Live::default();
                     self.live.active = true;
@@ -155,6 +160,15 @@ impl App {
             }
             None => {
                 if self.live.active {
+                    // We may have just started it: wait a few seconds for the daemon to
+                    // write the state file before declaring the meeting finished.
+                    if self
+                        .pending_start
+                        .is_some_and(|t| t.elapsed() < Duration::from_secs(6))
+                    {
+                        return;
+                    }
+                    self.pending_start = None;
                     self.live = Live::default();
                     self.mode = Mode::List;
                     self.refresh_meetings();
@@ -274,6 +288,7 @@ impl App {
                 self.input.clear();
                 match voxtype::meeting_start(&title) {
                     Ok(()) => {
+                        self.pending_start = Some(Instant::now());
                         self.live = Live {
                             active: true,
                             status: "recording".to_string(),
@@ -307,21 +322,21 @@ impl App {
     }
 
     fn toggle_pause(&mut self) {
-        let paused = self.live.status.eq_ignore_ascii_case("paused");
-        let result = if paused {
-            voxtype::meeting_resume()
+        let status = self.live.status.to_ascii_lowercase();
+        let result = if status == "paused" {
+            voxtype::meeting_resume().map(|()| "recording")
+        } else if matches!(status.as_str(), "recording" | "active" | "starting") {
+            voxtype::meeting_pause().map(|()| "paused")
         } else {
-            voxtype::meeting_pause()
+            self.toast("Nothing to pause.");
+            return;
         };
         match result {
-            Ok(()) => {
-                self.live.status = if paused { "recording" } else { "paused" }.to_string();
+            Ok(next) => {
+                self.live.status = next.to_string();
                 self.poll_live();
             }
-            Err(e) => self.toast(format!(
-                "{} failed: {e}",
-                if paused { "Resume" } else { "Pause" }
-            )),
+            Err(e) => self.toast(format!("Pause/resume failed: {e}")),
         }
     }
 
