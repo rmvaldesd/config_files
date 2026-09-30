@@ -13,6 +13,9 @@ use crate::meeting::{self, Meeting};
 use crate::paths;
 use crate::voxtype;
 
+/// Number of rows on the configuration screen.
+pub const SETTINGS_COUNT: usize = 5;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputKind {
     /// Ask for the meeting name before starting.
@@ -35,6 +38,8 @@ pub enum Mode {
     List,
     /// A meeting is recording or paused.
     Live,
+    /// The configuration screen.
+    Settings,
     /// A modal text prompt.
     Input(InputKind),
 }
@@ -52,6 +57,7 @@ pub struct App {
     pub config: AppConfig,
     pub meetings: Vec<Meeting>,
     pub table: TableState,
+    pub settings: TableState,
     pub mode: Mode,
     pub input: String,
     pub live: Live,
@@ -62,14 +68,20 @@ pub struct App {
     /// Set when we start a meeting ourselves: the daemon needs a moment to write the
     /// state file, and that gap must not be mistaken for "the meeting already ended".
     pending_start: Option<Instant>,
+    /// Where the text prompt returns to when it closes (List for a new name, Settings for
+    /// the export folder).
+    input_return: Mode,
 }
 
 impl App {
     pub fn new() -> Self {
+        let mut settings = TableState::default();
+        settings.select(Some(0));
         let mut app = Self {
             config: AppConfig::load(),
             meetings: meeting::load_meetings(),
             table: TableState::default(),
+            settings,
             mode: Mode::List,
             input: String::new(),
             live: Live::default(),
@@ -78,6 +90,7 @@ impl App {
             voxtype_version: voxtype::version(),
             last_poll: Instant::now(),
             pending_start: None,
+            input_return: Mode::List,
         };
         if !app.meetings.is_empty() {
             app.table.select(Some(0));
@@ -97,19 +110,35 @@ impl App {
         self.config.export_dir.display().to_string()
     }
 
-    /// One-line summary of the export options, shown under the list.
-    pub fn export_settings_line(&self) -> String {
-        format!(
-            "export:  [f] format={}   [S] speakers={}   [t] timestamps={}   [m] metadata={}",
-            self.config.export_format,
-            on_off(self.config.include_speakers),
-            on_off(self.config.include_timestamps),
-            on_off(self.config.include_metadata),
-        )
+    /// The configuration screen rows: `(label, current value)`.
+    pub fn settings_rows(&self) -> Vec<(&'static str, String)> {
+        vec![
+            ("Export format", self.config.export_format.clone()),
+            ("Export folder", self.export_dir_display()),
+            (
+                "Include speakers",
+                on_off(self.config.include_speakers).to_string(),
+            ),
+            (
+                "Include timestamps",
+                on_off(self.config.include_timestamps).to_string(),
+            ),
+            (
+                "Include metadata",
+                on_off(self.config.include_metadata).to_string(),
+            ),
+        ]
     }
 
     pub fn toast(&mut self, msg: impl Into<String>) {
         self.message = Some((msg.into(), Instant::now()));
+    }
+
+    fn save_config(&mut self, message: String) {
+        match self.config.save() {
+            Ok(()) => self.toast(message),
+            Err(e) => self.toast(format!("Could not save config: {e}")),
+        }
     }
 
     pub fn refresh_meetings(&mut self) {
@@ -214,24 +243,27 @@ impl App {
     // ------------------------------------------------------------- key input
 
     pub fn on_key(&mut self, key: KeyEvent) {
-        match self.mode {
-            Mode::Input(kind) => self.on_input_key(key, kind),
-            Mode::List => self.on_list_key(key),
-            Mode::Live => self.on_live_key(key),
-        }
-    }
-
-    fn on_list_key(&mut self, key: KeyEvent) {
+        // Ctrl-C quits from anywhere.
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             self.should_quit = true;
             return;
         }
+        match self.mode {
+            Mode::Input(kind) => self.on_input_key(key, kind),
+            Mode::List => self.on_list_key(key),
+            Mode::Live => self.on_live_key(key),
+            Mode::Settings => self.on_settings_key(key),
+        }
+    }
+
+    fn on_list_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
             KeyCode::Up | KeyCode::Char('k') => self.move_selection(-1),
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
             KeyCode::Char('s') => {
                 self.input.clear();
+                self.input_return = Mode::List;
                 self.mode = Mode::Input(InputKind::Name);
             }
             KeyCode::Char('e') | KeyCode::Enter => self.export_selected(),
@@ -240,21 +272,10 @@ impl App {
                 self.open_path(&dir);
             }
             KeyCode::Char('O') => self.open_meeting_dir(),
-            KeyCode::Char('d') => {
-                self.input = self.export_dir_display();
-                self.mode = Mode::Input(InputKind::ExportDir);
+            KeyCode::Char('c') => {
+                self.settings.select(Some(0));
+                self.mode = Mode::Settings;
             }
-            KeyCode::Char('f') => {
-                self.config.cycle_format();
-                let format = self.config.export_format.clone();
-                match self.config.save() {
-                    Ok(()) => self.toast(format!("Export format: {format}")),
-                    Err(e) => self.toast(format!("Could not save config: {e}")),
-                }
-            }
-            KeyCode::Char('t') => self.toggle_export_flag(ExportFlag::Timestamps),
-            KeyCode::Char('S') => self.toggle_export_flag(ExportFlag::Speakers),
-            KeyCode::Char('m') => self.toggle_export_flag(ExportFlag::Metadata),
             KeyCode::Char('r') => {
                 self.refresh_meetings();
                 self.toast("List refreshed.");
@@ -263,11 +284,17 @@ impl App {
         }
     }
 
-    fn on_live_key(&mut self, key: KeyEvent) {
-        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-            self.should_quit = true;
-            return;
+    fn on_settings_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('c') => self.mode = Mode::List,
+            KeyCode::Up | KeyCode::Char('k') => self.move_settings(-1),
+            KeyCode::Down | KeyCode::Char('j') => self.move_settings(1),
+            KeyCode::Enter | KeyCode::Char(' ') => self.activate_setting(),
+            _ => {}
         }
+    }
+
+    fn on_live_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => self.should_quit = true,
             KeyCode::Char('p') => self.toggle_pause(),
@@ -280,7 +307,7 @@ impl App {
         match key.code {
             KeyCode::Esc => {
                 self.input.clear();
-                self.mode = Mode::List;
+                self.mode = self.input_return;
             }
             KeyCode::Enter => self.submit_input(kind),
             KeyCode::Backspace => {
@@ -301,7 +328,34 @@ impl App {
             .select(Some((current + delta).rem_euclid(len) as usize));
     }
 
+    fn move_settings(&mut self, delta: isize) {
+        let len = SETTINGS_COUNT as isize;
+        let current = self.settings.selected().unwrap_or(0) as isize;
+        self.settings
+            .select(Some((current + delta).rem_euclid(len) as usize));
+    }
+
     // --------------------------------------------------------------- actions
+
+    /// Change whatever row of the configuration screen is selected.
+    fn activate_setting(&mut self) {
+        match self.settings.selected().unwrap_or(0) {
+            0 => {
+                self.config.cycle_format();
+                let format = self.config.export_format.clone();
+                self.save_config(format!("Export format: {format}"));
+            }
+            1 => {
+                self.input = self.export_dir_display();
+                self.input_return = Mode::Settings;
+                self.mode = Mode::Input(InputKind::ExportDir);
+            }
+            2 => self.toggle_export_flag(ExportFlag::Speakers),
+            3 => self.toggle_export_flag(ExportFlag::Timestamps),
+            4 => self.toggle_export_flag(ExportFlag::Metadata),
+            _ => {}
+        }
+    }
 
     fn submit_input(&mut self, kind: InputKind) {
         match kind {
@@ -330,15 +384,13 @@ impl App {
             InputKind::ExportDir => {
                 let dir = paths::expand_tilde(&self.input);
                 self.input.clear();
-                self.mode = Mode::List;
+                self.mode = self.input_return;
                 if dir.as_os_str().is_empty() {
                     return;
                 }
                 self.config.export_dir = dir;
-                match self.config.save() {
-                    Ok(()) => self.toast(format!("Export folder: {}", self.export_dir_display())),
-                    Err(e) => self.toast(format!("Could not save config: {e}")),
-                }
+                let message = format!("Export folder: {}", self.export_dir_display());
+                self.save_config(message);
             }
         }
     }
@@ -432,10 +484,8 @@ impl App {
                 ("metadata", self.config.include_metadata)
             }
         };
-        match self.config.save() {
-            Ok(()) => self.toast(format!("Export {name}: {}", on_off(value))),
-            Err(e) => self.toast(format!("Could not save config: {e}")),
-        }
+        let message = format!("Export {name}: {}", on_off(value));
+        self.save_config(message);
     }
 }
 
@@ -469,5 +519,18 @@ mod tests {
     fn given_name_is_kept_and_timestamped() {
         let title = timestamped_title("Daily");
         assert!(title.starts_with("Daily "), "{title}");
+    }
+
+    #[test]
+    fn settings_screen_lists_every_option() {
+        let app = App::new();
+        let rows = app.settings_rows();
+        assert_eq!(rows.len(), SETTINGS_COUNT);
+        let labels: Vec<&str> = rows.iter().map(|(label, _)| *label).collect();
+        assert!(labels.contains(&"Export format"));
+        assert!(labels.contains(&"Export folder"));
+        assert!(labels.contains(&"Include speakers"));
+        assert!(labels.contains(&"Include timestamps"));
+        assert!(labels.contains(&"Include metadata"));
     }
 }

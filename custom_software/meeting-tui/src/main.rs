@@ -175,15 +175,19 @@ mod tests {
     }
 
     #[test]
-    fn list_view_shows_the_export_options() {
+    fn settings_view_shows_every_option() {
         let mut app = App::new();
-        app.mode = Mode::List;
+        app.mode = Mode::Settings;
         let text = rendered_text(&app);
-        for needle in ["speakers=", "timestamps=", "metadata=", "format="] {
-            assert!(
-                text.contains(needle),
-                "export settings line missing {needle}"
-            );
+        for needle in [
+            "Configuration",
+            "Export format",
+            "Export folder",
+            "Include speakers",
+            "Include timestamps",
+            "Include metadata",
+        ] {
+            assert!(text.contains(needle), "settings view missing {needle}");
         }
     }
 }

@@ -29,11 +29,12 @@ The toolchain is whatever `cargo` is on `PATH` (rustup or the `rust` package).
 | List | `e` / `Enter` | Export the selected meeting |
 | List | `o` | Open the export folder |
 | List | `O` | Open the selected meeting's voxtype folder |
-| List | `d` | Set the export folder |
-| List | `f` | Cycle export format (markdown → text → json) |
-| List | `t` / `S` / `m` | Toggle timestamps / speakers / metadata in the export |
+| List | `c` | Open the configuration screen |
 | List | `r` | Refresh the list |
 | List | `q` / `Esc` | Quit |
+| Config | `↑`/`↓`, `k`/`j` | Move between options |
+| Config | `Enter` / `Space` | Change the value (cycle format, toggle, edit folder) |
+| Config | `Esc` / `q` / `c` | Back to the list |
 | Meeting | `p` | Pause / resume |
 | Meeting | `x` | Stop and transcribe |
 | Meeting | `q` / `Esc` | Close the window (recording continues) |

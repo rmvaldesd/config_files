@@ -1,4 +1,4 @@
-//! Rendering. Two views (idle list / live meeting) plus a modal prompt.
+//! Rendering. Three views (idle list / live meeting / configuration) plus a modal prompt.
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -14,13 +14,14 @@ pub fn draw(f: &mut Frame, app: &App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Min(3),
-            Constraint::Length(3),
+            Constraint::Length(2),
         ])
         .split(f.area());
 
     draw_header(f, app, chunks[0]);
     match app.mode {
         Mode::Live => draw_live(f, app, chunks[1]),
+        Mode::Settings => draw_settings(f, app, chunks[1]),
         _ => draw_list(f, app, chunks[1]),
     }
     draw_footer(f, app, chunks[2]);
@@ -103,6 +104,33 @@ fn draw_list(f: &mut Frame, app: &App, area: Rect) {
     f.render_stateful_widget(table, area, &mut state);
 }
 
+fn draw_settings(f: &mut Frame, app: &App, area: Rect) {
+    let header =
+        Row::new(vec!["Setting", "Value"]).style(Style::default().add_modifier(Modifier::BOLD));
+    let rows = app
+        .settings_rows()
+        .into_iter()
+        .map(|(label, value)| Row::new(vec![Cell::from(label), Cell::from(value)]));
+    let widths = [Constraint::Length(22), Constraint::Min(24)];
+
+    let table = Table::new(rows, widths)
+        .header(header)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Configuration"),
+        )
+        .row_highlight_style(
+            Style::default()
+                .add_modifier(Modifier::REVERSED)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+
+    let mut state = app.settings.clone();
+    f.render_stateful_widget(table, area, &mut state);
+}
+
 fn draw_live(f: &mut Frame, app: &App, area: Rect) {
     let title = app
         .live
@@ -150,33 +178,26 @@ fn draw_live(f: &mut Frame, app: &App, area: Rect) {
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     let hints = match app.mode {
         Mode::Input(InputKind::Name) => "type a name  ·  Enter start  ·  Esc cancel",
-        Mode::Input(InputKind::ExportDir) => "type a folder (or ~/...)  ·  Enter save  ·  Esc cancel",
+        Mode::Input(InputKind::ExportDir) => {
+            "type a folder (or ~/...)  ·  Enter save  ·  Esc cancel"
+        }
         Mode::Live => "p pause/resume  ·  x stop  ·  q quit",
+        Mode::Settings => "↑↓ move  ·  Enter change  ·  Esc back",
         Mode::List => {
-            "s start  ·  e/Enter export  ·  o open folder  ·  O meeting folder  ·  d set folder  ·  f format  ·  r refresh  ·  q quit"
+            "s start  ·  e/Enter export  ·  o folder  ·  O meeting dir  ·  c configuration  ·  r refresh  ·  q quit"
         }
     };
 
-    let settings = match app.mode {
-        Mode::List => Line::from(Span::styled(
-            app.export_settings_line(),
-            Style::default().fg(Color::DarkGray),
-        )),
-        _ => Line::default(),
-    };
-    let message = match app.message_text() {
-        Some(msg) => Line::from(Span::styled(
+    let mut lines = vec![Line::from(Span::styled(
+        hints,
+        Style::default().fg(Color::DarkGray),
+    ))];
+    if let Some(msg) = app.message_text() {
+        lines.push(Line::from(Span::styled(
             msg.to_string(),
             Style::default().fg(Color::Green),
-        )),
-        None => Line::default(),
-    };
-
-    let lines = vec![
-        Line::from(Span::styled(hints, Style::default().fg(Color::DarkGray))),
-        settings,
-        message,
-    ];
+        )));
+    }
     f.render_widget(Paragraph::new(lines), area);
 }
 
