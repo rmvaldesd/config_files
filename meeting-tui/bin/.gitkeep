@@ -1,0 +1,5 @@
+# bin/
+
+`make` (or `make release`) drops the compiled `meeting-tui` binary here. The
+`SUPER + SHIFT + M` Hyprland bind runs `<repo>/meeting-tui/bin/meeting-tui`, so build once
+per machine after cloning. The binary itself is gitignored (it is machine-specific).

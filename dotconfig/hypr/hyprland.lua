@@ -699,16 +699,16 @@ hl.bind(mainMod .. " + ALT + Space", hl.dsp.exec_cmd("recent-files"))
 -- bin_configs/voxtype-meeting wrapper, not a flag.
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd("voxtype record toggle"))
 
--- MEETING panel (Quickshell OSD): buttons to start/stop recording a meeting instead of
--- typing 'voxtype meeting start/stop'. It only touches the flag the OSD watches, so the
--- panel appears and the dictation OSD still shows while you record. Requires the
--- 'quickshell' package + '[osd] frontend = "quickshell"' in voxtype (and a daemon
--- restart). SHIFT + M for 'Meeting': it was free after moving the shutdown bind to
--- SUPER + CONTROL + ESC.
-hl.bind(
-  secondMod .. " + M",
-  hl.dsp.exec_cmd("mkdir -p $XDG_RUNTIME_DIR/voxtype && touch $XDG_RUNTIME_DIR/voxtype/meeting-controls.flag")
-)
+-- MEETING control (meeting-tui): a ratatui TUI, in its own floating foot window, that
+-- starts/stops/pauses the meeting, names it (a timestamp is appended) and, while idle,
+-- lists past meetings and exports them to a folder. Source and build live in
+-- meeting-tui/ (run 'make' there once; the bind runs meeting-tui/bin/meeting-tui).
+-- This replaces the old Quickshell meeting panel: it no longer triggers the OSD
+-- 'meeting-controls.flag'. SHIFT + M for 'Meeting': it was free after moving the
+-- shutdown bind to SUPER + CONTROL + ESC.
+local meetingTui =
+    "foot --title=meeting-tui '--font=JetBrainsMono Nerd Font:size=12' -W 100x30 -e $HOME/config_files/meeting-tui/bin/meeting-tui"
+hl.bind(secondMod .. " + M", hl.dsp.exec_cmd(meetingTui))
 
 -- Activar el submapa al pulsar Mod + R
 hl.bind("SUPER + R", hl.dsp.submap("resize"))
@@ -1016,6 +1016,18 @@ hl.window_rule({
 hl.window_rule({
   name = "monitor-setup-flotante",
   match = { title = "^monitor-setup$" },
+
+  float = true,
+  center = true,
+  stay_focused = true,
+})
+
+-- meeting-tui (SUPER + SHIFT + M): the same floating treatment as monitor-setup, matched
+-- by the --title= the bind passes. 'stay_focused' matters for the same reason: the TUI
+-- must keep receiving keys (p/x/q) while the mouse is elsewhere.
+hl.window_rule({
+  name = "meeting-tui-flotante",
+  match = { title = "^meeting-tui$" },
 
   float = true,
   center = true,

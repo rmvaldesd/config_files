@@ -1,0 +1,21 @@
+[package]
+name = "meeting-tui"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "ratatui control panel for voxtype meeting recording: start/stop/pause, name the meeting, and export past transcripts."
+
+[dependencies]
+anyhow = "1"
+chrono = "0.4"
+crossterm = "0.28"
+ratatui = "0.29"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Smaller, faster release binary: the SUPER+SHIFT+M bind runs this straight from bin/.
+[profile.release]
+opt-level = 3
+lto = true
+strip = true

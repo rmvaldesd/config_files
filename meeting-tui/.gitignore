@@ -1,0 +1,5 @@
+# Build output and the built binary. The Makefile drops the release binary in bin/ for
+# the Hyprland bind to run; it is machine-specific, so it is not tracked.
+/target
+/bin/*
+!/bin/.gitkeep
