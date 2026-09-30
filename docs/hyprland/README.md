@@ -296,8 +296,9 @@ Quickshell meeting OSD:
 - While recording: `p` pause/resume, `x` stop (voxtype then finishes the transcript).
 - While idle it lists past meetings; pick one with the arrows / `j` / `k` and press
   `e` / `Enter` to export it. `d` changes the export folder (default
-  `~/meeting-transcriptions`), `f` cycles markdown/text/json, `o` opens the folder, `O`
-  opens the meeting's voxtype folder.
+  `~/meeting-transcriptions`), `f` cycles markdown/text/json, `t` / `S` / `m` toggle
+  timestamps / speakers / metadata, `o` opens the folder, `O` opens the meeting's voxtype
+  folder. The current export options are shown above the file list.
 
 Build once per machine: `cd ~/config_files/custom_software/meeting-tui && make` (needs
 `cargo`; it drops the binary in `custom_software/meeting-tui/bin/`, which is what the bind

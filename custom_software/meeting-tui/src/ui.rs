@@ -14,7 +14,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Min(3),
-            Constraint::Length(2),
+            Constraint::Length(3),
         ])
         .split(f.area());
 
@@ -157,16 +157,26 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
         }
     };
 
-    let mut lines = vec![Line::from(Span::styled(
-        hints,
-        Style::default().fg(Color::DarkGray),
-    ))];
-    if let Some(msg) = app.message_text() {
-        lines.push(Line::from(Span::styled(
+    let settings = match app.mode {
+        Mode::List => Line::from(Span::styled(
+            app.export_settings_line(),
+            Style::default().fg(Color::DarkGray),
+        )),
+        _ => Line::default(),
+    };
+    let message = match app.message_text() {
+        Some(msg) => Line::from(Span::styled(
             msg.to_string(),
             Style::default().fg(Color::Green),
-        )));
-    }
+        )),
+        None => Line::default(),
+    };
+
+    let lines = vec![
+        Line::from(Span::styled(hints, Style::default().fg(Color::DarkGray))),
+        settings,
+        message,
+    ];
     f.render_widget(Paragraph::new(lines), area);
 }
 

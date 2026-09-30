@@ -42,6 +42,38 @@ pub fn meeting_resume() -> Result<()> {
     run(&["meeting", "resume"]).map(|_| ())
 }
 
+/// Build the argv for `voxtype meeting export` (without the program name).
+///
+/// Pure, so the flag logic is unit-testable.
+pub fn export_args(
+    id: &str,
+    output: &str,
+    format: &str,
+    speakers: bool,
+    metadata: bool,
+    timestamps: bool,
+) -> Vec<String> {
+    let mut args = vec![
+        "meeting".to_string(),
+        "export".to_string(),
+        id.to_string(),
+        "--format".to_string(),
+        format.to_string(),
+        "--output".to_string(),
+        output.to_string(),
+    ];
+    if speakers {
+        args.push("--speakers".to_string());
+    }
+    if metadata {
+        args.push("--metadata".to_string());
+    }
+    if timestamps {
+        args.push("--timestamps".to_string());
+    }
+    args
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn meeting_export(
     id: &str,
@@ -52,19 +84,9 @@ pub fn meeting_export(
     timestamps: bool,
 ) -> Result<()> {
     let output = output.to_string_lossy().to_string();
-    let mut args: Vec<&str> = vec![
-        "meeting", "export", id, "--format", format, "--output", &output,
-    ];
-    if speakers {
-        args.push("--speakers");
-    }
-    if metadata {
-        args.push("--metadata");
-    }
-    if timestamps {
-        args.push("--timestamps");
-    }
-    run(&args).map(|_| ())
+    let args = export_args(id, &output, format, speakers, metadata, timestamps);
+    let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    run(&refs).map(|_| ())
 }
 
 /// Live meeting state, from the daemon's state file: `(status, meeting_id)`.
@@ -145,5 +167,19 @@ mod tests {
         assert!(is_active_status("Recording"));
         assert!(is_active_status(" PAUSED "));
         assert!(!is_active_status("Idle"));
+    }
+
+    #[test]
+    fn export_args_include_only_the_selected_flags() {
+        let args = export_args("id1", "/tmp/x.md", "markdown", true, false, true);
+        assert_eq!(&args[0..3], &["meeting", "export", "id1"]);
+        assert!(args.contains(&"--speakers".to_string()));
+        assert!(args.contains(&"--timestamps".to_string()));
+        assert!(!args.contains(&"--metadata".to_string()));
+
+        let none = export_args("id2", "/tmp/y.txt", "text", false, false, false);
+        assert!(!none.contains(&"--speakers".to_string()));
+        assert!(!none.contains(&"--timestamps".to_string()));
+        assert!(!none.contains(&"--metadata".to_string()));
     }
 }

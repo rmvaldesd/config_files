@@ -21,6 +21,14 @@ pub enum InputKind {
     ExportDir,
 }
 
+/// Something you can flip on/off for the export (persisted in the config).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFlag {
+    Speakers,
+    Timestamps,
+    Metadata,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     /// Idle: the list of saved meetings.
@@ -87,6 +95,17 @@ impl App {
 
     pub fn export_dir_display(&self) -> String {
         self.config.export_dir.display().to_string()
+    }
+
+    /// One-line summary of the export options, shown under the list.
+    pub fn export_settings_line(&self) -> String {
+        format!(
+            "export:  [f] format={}   [S] speakers={}   [t] timestamps={}   [m] metadata={}",
+            self.config.export_format,
+            on_off(self.config.include_speakers),
+            on_off(self.config.include_timestamps),
+            on_off(self.config.include_metadata),
+        )
     }
 
     pub fn toast(&mut self, msg: impl Into<String>) {
@@ -233,6 +252,9 @@ impl App {
                     Err(e) => self.toast(format!("Could not save config: {e}")),
                 }
             }
+            KeyCode::Char('t') => self.toggle_export_flag(ExportFlag::Timestamps),
+            KeyCode::Char('S') => self.toggle_export_flag(ExportFlag::Speakers),
+            KeyCode::Char('m') => self.toggle_export_flag(ExportFlag::Metadata),
             KeyCode::Char('r') => {
                 self.refresh_meetings();
                 self.toast("List refreshed.");
@@ -392,6 +414,36 @@ impl App {
             Ok(_) => self.toast(format!("Opening {path}")),
             Err(e) => self.toast(format!("Could not open {path}: {e}")),
         }
+    }
+
+    /// Flip one export flag and persist it.
+    fn toggle_export_flag(&mut self, flag: ExportFlag) {
+        let (name, value) = match flag {
+            ExportFlag::Speakers => {
+                self.config.include_speakers = !self.config.include_speakers;
+                ("speakers", self.config.include_speakers)
+            }
+            ExportFlag::Timestamps => {
+                self.config.include_timestamps = !self.config.include_timestamps;
+                ("timestamps", self.config.include_timestamps)
+            }
+            ExportFlag::Metadata => {
+                self.config.include_metadata = !self.config.include_metadata;
+                ("metadata", self.config.include_metadata)
+            }
+        };
+        match self.config.save() {
+            Ok(()) => self.toast(format!("Export {name}: {}", on_off(value))),
+            Err(e) => self.toast(format!("Could not save config: {e}")),
+        }
+    }
+}
+
+fn on_off(value: bool) -> &'static str {
+    if value {
+        "on"
+    } else {
+        "off"
     }
 }
 
