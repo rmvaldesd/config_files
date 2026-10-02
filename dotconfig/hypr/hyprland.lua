@@ -204,6 +204,18 @@ local ayuda = "foot --title=ayuda-atajos -e sh -c "
 -- Or execute your favorite apps at launch like this:
 --
 hl.on("hyprland.start", function()
+  -- Hand the session environment to the systemd user manager and D-Bus, then start the
+  -- voice dictation daemon. The env import is what lets user units started from here reach
+  -- the compositor (the voxtype OSD needs WAYLAND_DISPLAY).
+  --
+  -- voxtype.service is WantedBy=graphical-session.target, and this session never activates
+  -- that target (it is also RefuseManualStart), so an 'enabled' voxtype would only run if
+  -- something started it by hand -- which is why SUPER+T did nothing after a reboot.
+  -- Start it explicitly, like waybar/hypridle/mako below.
+  hl.exec_cmd(
+    "dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE XDG_SESSION_ID HYPRLAND_INSTANCE_SIGNATURE XDG_RUNTIME_DIR PATH; systemctl --user start voxtype.service"
+  )
+
   -- GTK 4 Apps
   hl.exec_cmd('gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"')
   -- GTK 3 Apps
