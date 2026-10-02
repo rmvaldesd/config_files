@@ -174,7 +174,7 @@ EOF
     echo "   Sincronizar ahora:          rclone-sync once"
     echo
     echo "   El icono ya tendría que estar en la barra. Si no aparece, recargala:"
-    echo "     pkill -SIGUSR2 waybar"
+    echo "     waybar-reload   (o: killall waybar, y auto-reload.sh la levanta de nuevo)"
 }
 
 # --------------------------------------------------------------------------

@@ -140,7 +140,7 @@ else
 fi
 if pgrep -x waybar > /dev/null 2>&1; then
     echo "-> Reloading Waybar (the voxtype icon opens the new panel)..."
-    killall -SIGUSR2 waybar || true
+    bash "$REPO/bin_configs/waybar-reload" 2> /dev/null || killall -SIGUSR2 waybar 2> /dev/null || true
 else
     echo "-> Waybar is not running; the icon applies when it starts."
 fi

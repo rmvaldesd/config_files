@@ -199,7 +199,7 @@ zathura           # Visor de documentos minimalista con teclas tipo vim (j/k par
     htop              # Monitor de procesos clásico en la terminal (on-click del módulo de memoria en Waybar).
     jq                # Procesador de JSON en la terminal; kb_layout.sh lo usa para leer la salida de 'hyprctl -j'.
     inotify-tools     # Provee 'inotifywait'; auto-reload.sh lo usa para recargar Waybar al guardar cambios en su config.
-    psmisc            # Provee 'killall'; auto-reload.sh lo usa para enviar la señal SIGUSR2 de recarga a Waybar.
+    psmisc            # Provee 'killall'; bin_configs/waybar-reload lo usa para reiniciar la barra (SIGUSR2 crashea en waybar 0.15, ver ese script).
     neovim            # Editor de texto; su configuración se enlaza desde config_files/dotconfig/nvim en la sección 9.
     tmux              # Multiplexor de terminal; su configuración se enlaza desde config_files/tmux.conf en la sección 9.
     lazygit           # Interfaz TUI para git; simplifica staging, commits, ramas y rebases desde la terminal.

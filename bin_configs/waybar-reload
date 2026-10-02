@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# waybar-reload — restart the bar the safe way.
+#
+# `killall -SIGUSR2 waybar` (waybar's own "re-read the config") crashes on 0.15.0: the
+# reload trips a GLib-GIO assertion (g_application_impl_command_line: object_id != 0) and
+# waybar aborts with SIGABRT (upstream: Waybar #3546). Verified on this machine with a
+# coredump and a foreground reproduction.
+#
+# So we TERMINATE waybar instead and let the supervisor in ~/.config/waybar/auto-reload.sh
+# bring it back. The flag file marks the death as a deliberate restart so the supervisor
+# does not spend one of its three retries (and so an unrelated crash is still counted).
+set -u
+
+flag="${XDG_RUNTIME_DIR:-/tmp}/waybar-reload.flag"
+
+if pgrep -x waybar > /dev/null 2>&1; then
+    : > "$flag"
+    killall -TERM waybar 2> /dev/null || rm -f "$flag"
+else
+    rm -f "$flag"
+fi

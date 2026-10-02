@@ -150,7 +150,7 @@ bash "$REPO/scripts/link-bins.sh"
 # running processes keep the old version in memory until they are told to reload.
 if pgrep -x waybar >/dev/null 2>&1; then
     echo "-> Reloading Waybar (the custom/voxtype module)..."
-    killall -SIGUSR2 waybar || true
+    bash "$REPO/bin_configs/waybar-reload" 2> /dev/null || killall -SIGUSR2 waybar 2> /dev/null || true
 else
     echo "-> Waybar is not running; the module will appear when it starts."
 fi

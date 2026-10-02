@@ -102,15 +102,19 @@ fi
 # 3. MÓDULO DE SWAP EN LA BARRA
 # ==========================================
 # El script del módulo ya llegó con el pull (dotconfig/waybar está enlazado a
-# ~/.config/waybar), pero waybar tiene su config en memoria. SIGUSR2 es "releé
-# la config" -- no reinicia el proceso, así que la barra no parpadea.
+# ~/.config/waybar), pero waybar tiene su config en memoria.
+#
+# OJO: antes esto mandaba SIGUSR2 ("releé la config" sin reiniciar), pero en waybar 0.15
+# ese camino crashea con una aserción de GLib-GIO (Waybar #3546). Ahora se REINICIA con
+# bin_configs/waybar-reload, que marca la caída como intencional para no gastar un
+# reintento del supervisor y deja que auto-reload.sh la levante de nuevo.
 #
 # No alcanza con confiar en auto-reload.sh: su inotifywait vigila el DIRECTORIO
 # ~/.config/waybar y no es recursivo, así que un pull que sólo toque
 # scripts/swap.sh no dispara nada.
 if pgrep -x waybar >/dev/null 2>&1; then
     echo "-> Recargando waybar para que aparezca el módulo de swap..."
-    killall -SIGUSR2 waybar || true
+    bash "$REPO/bin_configs/waybar-reload" 2> /dev/null || killall -SIGUSR2 waybar 2> /dev/null || true
 else
     echo "-> waybar no está corriendo; el módulo de swap aparecerá al iniciarla."
 fi

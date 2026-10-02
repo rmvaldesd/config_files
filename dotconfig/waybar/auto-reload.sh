@@ -3,8 +3,13 @@
 #
 # Hace DOS cosas que antes estaban separadas:
 #
-#   1) RECARGA EN CALIENTE: inotify sobre ~/.config/waybar; ante un cambio manda
-#      SIGUSR2, que waybar interpreta como "relee la config". No reinicia el proceso.
+#   1) HOT RELOAD: inotify on ~/.config/waybar; on a change it RESTARTS waybar (kills
+#      it and the supervisor below brings it back).
+#
+#      NOTE: it used to send SIGUSR2 ("re-read the config") without restarting. On
+#      waybar 0.15.0 that path crashes: reloading trips a GLib-GIO assertion
+#      (g_application_impl_command_line: object_id != 0) and aborts with SIGABRT
+#      (upstream: Waybar #3546). A restart costs a bar flicker, but it holds.
 #   2) SUPERVISIÓN: si waybar MUERE, la vuelve a levantar hasta 3 veces por sesión.
 #      A la cuarta caída se rinde y notifica.
 #
@@ -19,6 +24,14 @@
 # termine avisando en vez de reciclarse para siempre en silencio.
 MAX_REINTENTOS=3
 reintentos=0
+
+# Waybar pid + reload flag. The watcher runs in a subshell, so it cannot touch the
+# parent's variables; the flag file is how it tells the supervisor "this death was a
+# deliberate restart, do not spend a retry".
+run_dir="${XDG_RUNTIME_DIR:-/tmp}"
+waybar_pid_file="$run_dir/waybar.pid"
+reload_flag="$run_dir/waybar-reload.flag"
+rm -f "$reload_flag"
 
 # Cuántos segundos tiene que aguantar waybar para considerarla "estable" y devolverle
 # el presupuesto completo de reintentos.
@@ -79,7 +92,16 @@ vigilar_config() {
         # desapareció); si no, un error permanente giraría en vacío para siempre.
         wait "$hijo" || break
         render_config
-        killall -SIGUSR2 waybar
+        # Restart waybar instead of sending SIGUSR2 (which crashes on this version).
+        # The flag is written BEFORE the signal so the supervisor never sees the death
+        # before it knows the restart was deliberate.
+        : > "$reload_flag"
+        pid=$(cat "$waybar_pid_file" 2>/dev/null)
+        if [ -n "$pid" ]; then
+            kill "$pid" 2> /dev/null || rm -f "$reload_flag"
+        else
+            rm -f "$reload_flag"
+        fi
     done
 }
 vigilar_config &
@@ -95,7 +117,7 @@ watcher=$!
 #
 # $waybar_pid se expande cuando el trap DISPARA, no cuando se define, así que ya
 # tiene el PID vigente. Si aún no hay ninguno queda vacío y el kill falla en silencio.
-trap 'terminando=1; kill "$watcher" $waybar_pid 2>/dev/null' TERM INT HUP
+trap 'terminando=1; kill "$watcher" $waybar_pid 2>/dev/null; rm -f "$waybar_pid_file" "$reload_flag"' TERM INT HUP
 
 # --- 2. Supervisión -----------------------------------------------------------
 while :; do
@@ -108,6 +130,7 @@ while :; do
         waybar &
     fi
     waybar_pid=$!
+    printf '%s\n' "$waybar_pid" > "$waybar_pid_file"
 
     # Bloquea hasta que waybar termine, por la razón que sea. Como este script es su
     # padre, 'wait' es la forma exacta de enterarse: no hay polling ni ventana ciega.
@@ -116,6 +139,12 @@ while :; do
 
     # Salida intencional (logout): no cuenta como caída y no se relanza.
     [ "$terminando" -eq 1 ] && exit 0
+
+    # Hot reload (the config changed): relaunch immediately without spending a retry.
+    if [ -e "$reload_flag" ]; then
+        rm -f "$reload_flag"
+        continue
+    fi
 
     # Si aguantó lo suficiente, la caída no es parte de un crash-loop: se le devuelve
     # el presupuesto entero.
