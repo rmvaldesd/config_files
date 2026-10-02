@@ -231,6 +231,12 @@ hl.on("hyprland.start", function()
   hl.exec_cmd("~/.config/waybar/auto-reload.sh")
   hl.exec_cmd("hypridle")
   hl.exec_cmd("mako")
+  -- Quickshell visors (dotconfig/quickshell/visors): the CPU and power-profile
+  -- panels, both anchored under the bar's right corner. The Waybar cpu and
+  -- power-profile modules toggle them over IPC via bin_configs/cpu-visor and
+  -- bin_configs/power-visor. -n avoids a second copy if it is already running,
+  -- and -d detaches it from this startup command.
+  hl.exec_cmd("qs -n -c visors -d")
   hl.exec_cmd("/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1")
   hl.exec_cmd("wl-paste --watch cliphist store")
 end)
@@ -1044,6 +1050,11 @@ hl.window_rule({
   float = true,
   center = true,
   stay_focused = true,
+  -- Size as a fraction of the monitor, NOT foot's `-W`. A fixed -W came out bigger than
+  -- asked (the window inherits the tiled size before it floats), and on eDP-1 (1280x800
+  -- logical) that was taller than the screen: centered at y<0, the header and the footer
+  -- hints got cut. The TUI adapts to whatever width it ends up with.
+  size = "(monitor_w*0.6) (monitor_h*0.8)",
 })
 
 -- Las TUI que abren los clics de Waybar (volumen, bluetooth, red, CPU, memoria) son

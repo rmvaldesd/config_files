@@ -39,6 +39,13 @@ impl Meeting {
         }
     }
 
+    /// Title for the meetings table: same as `display_title` but without the redundant
+    /// trailing `YYYY-MM-DD HH:MM:SS` that we append when starting a meeting — the Date
+    /// column already shows it, and dropping it leaves room for the other columns.
+    pub fn short_title(&self) -> String {
+        strip_trailing_timestamp(&self.display_title())
+    }
+
     pub fn started_local(&self) -> String {
         format_local(self.started_at.as_deref())
     }
@@ -131,6 +138,42 @@ pub fn slugify(s: &str) -> String {
     }
 }
 
+/// Drop a trailing ` YYYY-MM-DD HH:MM:SS` from a title, char-safe.
+fn strip_trailing_timestamp(s: &str) -> String {
+    let chars: Vec<char> = s.trim_end().chars().collect();
+    let n = chars.len();
+    if n >= 20 {
+        let time: String = chars[n - 8..].iter().collect();
+        let sep1: String = chars[n - 9..n - 8].iter().collect();
+        let date: String = chars[n - 19..n - 9].iter().collect();
+        let sep2: String = chars[n - 20..n - 19].iter().collect();
+        if sep1 == " " && sep2 == " " && is_clock(&time) && is_date(&date) {
+            return chars[..n - 20].iter().collect();
+        }
+    }
+    s.to_string()
+}
+
+fn is_clock(s: &str) -> bool {
+    let b = s.as_bytes();
+    b.len() == 8
+        && b[2] == b':'
+        && b[5] == b':'
+        && b[..2].iter().all(u8::is_ascii_digit)
+        && b[3..5].iter().all(u8::is_ascii_digit)
+        && b[6..].iter().all(u8::is_ascii_digit)
+}
+
+fn is_date(s: &str) -> bool {
+    let b = s.as_bytes();
+    b.len() == 10
+        && b[4] == b'-'
+        && b[7] == b'-'
+        && b[..4].iter().all(u8::is_ascii_digit)
+        && b[5..7].iter().all(u8::is_ascii_digit)
+        && b[8..].iter().all(u8::is_ascii_digit)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,5 +193,27 @@ mod tests {
         assert_eq!(human_duration(6), "6s");
         assert_eq!(human_duration(358), "5m 58s");
         assert_eq!(human_duration(3661), "1h 01m");
+    }
+
+    #[test]
+    fn strips_only_a_trailing_seconds_timestamp() {
+        assert_eq!(
+            strip_trailing_timestamp("daily 2026-10-02 09:32:25"),
+            "daily"
+        );
+        assert_eq!(
+            strip_trailing_timestamp("operations core 2026-09-30 11:36:17"),
+            "operations core"
+        );
+        assert_eq!(
+            strip_trailing_timestamp("Reunión 2026-10-02 09:32:25"),
+            "Reunión"
+        );
+        // No seconds (the "Meeting <date>" fallback for unnamed meetings): keep it.
+        assert_eq!(
+            strip_trailing_timestamp("Meeting 2026-09-30 09:31"),
+            "Meeting 2026-09-30 09:31"
+        );
+        assert_eq!(strip_trailing_timestamp("test"), "test");
     }
 }

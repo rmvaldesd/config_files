@@ -102,7 +102,10 @@ fn list_layout(width: u16) -> ListLayout {
     if show_chunks {
         fixed += CHUNKS_W;
     }
-    let title_width = width.saturating_sub(overhead + fixed).max(12);
+    // Cap it: on a wide monitor the title column would otherwise stretch and push the rest
+    // far to the right, leaving a lot of empty space.
+    const TITLE_MAX: u16 = 44;
+    let title_width = width.saturating_sub(overhead + fixed).clamp(12, TITLE_MAX);
 
     let mut headers: Vec<&'static str> = vec!["Title", "Date"];
     let mut widths: Vec<Constraint> =
@@ -140,7 +143,7 @@ fn draw_list(f: &mut Frame, app: &App, area: Rect) {
 
     let rows = app.meetings.iter().map(|m| {
         let mut cells = vec![
-            Cell::from(ellipsize(&m.display_title(), title_width)),
+            Cell::from(ellipsize(&m.short_title(), title_width)),
             Cell::from(m.started_local()),
         ];
         if show_duration {

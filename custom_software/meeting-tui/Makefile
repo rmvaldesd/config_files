@@ -20,7 +20,9 @@ all: release
 release:
 	$(CARGO) build --release
 	@mkdir -p bin
-	cp target/release/$(NAME) $(BIN)
+	@# Replace atomically: a plain `cp` fails with "Text file busy" while the panel is open.
+	@cp target/release/$(NAME) $(BIN).tmp
+	@mv -f $(BIN).tmp $(BIN)
 	@echo "-> $(BIN) ready"
 
 build:

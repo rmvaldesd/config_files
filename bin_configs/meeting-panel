@@ -34,4 +34,6 @@ if command -v hyprctl > /dev/null 2>&1 && command -v jq > /dev/null 2>&1; then
     done
 fi
 
-exec foot --title="$title" '--font=JetBrainsMono Nerd Font:size=12' -W 110x30 -e "$tui"
+# Size comes from the Hyprland window rule (a fraction of the monitor) so it always fits,
+# even on eDP-1 (1280x800 logical) where a fixed foot -W overflowed and cut the header.
+exec foot --title="$title" '--font=JetBrainsMono Nerd Font:size=12' -e "$tui"
