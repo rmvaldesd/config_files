@@ -54,7 +54,9 @@ fi
 # batch (its config moved into the repo). Link any of them that is missing, backing up a
 # real directory first, exactly like archdesktopinstall.sh section 9.
 link_dotconfig() {
-    local name="$1" src="$REPO/dotconfig/$name" dest="$HOME/.config/$name"
+    local name="$1"
+    local src="$REPO/dotconfig/$name"
+    local dest="$HOME/.config/$name"
     [ -d "$src" ] || return 0
     mkdir -p "$HOME/.config"
     if [ -L "$dest" ]; then

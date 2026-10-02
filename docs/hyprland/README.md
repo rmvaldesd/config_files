@@ -252,7 +252,7 @@ Lista huérfanos con tamaño, pide confirmación y los elimina (en rondas hasta 
 
 ### Actualizar un equipo rezagado
 
-- `bash ~/config_files/scripts/update-since-*.sh` → scripts idempotentes que van más allá de un `git pull` (paquetes nuevos, reiniciar procesos). Ejecutarlos en un equipo al día no cambia nada. `update-since-voxtype.sh` cubre la tanda de atajos + voxtype (commits `4b420b0..125c4d3`).
+- `bash ~/config_files/scripts/update-since-*.sh` → scripts idempotentes que van más allá de un `git pull` (paquetes nuevos, reiniciar procesos). Ejecutarlos en un equipo al día no cambia nada. `update-since-voxtype.sh` cubre la tanda de atajos + voxtype (commits `4b420b0..125c4d3`); `update-since-meeting-tui.sh` cubre el panel `meeting-tui` (instala `rust` si falta y lo compila).
 
 ---
 

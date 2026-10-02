@@ -260,7 +260,9 @@ zathura           # Visor de documentos minimalista con teclas tipo vim (j/k par
     xdg-utils         # Provides 'xdg-open' and 'xdg-mime': find-file uses them to open with the default app, to warn when a type has no handler, and to resolve the http(s) handler that opens clipboard URLs. It usually arrives as a transitive dependency; listed explicitly so the openers do not depend on that tree.
     glib2             # Provides 'gio': recent-files uses 'gio trash' to move a file to the trash. Usually present as a GTK dependency; listed explicitly for the same reason.
     # --- voxtype OSD frontend (Quickshell) ---
-    quickshell        # QML OSD frontend voxtype is configured to use ([osd] frontend = "quickshell"): the graphical meeting panel (SUPER+SHIFT+M) and the dictation overlay. Ships in the 'extra' repo.
+    quickshell        # QML OSD frontend voxtype is configured to use ([osd] frontend = "quickshell"): the dictation overlay. Ships in the 'extra' repo.
+    # --- custom_software/ (apps we build ourselves) ---
+    rust              # Toolchain (cargo) used to build custom_software/meeting-tui, the meeting panel behind SUPER+SHIFT+M; section 9 compiles it into the repo's bin/. Without this package that bind has no binary.
 )
 sudo pacman -S --needed --noconfirm "${paquetes_utilidades[@]}"
 
@@ -579,6 +581,8 @@ bash "$HOME/config_files/scripts/install-fonts.sh"
 #   voxtype-meeting  wrapper that swaps whisper.model to large-v3-turbo for a meeting and
 #                 restores 'base' when it ends (this build ignores a per-run --model).
 #   voxtype-state    Waybar helper for the custom/voxtype module; empty when voxtype is idle.
+#   meeting-panel    opens meeting-tui in a floating foot window, replacing any panel already
+#                 on screen; called by the SUPER+SHIFT+M bind and the Waybar voxtype icon.
 #
 # Va como script aparte y en un loop, y no como cinco 'ln' acá, para que sumar un
 # ejecutable a bin_configs/ no requiera acordarse de tocar este archivo. El script
@@ -600,8 +604,8 @@ fi
 
 # Build meeting-tui (Rust/ratatui), the meeting panel that SUPER+SHIFT+M opens. Its binary
 # is machine-specific and not versioned, so it is compiled here into
-# custom_software/meeting-tui/bin/.
-# Needs cargo: without it the bind has nothing to run, so warn instead of failing.
+# custom_software/meeting-tui/bin/. Needs cargo from the 'rust' package (section 5); if the
+# build fails the installer does not abort, it just warns.
 if command -v cargo >/dev/null 2>&1; then
     if make -C "$HOME/config_files/custom_software/meeting-tui" >/dev/null 2>&1; then
         echo "-> meeting-tui built (SUPER+SHIFT+M ready)."
