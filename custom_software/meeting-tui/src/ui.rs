@@ -7,6 +7,7 @@ use ratatui::widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, Wrap}
 use ratatui::Frame;
 
 use crate::app::{App, InputKind, Mode};
+use crate::paths;
 
 pub fn draw(f: &mut Frame, app: &App) {
     let area = f.area();
@@ -68,35 +69,97 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(Paragraph::new(line).block(block), area);
 }
 
+/// Fixed widths of the meetings table. The title column takes whatever is left over.
+const DATE_W: u16 = 16; // 2026-10-02 11:36
+const DURATION_W: u16 = 10; // 55m 41s / 1h 01m
+const CHUNKS_W: u16 = 6; // "Chunks"
+const STATUS_W: u16 = 9; // "completed"
+
+/// Column plan for the meetings table, sized to the available width.
+///
+/// The fixed columns always keep their width and the title is the one that flexes (and
+/// gets ellipsized). Before this, the sum of the constraints could exceed the width and
+/// ratatui squeezed *every* column, truncating the date, duration and status.
+struct ListLayout {
+    headers: Vec<&'static str>,
+    widths: Vec<Constraint>,
+    title_width: u16,
+    show_duration: bool,
+    show_chunks: bool,
+}
+
+fn list_layout(width: u16) -> ListLayout {
+    // 2 border cells + 2 for the "> " highlight + one space between each pair of columns.
+    let show_duration = width >= 58;
+    let show_chunks = width >= 66;
+    let columns = 3 + u16::from(show_duration) + u16::from(show_chunks);
+    let overhead = 2 + 2 + (columns - 1);
+
+    let mut fixed = DATE_W + STATUS_W;
+    if show_duration {
+        fixed += DURATION_W;
+    }
+    if show_chunks {
+        fixed += CHUNKS_W;
+    }
+    let title_width = width.saturating_sub(overhead + fixed).max(12);
+
+    let mut headers: Vec<&'static str> = vec!["Title", "Date"];
+    let mut widths: Vec<Constraint> =
+        vec![Constraint::Length(title_width), Constraint::Length(DATE_W)];
+    if show_duration {
+        headers.push("Duration");
+        widths.push(Constraint::Length(DURATION_W));
+    }
+    if show_chunks {
+        headers.push("Chunks");
+        widths.push(Constraint::Length(CHUNKS_W));
+    }
+    headers.push("Status");
+    widths.push(Constraint::Length(STATUS_W));
+
+    ListLayout {
+        headers,
+        widths,
+        title_width,
+        show_duration,
+        show_chunks,
+    }
+}
+
 fn draw_list(f: &mut Frame, app: &App, area: Rect) {
-    let header = Row::new(vec!["Title", "Date", "Duration", "Chunks", "Status"])
-        .style(Style::default().add_modifier(Modifier::BOLD));
+    let layout = list_layout(area.width);
+    let (title_width, show_duration, show_chunks) = (
+        layout.title_width as usize,
+        layout.show_duration,
+        layout.show_chunks,
+    );
+
+    let header =
+        Row::new(layout.headers.clone()).style(Style::default().add_modifier(Modifier::BOLD));
 
     let rows = app.meetings.iter().map(|m| {
-        Row::new(vec![
-            Cell::from(m.display_title()),
+        let mut cells = vec![
+            Cell::from(ellipsize(&m.display_title(), title_width)),
             Cell::from(m.started_local()),
-            Cell::from(m.duration_human()),
-            Cell::from(m.chunks().to_string()),
-            Cell::from(m.status_str().to_string()),
-        ])
+        ];
+        if show_duration {
+            cells.push(Cell::from(m.duration_human()));
+        }
+        if show_chunks {
+            cells.push(Cell::from(m.chunks().to_string()));
+        }
+        cells.push(Cell::from(m.status_str().to_string()));
+        Row::new(cells)
     });
-
-    let widths = [
-        Constraint::Min(26),
-        Constraint::Length(16),
-        Constraint::Length(10),
-        Constraint::Length(7),
-        Constraint::Length(11),
-    ];
 
     let title = format!(
         "Saved meetings ({})   export -> {}",
         app.meetings.len(),
-        app.export_dir_display()
+        shorten_home(&app.export_dir_display())
     );
 
-    let table = Table::new(rows, widths)
+    let table = Table::new(rows, layout.widths)
         .header(header)
         .block(Block::default().borders(Borders::ALL).title(title))
         .row_highlight_style(
@@ -109,6 +172,31 @@ fn draw_list(f: &mut Frame, app: &App, area: Rect) {
     // The table state is cloned so `draw` can stay read-only; it is tiny.
     let mut state = app.table.clone();
     f.render_stateful_widget(table, area, &mut state);
+}
+
+/// Truncate `s` to `max` columns, adding `…` when it does not fit.
+fn ellipsize(s: &str, max: usize) -> String {
+    if max == 0 {
+        return String::new();
+    }
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let mut out: String = s.chars().take(max - 1).collect();
+    out.push('…');
+    out
+}
+
+/// `/home/rodrigo/foo` -> `~/foo`, so the table title is not dominated by the path.
+fn shorten_home(path: &str) -> String {
+    let home = paths::home().display().to_string();
+    if path == home {
+        "~".to_string()
+    } else if let Some(rest) = path.strip_prefix(&format!("{home}/")) {
+        format!("~/{rest}")
+    } else {
+        path.to_string()
+    }
 }
 
 fn draw_settings(f: &mut Frame, app: &App, area: Rect) {
@@ -341,5 +429,38 @@ mod tests {
         for segment in &segments {
             assert!(lines.iter().any(|line| line == segment), "lost {segment}");
         }
+    }
+
+    #[test]
+    fn ellipsize_keeps_short_text_and_marker_on_long() {
+        assert_eq!(ellipsize("daily", 10), "daily");
+        let cut = ellipsize("daily 2026-10-02 09:32:25", 10);
+        assert_eq!(cut.chars().count(), 10);
+        assert!(cut.ends_with('…'), "{cut}");
+    }
+
+    #[test]
+    fn list_layout_keeps_the_fixed_columns_at_100_cols() {
+        let layout = list_layout(100);
+        assert_eq!(
+            layout.headers,
+            ["Title", "Date", "Duration", "Chunks", "Status"]
+        );
+        assert!(
+            layout.title_width >= 20,
+            "title column too narrow: {}",
+            layout.title_width
+        );
+        // borders + highlight + spacing + every column must not exceed the width.
+        let total = 2 + 2 + 4 + layout.title_width + DATE_W + DURATION_W + CHUNKS_W + STATUS_W;
+        assert!(total <= 100, "columns overflow the window: {total}");
+    }
+
+    #[test]
+    fn list_layout_drops_columns_when_narrow() {
+        let narrow = list_layout(50);
+        assert!(!narrow.show_chunks, "chunks should be dropped at 50 cols");
+        assert!(!narrow.show_duration);
+        assert!(narrow.title_width >= 12);
     }
 }

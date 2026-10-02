@@ -34,4 +34,4 @@ if command -v hyprctl > /dev/null 2>&1 && command -v jq > /dev/null 2>&1; then
     done
 fi
 
-exec foot --title="$title" '--font=JetBrainsMono Nerd Font:size=12' -W 100x30 -e "$tui"
+exec foot --title="$title" '--font=JetBrainsMono Nerd Font:size=12' -W 110x30 -e "$tui"

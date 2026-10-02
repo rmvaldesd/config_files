@@ -209,4 +209,37 @@ mod tests {
             "the configuration hint was cut off at 40 columns"
         );
     }
+
+    #[test]
+    fn list_columns_are_not_truncated_at_100_cols() {
+        let mut app = App::new();
+        app.mode = Mode::List;
+        // A synthetic meeting with a short title, so the date/status can only come from
+        // their own columns (not from the title).
+        app.meetings = vec![crate::meeting::Meeting {
+            id: "test".to_string(),
+            title: Some("Standup".to_string()),
+            started_at: Some("2026-10-15T12:00:00Z".to_string()),
+            ended_at: None,
+            duration_secs: Some(1922),
+            status: Some("completed".to_string()),
+            chunk_count: Some(128),
+            storage_path: None,
+        }];
+        app.table.select(Some(0));
+
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        terminal.draw(|f| ui::draw(f, &app)).unwrap();
+        let text: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+
+        assert!(text.contains("Duration"), "Duration header truncated");
+        assert!(text.contains("completed"), "Status column truncated");
+        assert!(text.contains("2026-10-"), "Date column truncated");
+    }
 }
