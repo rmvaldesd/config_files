@@ -146,8 +146,20 @@ if [ "$DRY" -eq 1 ] || [ "$cambios" -eq 0 ]; then
     done
 fi
 
+#!/usr/bin/env bash
+# Notify through the desktop when there is one; these scripts usually run from a Hyprland
+# bind, where stdout goes nowhere, but they also run from a terminal or from other scripts,
+# and there the plain line is what you want. Takes the message as the first argument.
+avisar() {
+    if command -v notify-send > /dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then
+        notify-send -a "Workspaces" "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
 if [ "$cambios" -eq 0 ]; then
-    echo "Ya están ordenados: no hay nada que mover."
+    avisar "Workspaces ya están ordenados (1..N): nada que mover."
     exit 0
 fi
 
@@ -206,10 +218,14 @@ done
 
 aplicar
 
-# --- 5. la barra se entera sola -----------------------------------------------------------
-# No hay que avisarle nada a waybar: el modulo de workspaces es 'ext/workspaces', que ve
-# los cambios de ID por el protocolo del compositor. Antes esto mandaba un SIGUSR2, que
-# reconstruye todos los modulos y hace parpadear la barra entera. Ver el comentario
-# equivalente en move-workspace y el bloque del modulo en waybar/config.jsonc.
+# --- 5. notify, and let the bar pick it up on its own -------------------------------------
+# The bar needs nothing: the workspaces module is 'ext/workspaces', which sees the ID
+# changes through the compositor protocol. This used to send a SIGUSR2, which rebuilds every
+# module and makes the whole bar flicker. See the equivalent comment in move-workspace and
+# the module block in waybar/config.jsonc.
+#
+# The notification IS needed: 'sort-workspaces' runs from a Hyprland bind, where nobody sees
+# stdout, so there was no way to tell whether it had done anything.
+avisar "Workspaces renumerados a 1..N (${cambios} cambio/s)."
 
 exit 0

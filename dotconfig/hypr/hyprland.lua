@@ -105,6 +105,9 @@ local function load_monitors()
 end
 
 local monitors = load_monitors()
+-- 'internal' is optional (older files and the template may not define it): an empty
+-- list keeps the behaviour of only configuring 'external'.
+local monitores_internos = monitors.internal or {}
 
 hl.monitor({
   output = "",
@@ -137,6 +140,15 @@ for _, monitor in ipairs(monitors.external) do
     for _, ws in ipairs(monitor.workspaces or {}) do
       hl.workspace_rule({ workspace = ws, monitor = monitor.desc })
     end
+  end
+end
+
+-- The internal panel only needs its workspaces pinned; mode/position/scale come from the
+-- PRIMARY_* keys in ~/.local_host_settings (the '' monitor rule above), so this block does
+-- not touch them.
+for _, monitor in ipairs(monitores_internos) do
+  for _, ws in ipairs(monitor.workspaces or {}) do
+    hl.workspace_rule({ workspace = ws, monitor = monitor.desc })
   end
 end
 
