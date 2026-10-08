@@ -895,6 +895,14 @@ hl.bind(thirdMod .. " + J", hl.dsp.focus({ workspace = "e+1" })) -- Abajo / Sigu
 -- de la navegacion entre workspaces, que es de lo que se trata.
 hl.bind(thirdMod .. " + M", hl.dsp.exec_cmd("sort-workspaces"))
 
+-- CREAR un workspace vacio al lado del actual y mudarse ahi (bin_configs/new-workspace).
+-- 'e+1' se mueve al siguiente workspace que YA existe y 'empty' busca uno vacio que ya
+-- exista: ninguno de los dos crea nada, y las teclas numericas van a un numero FIJO que
+-- puede estar ocupado. El script usa el rango que fija ~/.local_host_monitors para el
+-- monitor actual, asi el nuevo numero cae donde corresponde en vez de quedar suelto.
+hl.bind(thirdMod .. " + SHIFT + M", hl.dsp.exec_cmd("$HOME/config_files/bin_configs/new-workspace right"))
+hl.bind(thirdMod .. " + SHIFT + N", hl.dsp.exec_cmd("$HOME/config_files/bin_configs/new-workspace left"))
+
 -- ==========================================
 -- 2. REORDENAR WORKSPACES (arrastrar de posicion)
 -- ==========================================

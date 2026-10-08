@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# new-workspace — create a fresh EMPTY workspace right after the current one and move there.
+#
+#   new-workspace [left|right]
+#
+# Why a script and not a dispatcher: Hyprland's "e+1" moves to the next EXISTING workspace,
+# and "empty" only finds an existing empty one. Neither creates anything, so there was no way
+# to say "give me a new workspace next to this one" — the number keys go to a FIXED workspace,
+# which may already be in use.
+#
+# The new id is placed at the end of the current monitor's workspace range, using the values
+# pinned in ~/.local_host_monitors ('workspaces = { 2, 3, 4, 5 }'). That keeps the layout the
+# pins describe instead of dropping a stray number that then has to be sorted out with
+# sort-workspaces.
+#
+# Idempotent in the useful sense: if the number that would be created is already taken, it
+# just MOVES there instead of clobbering it.
+
+set -u
+
+DRY=0
+sentido="right"
+for arg in "$@"; do
+    case "$arg" in
+        -n|--dry-run) DRY=1 ;;
+        left|right)   sentido="$arg" ;;
+        -h|--help)
+            echo "usage: new-workspace [left|right] [--dry-run]"
+            echo "Creates a fresh empty workspace next to the current one and moves there."
+            exit 0 ;;
+        *)
+            echo "new-workspace: unknown argument '$arg' (use left|right|--dry-run)" >&2
+            exit 1 ;;
+    esac
+done
+
+command -v hyprctl > /dev/null 2>&1 || { echo "new-workspace: hyprctl not found (is this Hyprland?)" >&2; exit 1; }
+command -v jq      > /dev/null 2>&1 || { echo "new-workspace: jq is missing" >&2; exit 1; }
+
+# --- current monitor -------------------------------------------------------------------
+mon_actual=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')
+[ -n "$mon_actual" ] || { echo "new-workspace: could not read the focused monitor" >&2; exit 1; }
+
+# --- ids in use anywhere ----------------------------------------------------------------
+ocupados=$(hyprctl workspaces -j | jq -r '[.[] | select(.id > 0) | .id] | sort | .[]')
+
+# --- the range pinned for this monitor (~/.local_host_monitors) --------------------------
+# The file is written by hand in Lua, and this is not a Lua parser: it looks for the line
+# that mentions this monitor's 'desc' AND declares 'workspaces = { ... }', and pulls the
+# numbers out of the braces. If the monitor has no profile (or the file is missing), there is
+# no range and we fall back to "one past the highest id in use", which is what "one more at
+# the end" means anyway.
+desc_mon=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .description')
+rango=$(awk -v desc="$desc_mon" '
+    index($0, desc) && match($0, /workspaces[[:space:]]*=[[:space:]]*\{[^}]*\}/) {
+        s = substr($0, RSTART, RLENGTH)
+        gsub(/[^0-9, ]/, "", s)
+        print s
+        exit
+    }
+' "$HOME/.local_host_monitors" 2> /dev/null | tr ',' '\n' | tr -s ' ' | sed '/^$/d' | sort -n)
+
+# --- decide the id ----------------------------------------------------------------------
+# Min/max of THIS monitor's pinned range, and the highest id any monitor pins: when there is
+# no room to the left (the range starts at the lowest pinned number) we go right instead of
+# handing back an invalid id.
+min=$(printf '%s\n' $rango | sed '/^$/d' | sort -n | head -1)
+max=$(printf '%s\n' $rango | sed '/^$/d' | sort -n | tail -1)
+min_global=$(grep -v '^[[:space:]]*--' "$HOME/.local_host_monitors" 2> /dev/null \
+    | sed -n 's/.*workspaces[[:space:]]*=[[:space:]]*{\([^}]*\)}.*/\1/p' \
+    | tr ',' '\n' | tr -dc '0-9\n' | sed '/^$/d' | sort -n | head -1)
+min_global=${min_global:-1}
+
+if [ -n "${min:-}" ] && [ -n "${max:-}" ]; then
+    if [ "$sentido" = "left" ] && [ "$min" -gt "${min_global:-1}" ]; then
+        # There is room to the left of this monitor's range.
+        nuevo=$(( min - 1 ))
+        while printf '%s\n' $ocupados | grep -qx "$nuevo" && [ "$nuevo" -gt 1 ]; do
+            nuevo=$(( nuevo - 1 ))
+        done
+    else
+        # No room to the left (or we asked for the right): one past the end of the range.
+        nuevo=$(( max + 1 ))
+        while printf '%s\n' $ocupados | grep -qx "$nuevo"; do
+            nuevo=$(( nuevo + 1 ))
+        done
+    fi
+else
+    # No pinned range for this monitor: one past the highest in use, skipping taken numbers.
+    nuevo=$(printf '%s\n' $ocupados | sed '/^$/d' | sort -n | tail -1)
+    nuevo=$(( ${nuevo:-0} + 1 ))
+    while printf '%s\n' $ocupados | grep -qx "$nuevo"; do
+        nuevo=$(( nuevo + 1 ))
+    done
+fi
+
+# A workspace already in use somewhere is not ours to take (that includes another monitor's).
+while printf '%s\n' $ocupados | grep -qx "$nuevo"; do
+    nuevo=$(( nuevo + 1 ))
+done
+
+if [ "$nuevo" -lt 1 ]; then
+    echo "new-workspace: could not find a free workspace id" >&2
+    exit 1
+fi
+
+if [ "$DRY" -eq 1 ]; then
+    printf 'monitor: %s (%s)\n' "$mon_actual" "$desc_mon"
+    printf 'pinned range: %s\n' "${rango:-<none>}"
+    printf 'in use: %s\n' "$(printf '%s' "$ocupados" | tr '\n' ' ')"
+    printf 'would focus: %s\n' "$nuevo"
+    exit 0
+fi
+
+# One trip through the socket; the bar sees the new id through the protocol.
+hyprctl --batch "dispatch hl.dsp.focus({ workspace = $nuevo })" > /dev/null
+
+printf 'New workspace: %s (monitor %s)\n' "$nuevo" "$mon_actual"
+if command -v notify-send > /dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then
+    notify-send -a "Workspaces" "Nuevo workspace: $nuevo"
+fi
