@@ -92,7 +92,7 @@ window#waybar {
 #custom-voxtype,
 #volume,
 #battery,
-#power-profiles-daemon,
+#custom-power-profile,
 #bluetooth,
 #custom-rclone,
 #network,
@@ -123,6 +123,19 @@ window#waybar {
   background-size: 1px 100%;
   background-repeat: no-repeat;
   background-position: left center;
+}
+
+/* Power profile tint. 'performance' uses the system cyan accent (the same color
+   the bar uses for "active"), 'balanced' keeps the default color and
+   'power-saver' drops one step. Deliberately NOT @urgent/coral: that reads as an
+   error, and a power profile is a normal operating mode. The class comes from
+   bin_configs/power-profile-state. */
+#custom-power-profile.performance {
+  color: @highlight;
+}
+
+#custom-power-profile.power-saver {
+  color: @dark-5;
 }
 
 /* Aire al borde derecho de la pantalla, que si no el último módulo queda pegado.

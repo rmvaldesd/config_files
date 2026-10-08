@@ -25,7 +25,7 @@
     "custom/language",
     "group/volume",
     "battery",
-    "power-profiles-daemon",
+    "custom/power-profile",
     "bluetooth",
     "custom/rclone",
     "network",
@@ -137,16 +137,19 @@
       "󰁹"
     ]
   },
-  "power-profiles-daemon": {
-    "format": "{icon}",
-    "tooltip": true,
-    "tooltip-format": "Perfil: {profile}\nDriver: {driver}",
-    "format-icons": {
-      "default": "󰾅",
-      "performance": "󰓅",
-      "balanced": "󰾅",
-      "power-saver": "󰌪"
-    }
+  // Power profile. Custom, not the built-in 'power-profiles-daemon': that module
+  // cycles to the next profile on left click in C++ (handleToggle), which an
+  // on-click config cannot override. Here the click opens the Quickshell power
+  // visor and the profile is chosen explicitly. The icon/tooltip come from
+  // bin_configs/power-profile-state; the visor pings "signal" (SIGRTMIN+7) for an
+  // immediate refresh, and the long interval is only a safety net.
+  "custom/power-profile": {
+    "exec": "$HOME/config_files/bin_configs/power-profile-state",
+    "return-type": "json",
+    "interval": 30,
+    "signal": 7,
+    "format": "{}",
+    "on-click": "$HOME/config_files/bin_configs/power-visor"
   },
   "bluetooth": {
     "format": "",
@@ -169,8 +172,16 @@
   // icono del módulo de red (que tenía el mismo 'max-length' heredado de un ejemplo).
   "cpu": {
     "interval": 10,
-    "format": " {}%",
-    "on-click": "exec foot --title=btop -e btop"
+    // '{usage}' is required: waybar pushes the 1-minute load average as the FIRST fmt
+    // argument, so the positional '{}' renders the load average with a '%' appended
+    // (e.g. "5.4%") instead of the CPU usage. See src/modules/cpu.cpp:
+    // fmt::arg("load", load1) comes before fmt::arg("usage", total_usage).
+    "format": " {usage}%",
+    // Left-click reveals the Quickshell CPU visor (dotconfig/quickshell/visors);
+    // right-click keeps the old deep-dive in btop. The wrapper starts the visor
+    // daemon if it is not running. See bin_configs/cpu-visor.
+    "on-click": "$HOME/config_files/bin_configs/cpu-visor",
+    "on-click-right": "exec foot --title=btop -e btop"
   },
   // El clic abre 'ram-top' y no htop: htop lista procesos sueltos, y una aplicación
   // moderna son veinte -- Firefox aparece como una fila de "firefox" repetidos sin un

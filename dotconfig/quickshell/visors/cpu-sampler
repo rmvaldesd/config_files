@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Streaming CPU sampler for the Quickshell CPU visor.
+
+Emits one JSON object per sample on stdout, one per line (NDJSON):
+
+    {"total": 36,
+     "cores": [12, 48, 7, ...],
+     "load": [5.06, 5.34, 4.37],
+     "top": [{"pid": 4201, "name": "firefox", "cpu": 212.0, "machine": 15.1, "rss_mb": 812.3}, ...]}
+
+Why a stream and not "one process per refresh": every number here is a delta, so
+the sampler keeps the previous /proc sample in memory and subtracts it on the
+next tick. That avoids re-reading every /proc/<pid>/stat twice per refresh and
+re-spawning Python twice a second while the visor is open. Quickshell starts it
+when the visor is shown and kills it when the visor is hidden, so it does no
+work while the panel is off screen.
+
+`total`, `cores` and per-process `cpu` are percentages. Per-process `cpu` is on a
+single-core scale (like top/htop), so a busy multi-threaded process can exceed
+100. `machine` is the same work as a share of every logical CPU combined
+(0..100), matching `total`. `rss_mb` is resident memory in MiB.
+
+Run standalone for testing:
+    ./cpu-sampler --interval 1.0 --top 5
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+
+HZ = os.sysconf("SC_CLK_TCK")
+PAGE = os.sysconf("SC_PAGE_SIZE")
+
+
+def read_cpu():
+    """Aggregate and per-core (idle, total) jiffies from /proc/stat.
+
+    idle = idle + iowait (the two fields the kernel does not count as work),
+    matching waybar's own cpu module and every other CPU meter.
+    """
+    agg = (0, 0)
+    cores = []
+    with open("/proc/stat") as f:
+        for line in f:
+            if not line.startswith("cpu"):
+                break
+            parts = line.split()
+            vals = [int(x) for x in parts[1:]]
+            idle = vals[3] + vals[4]
+            total = sum(vals)
+            if parts[0] == "cpu":
+                agg = (idle, total)
+            else:
+                cores.append((idle, total))
+    return agg, cores
+
+
+def read_procs():
+    """pid -> (utime+stime ticks, rss bytes, comm) for every readable process."""
+    procs = {}
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        try:
+            with open("/proc/%d/stat" % pid, "rb") as f:
+                data = f.read()
+        except OSError:
+            continue
+        # comm is wrapped in the first '(' and the last ')'; it may itself
+        # contain spaces and parentheses, so only the outer pair is reliable.
+        try:
+            left = data.index(b"(")
+            right = data.rindex(b")")
+        except ValueError:
+            continue
+        comm = data[left + 1:right].decode("utf-8", "replace")
+        # After ") " the fields shift by 3 vs proc(5): utime -> 11, stime -> 12,
+        # rss -> 21 (rss is in pages).
+        fields = data[right + 2:].split()
+        try:
+            ticks = int(fields[11]) + int(fields[12])
+            rss = int(fields[21]) * PAGE
+        except (IndexError, ValueError):
+            continue
+        procs[pid] = (ticks, rss, comm)
+    return procs
+
+
+def pct(busy, total):
+    return round(100.0 * busy / total) if total > 0 else 0
+
+
+def top_procs(prev, cur, ticks_span, ncpu, limit):
+    out = []
+    for pid, (ticks, rss, comm) in cur.items():
+        before = prev.get(pid)
+        if before is None:
+            continue
+        delta = ticks - before[0]
+        if delta <= 0:
+            continue
+        # per-core is top/htop semantics (100 = one full logical CPU, can exceed
+        # 100); machine is the same work as a share of the whole machine, so it
+        # shares its denominator with the panel's overall number and never
+        # exceeds 100.
+        per_core = 100.0 * delta / ticks_span
+        out.append({
+            "pid": pid,
+            "name": comm,
+            "cpu": round(per_core, 1),
+            "machine": round(per_core / ncpu, 1),
+            "rss_mb": round(rss / (1024 * 1024), 1),
+        })
+    out.sort(key=lambda p: p["machine"], reverse=True)
+    return out[:limit]
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Stream CPU samples as NDJSON.")
+    ap.add_argument("--interval", type=float, default=1.0,
+                    help="seconds between samples after the first (default 1.0)")
+    ap.add_argument("--first-window", type=float, default=0.4,
+                    help="seconds before the first sample, so the visor fills fast")
+    ap.add_argument("--top", type=int, default=5,
+                    help="how many processes to report")
+    args = ap.parse_args()
+
+    prev_agg, prev_cores = read_cpu()
+    prev_procs = read_procs()
+    window = args.first_window
+
+    while True:
+        time.sleep(window)
+        cur_agg, cur_cores = read_cpu()
+        cur_procs = read_procs()
+        # The first tick uses a short window, the rest the full interval. This is
+        # the span the process deltas below are measured over.
+        ticks_span = window * HZ
+        window = args.interval
+
+        idle_delta = cur_agg[0] - prev_agg[0]
+        total_delta = cur_agg[1] - prev_agg[1]
+        total = pct(total_delta - idle_delta, total_delta)
+
+        if len(cur_cores) == len(prev_cores):
+            cores = [pct((c[1] - p[1]) - (c[0] - p[0]), c[1] - p[1])
+                     for p, c in zip(prev_cores, cur_cores)]
+        else:
+            cores = [0] * len(cur_cores)
+
+        with open("/proc/loadavg") as f:
+            load = [float(x) for x in f.readline().split()[:3]]
+
+        sys.stdout.write(json.dumps({
+            "total": total,
+            "cores": cores,
+            "load": load,
+            "top": top_procs(prev_procs, cur_procs, ticks_span, len(cur_cores), args.top),
+        }) + "\n")
+        sys.stdout.flush()
+
+        prev_agg, prev_cores, prev_procs = cur_agg, cur_cores, cur_procs
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (BrokenPipeError, KeyboardInterrupt):
+        pass

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# cpu-visor — toggle the Quickshell CPU visor from the Waybar CPU module.
+#
+# The visor is a panel of the Quickshell config named "visors" (see
+# dotconfig/quickshell), started at login from hyprland.lua. This wrapper just
+# sends the toggle over Quickshell IPC; if the daemon is not running (it
+# crashed, or it was killed by hand) it starts it and then shows the panel, so a
+# click is never a no-op.
+#
+# Waybar calls it from the cpu module's on-click; the module's previous action
+# (btop in foot) moved to on-click-right.
+#
+# The panel opens centred under the icon that was clicked. Waybar does not tell
+# the handler which module was hit, but the pointer is on it at click time, so
+# the cursor position is read here and passed to the visor. If hyprctl fails, it
+# falls back to the plain toggle (the panel then hugs the bar's right corner).
+set -u
+
+pointer=$(hyprctl cursorpos -j 2> /dev/null || true)
+px=$(printf '%s' "$pointer" | sed -n 's/.*"x"[[:space:]]*:[[:space:]]*\(-\{0,1\}[0-9][0-9]*\).*/\1/p')
+py=$(printf '%s' "$pointer" | sed -n 's/.*"y"[[:space:]]*:[[:space:]]*\(-\{0,1\}[0-9][0-9]*\).*/\1/p')
+
+if [ -n "$px" ] && [ -n "$py" ]; then
+    toggle_args=(toggleAt "$px" "$py")
+    open_args=(openAt "$px" "$py")
+else
+    toggle_args=(toggle)
+    open_args=(open)
+fi
+
+if qs ipc -c visors call cpuvisor "${toggle_args[@]}" > /dev/null 2>&1; then
+    exit 0
+fi
+
+# Not running: start it daemonized. -n exits instead of starting a second copy
+# if one came up in the meantime, so the show loop below still works.
+qs -n -c visors -d > /dev/null 2>&1
+for _ in $(seq 1 30); do
+    if qs ipc -c visors call cpuvisor "${open_args[@]}" > /dev/null 2>&1; then
+        exit 0
+    fi
+    sleep 0.1
+done
+
+exit 1

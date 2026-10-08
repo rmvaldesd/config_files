@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# power-visor — toggle the Quickshell power-profile visor from the Waybar
+# power-profile module.
+#
+# Same pattern as bin_configs/cpu-visor: the visor is a panel of the "visors"
+# Quickshell config (dotconfig/quickshell), started at login from hyprland.lua.
+# This only sends the toggle over IPC; if the daemon is not running it starts it
+# and then opens the panel, so a click is never a no-op.
+#
+# The panel opens centred under the icon that was clicked: the cursor position is
+# read here and passed to the visor. If hyprctl fails, it falls back to the plain
+# toggle (the panel then hugs the bar's right corner).
+set -u
+
+pointer=$(hyprctl cursorpos -j 2> /dev/null || true)
+px=$(printf '%s' "$pointer" | sed -n 's/.*"x"[[:space:]]*:[[:space:]]*\(-\{0,1\}[0-9][0-9]*\).*/\1/p')
+py=$(printf '%s' "$pointer" | sed -n 's/.*"y"[[:space:]]*:[[:space:]]*\(-\{0,1\}[0-9][0-9]*\).*/\1/p')
+
+if [ -n "$px" ] && [ -n "$py" ]; then
+    toggle_args=(toggleAt "$px" "$py")
+    open_args=(openAt "$px" "$py")
+else
+    toggle_args=(toggle)
+    open_args=(open)
+fi
+
+if qs ipc -c visors call powervisor "${toggle_args[@]}" > /dev/null 2>&1; then
+    exit 0
+fi
+
+qs -n -c visors -d > /dev/null 2>&1
+for _ in $(seq 1 30); do
+    if qs ipc -c visors call powervisor "${open_args[@]}" > /dev/null 2>&1; then
+        exit 0
+    fi
+    sleep 0.1
+done
+
+exit 1

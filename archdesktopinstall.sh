@@ -259,8 +259,8 @@ zathura           # Visor de documentos minimalista con teclas tipo vim (j/k par
     # --- File openers (bin_configs/find-file, bin_configs/recent-files) ---
     xdg-utils         # Provides 'xdg-open' and 'xdg-mime': find-file uses them to open with the default app, to warn when a type has no handler, and to resolve the http(s) handler that opens clipboard URLs. It usually arrives as a transitive dependency; listed explicitly so the openers do not depend on that tree.
     glib2             # Provides 'gio': recent-files uses 'gio trash' to move a file to the trash. Usually present as a GTK dependency; listed explicitly for the same reason.
-    # --- voxtype OSD frontend (Quickshell) ---
-    quickshell        # QML OSD frontend voxtype is configured to use ([osd] frontend = "quickshell"): the dictation overlay. Ships in the 'extra' repo.
+    # --- Quickshell (venv OSD del dictado + visores de CPU y perfil de energía) ---
+    quickshell        # QtQuick toolkit for desktop shells. Two uses here: the voxtype dictation OSD ([osd] frontend = "quickshell") and dotconfig/quickshell/visors, the CPU and power-profile panels behind the Waybar cpu / custom/power-profile on-clicks (bin_configs/cpu-visor, bin_configs/power-visor).
     # --- custom_software/ (apps we build ourselves) ---
     rust              # Toolchain (cargo) used to build custom_software/meeting-tui, the meeting panel behind SUPER+SHIFT+M; section 9 compiles it into the repo's bin/. Without this package that bind has no binary.
 )
@@ -390,7 +390,7 @@ mkdir -p "$HOME/.config"
 # Enlaza cada directorio de config_files/dotconfig dentro de ~/.config.
 # El guard de existencia permite sumar o quitar directorios del repo sin tocar este
 # script: los que no estén en dotconfig/ simplemente se saltean.
-for dir in nvim hypr waybar rofi mako ghostty foot git mpv voxtype; do
+for dir in nvim hypr waybar rofi mako ghostty foot git mpv voxtype quickshell; do
     origen="$HOME/config_files/dotconfig/$dir"
     [ -d "$origen" ] || continue
     destino="$HOME/.config/$dir"

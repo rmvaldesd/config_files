@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Waybar custom/power-profile: icon + tooltip for the active power profile.
+#
+# Why a custom module and not the built-in 'power-profiles-daemon': its left
+# click cycles to the next profile inside C++ (handleToggle), ignoring the
+# module's on-click config, so it can't be pointed at the visor. Here the click
+# opens the Quickshell power visor (bin_configs/power-visor) instead.
+#
+# Reads the profile with busctl (~2 ms) rather than powerprofilesctl (~100 ms, a
+# Python startup): this runs on every refresh and on every SIGRTMIN+7, so the
+# cheap read matters. Falls back to powerprofilesctl if the bus call fails.
+set -u
+
+read_profile() {
+    # power-profiles-daemon 0.20 renamed the bus name; try the new one first.
+    busctl --system get-property org.freedesktop.UPower.PowerProfiles \
+        /org/freedesktop/UPower/PowerProfiles \
+        org.freedesktop.UPower.PowerProfiles ActiveProfile 2> /dev/null \
+    || busctl --system get-property net.hadess.PowerProfiles \
+        /net/hadess/PowerProfiles \
+        net.hadess.PowerProfiles ActiveProfile 2> /dev/null
+}
+
+profile=$(read_profile | sed -n 's/^s "\(.*\)"$/\1/p')
+[ -n "$profile" ] || profile=$(powerprofilesctl get 2> /dev/null || true)
+
+case "$profile" in
+    performance) glyph=$'\U000f04c5' ;;
+    balanced)    glyph=$'\U000f0f85' ;;
+    power-saver) glyph=$'\U000f032a' ;;
+    *)           glyph=$'\U000f0f85' ;;
+esac
+
+# JSON needs the profile as the class too, so style.css can tint each one.
+printf '{"text":"%s","class":"%s","tooltip":"Power profile: %s"}\n' \
+    "$glyph" "${profile:-unknown}" "${profile:-unknown}"

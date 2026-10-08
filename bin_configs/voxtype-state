@@ -3,7 +3,7 @@
 # voxtype state, meant to be read at a glance.
 #
 # The module is HIDDEN when voxtype is idle and only shows up while it is in use:
-#   meeting recording -> camera + elapsed
+#   meeting recording -> microphone + elapsed
 #   dictating         -> dot + elapsed
 #   transcribing      -> spinner + elapsed (the gap after you stop)
 # The tooltip adds the model and the daemon CPU%, which is how you tell "still working"
@@ -56,8 +56,8 @@ emit() {
     printf '{"text":"%s","class":"%s","tooltip":"%s"}\n' "$text" "$class" "$tooltip"
 }
 
-# Nerd Font glyphs: camera, dot, spinner, microphone.
-cam=$'\uf03d'
+# Nerd Font glyphs: microphone, dot, spinner.
+mic=$'\uf130'
 dot=$'\uf111'
 spin=$'\uf110'
 
@@ -65,7 +65,7 @@ hints='Click: meeting panel  ·  Right-click: restart daemon  ·  Middle-click: 
 
 case "$meeting" in
     recording|active|paused)
-        emit "$cam $(elapsed "$dir/meeting_state")" "meeting" \
+        emit "$mic $(elapsed "$dir/meeting_state")" "meeting" \
 "Meeting: $meeting ($(elapsed "$dir/meeting_state"))
 Model: ${default_model:-?}
 CPU: ${cpu}%
