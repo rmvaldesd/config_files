@@ -198,6 +198,7 @@ zathura           # Visor de documentos minimalista con teclas tipo vim (j/k par
     btop              # Monitor de recursos moderno en la terminal (on-click del módulo de CPU en Waybar).
     htop              # Monitor de procesos clásico en la terminal (on-click del módulo de memoria en Waybar).
     jq                # Procesador de JSON en la terminal; kb_layout.sh lo usa para leer la salida de 'hyprctl -j'.
+    zram-generator    # Levanta /dev/zram0 como swap comprimido al arrancar y lee /etc/systemd/zram-generator.conf (que instala la sección 15). Sin este paquete el zram no existe y el swapfile del SSD es la única salida cuando la RAM se llena.
     inotify-tools     # Provee 'inotifywait'; auto-reload.sh lo usa para recargar Waybar al guardar cambios en su config.
     psmisc            # Provee 'killall'; bin_configs/waybar-reload lo usa para reiniciar la barra (SIGUSR2 crashea en waybar 0.15, ver ese script).
     neovim            # Editor de texto; su configuración se enlaza desde config_files/dotconfig/nvim en la sección 9.
@@ -856,6 +857,38 @@ else
     echo "AVISO: falló 'mkinitcpio -P'. El sistema arranca con la UKI anterior."
     echo "       Reintenta luego con: sudo mkinitcpio -P"
 fi
+
+# --- Memoria: zram y tuning del VM -------------------------------------------
+# Los dos atacan el MISMO sintoma que se vio en carne propia: tras 7 dias de uptime el
+# zram de 4G estaba lleno (100%), el swapfile del SSD ya tenia 2.2G y el contador
+# pswpout iba por 22 millones de paginas. La presion de memoria marcaba 'full' > 0, o
+# sea que TODAS las tareas se trababan a la vez esperando una pagina -- eso es el mouse
+# que se congela a tirones.
+#
+# Se COPIAN y no se enlazan, por el mismo motivo que power-profile-sync: los lee root en
+# el arranque, antes de que /home este montado (acá es el subvolumen @home de btrfs).
+echo "-> Instalando la config de zram y el tuning de memoria..."
+
+# zram-generator lee esto al arrancar (lo levanta su unit). El tamano pasa de 4G a
+# min(ram/2) para que el zram se banque el working set comprimido antes de que el kernel
+# tenga que ir al swapfile.
+sudo install -Dm644 "$HOME/config_files/etc/systemd/zram-generator.conf" \
+    /etc/systemd/zram-generator.conf
+
+# swappiness y vfs_cache_pressure. Un drop-in en /etc/sysctl.d lo lee systemd-sysctl en
+# cada boot, y 'sysctl --system' lo aplica al toque sin reiniciar.
+sudo install -Dm644 "$HOME/config_files/etc/sysctl.d/90-vm-memory.conf" \
+    /etc/sysctl.d/90-vm-memory.conf
+if sudo sysctl --system > /dev/null 2>&1; then
+    echo "-> VM tuning aplicado."
+else
+    echo "AVISO: 'sysctl --system' falló; los valores se aplican en el próximo boot."
+fi
+
+# El zram nuevo (el tamano) recien vale tras el reboot, porque el device ya esta creado.
+# La prioridad y el algoritmo no cambian en caliente sin rehacer el swap; mejor avisarlo
+# que hacer un swapoff/on silencioso que puede tardar minutos con el swap lleno.
+echo "   NOTA: el nuevo tamano de zram aplica al reiniciar (el device ya está creado)."
 
 # --- Monitoreo de la GPU -----------------------------------------------------
 # 'gpumemwatch' ya quedó enlazado en /usr/local/bin por la sección 9 (vive en
