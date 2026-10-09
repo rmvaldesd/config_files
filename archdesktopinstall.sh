@@ -879,6 +879,20 @@ sudo install -Dm644 "$HOME/config_files/etc/systemd/zram-generator.conf" \
 # cada boot, y 'sysctl --system' lo aplica al toque sin reiniciar.
 sudo install -Dm644 "$HOME/config_files/etc/sysctl.d/90-vm-memory.conf" \
     /etc/sysctl.d/90-vm-memory.conf
+
+# En este equipo aparecieron DOS archivos pisandose: un /etc/sysctl.d/99-swappiness.conf
+# hecho a mano (13 ago, fuera del repo) con 'vm.swappiness=10'. Como 99- se lee DESPUES de
+# 90-, ganaba el y el valor del repo nunca se aplicaba (se veia 'sysctl -n vm.swappiness'
+# devolviendo 10). El repo es ahora la unica fuente; se saca el suelto.
+#
+# Se mueve a un .bak en vez de borrarlo, que es la misma politica que el resto de este
+# script con los archivos que reemplaza.
+if [ -f /etc/sysctl.d/99-swappiness.conf ]; then
+    sudo mv /etc/sysctl.d/99-swappiness.conf \
+        "/etc/sysctl.d/99-swappiness.conf.bak.$(date +%Y%m%d%H%M%S)"
+    echo "-> /etc/sysctl.d/99-swappiness.conf suelto apartado (lo pisaba el del repo)."
+fi
+
 if sudo sysctl --system > /dev/null 2>&1; then
     echo "-> VM tuning aplicado."
 else
