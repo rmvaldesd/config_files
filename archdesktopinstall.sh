@@ -558,6 +558,13 @@ echo "-> Enlazado: ~/.zshrc.local -> ~/config_files/zshrc.local"
 # Es el mismo script que se usa en Fedora, así ambas máquinas ven exactamente los mismos glifos.
 bash "$HOME/config_files/scripts/install-fonts.sh"
 
+# Atajos de Thunar. NO se enlaza ~/.config/Thunar: accels.scm lo AUTO-GENERA GTK como volcado
+# de su accel map (125 defaults comentados + lo que hayas cambiado), así que un symlink haría
+# que GTK reescriba el repo. El repo guarda SÓLO los overrides
+# (dotconfig/Thunar/accels-overrides.scm) y este script los fusiona en el archivo del usuario,
+# de forma idempotente. Hoy agrega Ctrl+Shift+G ("ir a una ruta", el Cmd+Shift+G de macOS).
+bash "$HOME/config_files/scripts/apply-thunar-accels.sh"
+
 # Enlaza en /usr/local/bin todo lo ejecutable de bin_configs/, que en el PATH precede a
 # /usr/bin (por eso el wrapper 'dbeaver' logra tapar al binario del paquete). Hoy son:
 #   hyprshutdown  menú de apagado, lo llama el bind SUPER+CONTROL+ESC
