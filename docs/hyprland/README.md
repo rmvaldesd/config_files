@@ -158,7 +158,7 @@ Se puede llamar suelto: `pick-window` / `pick-window --all`
 
 ## Buscador de archivos (`find-file`)
 
-`SUPER + CONTROL + SPACE` busca en todo `~` y abre con la app por defecto (PDF → zathura, PNG → imv, texto → Sublime). Menú con nombre + carpeta, filtrable.
+`SUPER + CONTROL + SPACE` busca en todo `~` y abre con la app por defecto (PDF → zathura, PNG → imv, texto → Zed). Menú con nombre + carpeta, filtrable.
 
 - `find-file` → elige frontend automáticamente (rofi desde bind, fzf en terminal)
 - `find-file --rofi` → fuerza rofi

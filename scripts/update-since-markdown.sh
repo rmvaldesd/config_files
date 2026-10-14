@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pone al día un equipo que se instaló ANTES de que los .md pasaran a abrirse con
-# glow en vez de con Sublime Text.
+# glow en vez de con el editor de texto por defecto (hoy Zed, antes Sublime Text).
 #
 # Son TRES piezas y las tres tienen que estar, si no la asociación queda a medias:
 #
@@ -13,9 +13,10 @@
 #                         que no existe y el sistema cae al siguiente handler.
 #   perl-file-mimeinfo -> sólo para el 'xdg-open' de la TERMINAL. Ver la sección 3.
 #
-# Síntomas de que un equipo necesita esto:
-#   - Doble clic en un .md desde Thunar lo abre en Sublime Text.
-#   - 'xdg-open notas.md' desde la terminal abre Sublime Text.
+# Síntomas de que un equipo necesita esto (el "editor de texto por defecto" ahí era
+# Sublime Text; hoy ese rol lo ocupa Zed):
+#   - Doble clic en un .md desde Thunar lo abre en el editor de texto por defecto.
+#   - 'xdg-open notas.md' desde la terminal abre el editor de texto por defecto.
 #
 # El primer síntoma lo arreglan las dos primeras piezas; el segundo necesita
 # además la tercera, y es habitual quedarse a mitad de camino: se arregla Thunar,
@@ -84,10 +85,10 @@ fi
 # pero se chequea igual: es gratis y el equipo podría venir de más atrás.
 #
 # perl-file-mimeinfo es el que de verdad falta, y sólo arregla el camino de la
-# TERMINAL. Sin él, 'xdg-open archivo.md' abre Sublime aunque mimeapps.list diga
+# TERMINAL. Sin él, 'xdg-open archivo.md' abre Zed (el handler de text/plain) aunque mimeapps.list diga
 # glow: bajo Hyprland, xdg-mime no reconoce el entorno y cae a su rama genérica,
 # que detecta el tipo con 'file --mime-type'. Y 'file' mira el CONTENIDO, así que
-# un .md le da text/plain, o sea el handler de text/plain, que es Sublime.
+# un .md le da text/plain, o sea el handler de text/plain, que es Zed.
 #
 # Thunar y 'gio' nunca pasan por ahí: usan GLib, que resuelve por EXTENSIÓN, y
 # '*.md' pesa 50 para text/markdown contra 10 de dos globs de ROMs de Sega Genesis
@@ -137,7 +138,7 @@ fi
 
 # Thunar se queda de demonio en segundo plano aunque cierres todas las ventanas, y
 # se trae las asociaciones al arrancar. Sin este 'thunar -q' el doble clic puede
-# seguir yendo a Sublime hasta el próximo login. La siguiente vez que abras una
+# seguir yendo a Zed hasta el próximo login. La siguiente vez que abras una
 # carpeta, Thunar arranca solo.
 if pgrep -x thunar >/dev/null 2>&1; then
     echo "-> Reiniciando Thunar para que tome la asociación nueva..."
@@ -187,6 +188,6 @@ echo "---"
 echo "=== Equipo actualizado ==="
 echo "Markdown: doble clic en un .md desde Thunar, o 'xdg-open notas.md' desde la"
 echo "          terminal, abre glow en una ventana de ghostty. Se sale con 'q'."
-echo "          Para editarlo en Sublime sigue estando el 'Abrir con' de Thunar."
+echo "          Para editarlo en Zed sigue estando el 'Abrir con' de Thunar."
 
 exit 0
